@@ -1,9 +1,12 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const NAME_RE = /^[a-z0-9_]+$/;
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
-export function createApi({ getStatus, commands, store }) {
+export function createApi({ getStatus, commands, store, obs }) {
     const app = express();
     const origin = process.env.FRONTEND_ORIGIN || true;
 
@@ -20,6 +23,39 @@ export function createApi({ getStatus, commands, store }) {
             connected: status.connected,
             channel: status.channel,
             botUserId: process.env.BOT_USER_ID ?? null,
+            obs: status.obs ?? { webhook: false, listeners: 0 },
+        });
+    });
+
+    app.get('/obs', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'obs.html'));
+    });
+
+    app.get('/api/obs/config', (_req, res) => {
+        res.json(obs?.getConfig() ?? { scenes: {} });
+    });
+
+    app.get('/api/obs/events', (req, res) => {
+        if (!obs) {
+            res.status(503).json({ error: 'OBS events are not available' });
+            return;
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        req.socket.setTimeout(0);
+        const unsubscribe = obs.subscribe(res);
+        const heartbeat = setInterval(() => {
+            res.write(': ping\n\n');
+        }, 15000);
+
+        req.on('close', () => {
+            clearInterval(heartbeat);
+            unsubscribe();
         });
     });
 

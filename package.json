@@ -14,6 +14,7 @@
     "node": ">=20.6.0"
   },
   "dependencies": {
+    "@twurple/api": "^8.1.4",
     "@twurple/auth": "^8.1.4",
     "@twurple/chat": "^8.1.4",
     "cors": "^2.8.6",

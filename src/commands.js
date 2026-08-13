@@ -1,15 +1,175 @@
-const builtins = [
-    {
-        name: 'ping',
-        response: 'Pong!',
-        builtin: true,
-        execute({ say, channel }) {
-            return say(channel, 'Pong!');
-        },
-    },
-];
+import { formatDuration } from './isLive.js';
+import { getSceneMap } from './obs.js';
 
-export function createCommandHandler(store) {
+const COOLDOWN_MS = 10_000;
+const ALIASES = { help: 'commands' };
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage']);
+
+function sceneBuiltins() {
+    return Object.entries(getSceneMap())
+        .filter(([name]) => !RESERVED.has(name))
+        .map(([name, scene]) => ({
+            name,
+            response: `OBS scene ${scene}`,
+            builtin: true,
+            execute() {
+                return true;
+            },
+        }));
+}
+
+export function createCommandHandler(store, { getTwitch, obs } = {}) {
+    const cooldowns = new Map();
+
+    const builtins = [
+        {
+            name: 'ping',
+            response: 'Pong!',
+            builtin: true,
+            execute({ say, channel }) {
+                return say(channel, 'Pong!');
+            },
+        },
+        {
+            name: 'commands',
+            response: 'Lists available commands',
+            builtin: true,
+            async execute({ say, channel }) {
+                const all = await list();
+                const names = [...new Set(all.map((command) => command.name))].sort();
+                return say(channel, `Commands: ${names.map((name) => `!${name}`).join(', ')}`);
+            },
+        },
+        {
+            name: 'help',
+            response: 'Lists available commands',
+            builtin: true,
+            async execute(ctx) {
+                const commands = builtins.find((command) => command.name === 'commands');
+                return commands.execute(ctx);
+            },
+        },
+        {
+            name: 'lurk',
+            response: 'Thanks for the lurk',
+            builtin: true,
+            execute({ say, channel, displayName }) {
+                return say(channel, `Thanks for the lurk, ${displayName}!`);
+            },
+        },
+        {
+            name: 'so',
+            response: 'Shout out a user',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel, args }) {
+                const target = String(args[0] ?? '')
+                    .replace(/^@/, '')
+                    .trim();
+                if (!target) {
+                    say(channel, 'Usage: !so <user>');
+                    return false;
+                }
+                return say(channel, `Go check out ${target} at https://twitch.tv/${target.toLowerCase()}`);
+            },
+        },
+        {
+            name: 'game',
+            response: 'Current game',
+            builtin: true,
+            async execute({ say, channel }) {
+                const twitch = getTwitch?.();
+                if (!twitch) {
+                    return say(channel, 'Bot is still connecting.');
+                }
+                try {
+                    const stream = await twitch.getStream();
+                    const info = stream ?? (await twitch.getChannel());
+                    const game = info?.gameName?.trim();
+                    if (!game) {
+                        return say(channel, 'No game is set.');
+                    }
+                    return say(channel, `Currently playing: ${game}`);
+                } catch (err) {
+                    console.error('!game failed', err);
+                    return say(channel, 'Could not look up the current game.');
+                }
+            },
+        },
+        {
+            name: 'title',
+            response: 'Current stream title',
+            builtin: true,
+            async execute({ say, channel }) {
+                const twitch = getTwitch?.();
+                if (!twitch) {
+                    return say(channel, 'Bot is still connecting.');
+                }
+                try {
+                    const stream = await twitch.getStream();
+                    const info = stream ?? (await twitch.getChannel());
+                    const title = info?.title?.trim();
+                    if (!title) {
+                        return say(channel, 'No title is set.');
+                    }
+                    return say(channel, title);
+                } catch (err) {
+                    console.error('!title failed', err);
+                    return say(channel, 'Could not look up the stream title.');
+                }
+            },
+        },
+        {
+            name: 'uptime',
+            response: 'How long the stream has been live',
+            builtin: true,
+            async execute({ say, channel }) {
+                const twitch = getTwitch?.();
+                if (!twitch) {
+                    return say(channel, 'Bot is still connecting.');
+                }
+                try {
+                    const stream = await twitch.getStream();
+                    if (!stream) {
+                        return say(channel, 'Stream is offline.');
+                    }
+                    return say(channel, `Live for ${formatDuration(Date.now() - stream.startDate.getTime())}`);
+                } catch (err) {
+                    console.error('!uptime failed', err);
+                    return say(channel, 'Could not look up uptime.');
+                }
+            },
+        },
+        {
+            name: 'followage',
+            response: 'How long the chatter has followed',
+            builtin: true,
+            async execute({ say, channel, displayName, userId }) {
+                const twitch = getTwitch?.();
+                if (!twitch) {
+                    return say(channel, 'Bot is still connecting.');
+                }
+                try {
+                    const followedAt = await twitch.getFollowage(userId);
+                    if (!followedAt) {
+                        return say(channel, `${displayName} is not following.`);
+                    }
+                    return say(
+                        channel,
+                        `${displayName} has been following for ${formatDuration(Date.now() - followedAt.getTime())}.`,
+                    );
+                } catch (err) {
+                    if (err.code === 'FOLLOWAGE_SCOPE') {
+                        return say(channel, 'Followage is unavailable. The bot needs moderator:read:followers and to be a channel mod.');
+                    }
+                    console.error('!followage failed', err);
+                    return say(channel, 'Could not look up followage.');
+                }
+            },
+        },
+        ...sceneBuiltins(),
+    ];
+
     function normalizeName(name) {
         return String(name ?? '')
             .trim()
@@ -17,8 +177,13 @@ export function createCommandHandler(store) {
             .toLowerCase();
     }
 
+    function onCooldown(name) {
+        const last = cooldowns.get(name) ?? 0;
+        return Date.now() - last < COOLDOWN_MS;
+    }
+
     async function resolve(name) {
-        const key = normalizeName(name);
+        const key = ALIASES[normalizeName(name)] ?? normalizeName(name);
         const builtin = builtins.find((command) => command.name === key);
         if (builtin) {
             return builtin;
@@ -38,19 +203,41 @@ export function createCommandHandler(store) {
         };
     }
 
-    async function handleMessage({ channel, text, say }) {
-        const trimmed = text.trim();
+    async function handleMessage(ctx) {
+        const trimmed = ctx.text.trim();
         if (!trimmed.startsWith('!')) {
             return;
         }
 
-        const [raw] = trimmed.split(/\s+/);
+        const [raw, ...args] = trimmed.split(/\s+/);
         const command = await resolve(raw);
         if (!command) {
             return;
         }
 
-        await command.execute({ channel, say });
+        if (command.modOnly && !ctx.isMod && !ctx.isBroadcaster) {
+            return;
+        }
+
+        if (onCooldown(command.name)) {
+            return;
+        }
+
+        cooldowns.set(command.name, Date.now());
+
+        const result = await command.execute({ ...ctx, args });
+        if (result === false) {
+            return;
+        }
+
+        obs?.emit({
+            type: 'command',
+            command: command.name,
+            user: ctx.user,
+            displayName: ctx.displayName,
+            args,
+            text: trimmed,
+        });
     }
 
     async function list() {

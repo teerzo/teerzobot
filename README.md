@@ -36,20 +36,66 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 
 ## Chat commands
 
-| Command | What it does |
-| --- | --- |
-| `!ping` | Replies `Pong!` |
-| `!<name>` | Replies with any custom command created via the API |
+| Command | Who | What it does |
+| --- | --- | --- |
+| `!ping` | everyone | Replies `Pong!` |
+| `!commands` / `!help` | everyone | Lists built-in and custom commands |
+| `!lurk` | everyone | Thanks the chatter for lurking |
+| `!so <user>` | broadcaster / mod | Chat shoutout with a Twitch link |
+| `!game` | everyone | Current game |
+| `!title` | everyone | Current stream title |
+| `!uptime` | everyone | How long the stream has been live |
+| `!followage` | everyone | How long that chatter has followed |
+| `!<name>` | everyone | Any custom command created via the API |
+
+Commands have a 10 second cooldown.
+
+### !followage
+
+`!followage` needs the Helix scope `moderator:read:followers`. Make **teerzobot** a moderator in the channel, then re-authorize the bot token with that scope and update `accessToken` / `refreshToken` (or the token file). Without that, the bot replies that followage is unavailable.
+
+## OBS
+
+The bot on Railway cannot open OBS on your PC. Instead it exposes events:
+
+1. **Browser Source (simplest):** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+2. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+
+Map chat commands to OBS scene names with env vars:
+
+```
+OBS_SCENE_BRB=BRB
+OBS_SCENE_LIVE=Live
+```
+
+That creates `!brb` and `!live`. The overlay switches to those scene names when the commands fire.
+
+Example webhook payload:
+
+```json
+{
+  "type": "command",
+  "command": "so",
+  "user": "viewer",
+  "displayName": "Viewer",
+  "args": ["somechannel"],
+  "text": "!so somechannel",
+  "at": "2026-08-13T16:00:00.000Z"
+}
+```
 
 ## API
 
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | `{ ok: true }` |
-| `GET` | `/api/status` | `{ connected, channel, botUserId }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
 | `DELETE` | `/api/commands/:name` | Remove a custom command |
+| `GET` | `/obs` | OBS Browser Source page |
+| `GET` | `/api/obs/config` | Scene map from `OBS_SCENE_*` |
+| `GET` | `/api/obs/events` | Server-sent command events |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS.

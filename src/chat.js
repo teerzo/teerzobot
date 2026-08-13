@@ -39,12 +39,17 @@ export function createChatClient(authProvider, { channel, onMessage }) {
         console.error('Twitch chat auth failed', text, retryCount);
     });
 
-    chatClient.onMessage(async (chan, user, text) => {
+    chatClient.onMessage(async (chan, user, text, msg) => {
         try {
             await onMessage({
                 channel: chan,
                 user,
+                displayName: msg.userInfo.displayName || user,
+                userId: msg.userInfo.userId,
+                isMod: msg.userInfo.isMod,
+                isBroadcaster: msg.userInfo.isBroadcaster,
                 text,
+                msg,
                 say: chatClient.say.bind(chatClient),
             });
         } catch (err) {

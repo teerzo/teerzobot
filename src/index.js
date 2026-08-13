@@ -66,6 +66,7 @@ app.listen(port, '0.0.0.0', async () => {
                     user: ctx.user,
                     displayName: ctx.displayName,
                     text: ctx.text,
+                    parts: ctx.parts,
                     isMod: ctx.isMod,
                     isBroadcaster: ctx.isBroadcaster,
                 });

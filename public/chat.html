@@ -43,6 +43,12 @@
         .name.broadcaster { color: #ff6b6b; }
         .name.mod { color: #7cff9a; }
         .name.bot { color: #8ab4ff; }
+        .emote {
+            height: 1.4em;
+            width: auto;
+            vertical-align: middle;
+            margin: 0 0.05em;
+        }
     </style>
 </head>
 <body>
@@ -76,12 +82,25 @@
             return 'name';
         }
 
+        function renderText(data) {
+            if (!Array.isArray(data.parts) || data.parts.length === 0) {
+                return escapeHtml(data.text);
+            }
+
+            return data.parts.map((part) => {
+                if (part.type === 'emote' && part.url) {
+                    return `<img class="emote" src="${escapeHtml(part.url)}" alt="${escapeHtml(part.name)}" title="${escapeHtml(part.name)}">`;
+                }
+                return escapeHtml(part.text ?? '');
+            }).join('');
+        }
+
         function addMessage(data) {
             const row = document.createElement('div');
             row.className = 'msg';
             row.innerHTML =
                 `<span class="${nameClass(data)}">${escapeHtml(data.displayName || data.user)}</span>` +
-                `<span>${escapeHtml(data.text)}</span>`;
+                `<span>${renderText(data)}</span>`;
             listEl.prepend(row);
             while (listEl.children.length > MAX) {
                 listEl.removeChild(listEl.lastChild);

@@ -1,4 +1,25 @@
-import { ChatClient } from '@twurple/chat';
+import { ChatClient, buildEmoteImageUrl, parseChatMessage } from '@twurple/chat';
+
+function serializeMessageParts(text, emoteOffsets) {
+    return parseChatMessage(text, emoteOffsets ?? new Map()).map((part) => {
+        if (part.type === 'emote') {
+            return {
+                type: 'emote',
+                id: part.id,
+                name: part.name,
+                url: buildEmoteImageUrl(part.id, {
+                    animationSettings: 'default',
+                    backgroundType: 'dark',
+                    size: '2.0',
+                }),
+            };
+        }
+        if (part.type === 'cheer') {
+            return { type: 'text', text: `${part.name}${part.amount}` };
+        }
+        return { type: 'text', text: part.text };
+    });
+}
 
 export function createChatClient(authProvider, { channel, onMessage, onBotMessage }) {
     const state = {
@@ -66,6 +87,7 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
                 isMod: msg.userInfo.isMod,
                 isBroadcaster: msg.userInfo.isBroadcaster,
                 text,
+                parts: serializeMessageParts(text, msg.emoteOffsets),
                 msg,
                 say,
             });

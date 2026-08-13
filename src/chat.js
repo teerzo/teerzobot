@@ -1,27 +1,46 @@
 import { ChatClient, buildEmoteImageUrl, parseChatMessage } from '@twurple/chat';
 
-function serializeMessageParts(text, emoteOffsets) {
-    return parseChatMessage(text, emoteOffsets ?? new Map()).map((part) => {
-        if (part.type === 'emote') {
-            return {
-                type: 'emote',
-                id: part.id,
-                name: part.name,
-                url: buildEmoteImageUrl(part.id, {
-                    animationSettings: 'default',
-                    backgroundType: 'dark',
-                    size: '2.0',
-                }),
-            };
+function applyThirdPartyEmotes(text, lookup) {
+    if (!text) {
+        return [];
+    }
+    if (!lookup) {
+        return [{ type: 'text', text }];
+    }
+
+    return text.split(/(\s+)/).flatMap((token) => {
+        if (!token) {
+            return [];
         }
-        if (part.type === 'cheer') {
-            return { type: 'text', text: `${part.name}${part.amount}` };
-        }
-        return { type: 'text', text: part.text };
+        const emote = lookup(token);
+        return emote ? [emote] : [{ type: 'text', text: token }];
     });
 }
 
-export function createChatClient(authProvider, { channel, onMessage, onBotMessage }) {
+function serializeMessageParts(text, emoteOffsets, lookup) {
+    return parseChatMessage(text, emoteOffsets ?? new Map()).flatMap((part) => {
+        if (part.type === 'emote') {
+            return [
+                {
+                    type: 'emote',
+                    id: part.id,
+                    name: part.name,
+                    url: buildEmoteImageUrl(part.id, {
+                        animationSettings: 'default',
+                        backgroundType: 'dark',
+                        size: '2.0',
+                    }),
+                },
+            ];
+        }
+        if (part.type === 'cheer') {
+            return [{ type: 'text', text: `${part.name}${part.amount}` }];
+        }
+        return applyThirdPartyEmotes(part.text, lookup);
+    });
+}
+
+export function createChatClient(authProvider, { channel, onMessage, onBotMessage, getThirdPartyEmote }) {
     const state = {
         connected: false,
         channel,
@@ -40,6 +59,7 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
             user: botName,
             displayName: process.env.BOT_USERNAME || 'teerzobot',
             text,
+            parts: serializeMessageParts(text, new Map(), getThirdPartyEmote),
             isBot: true,
             isMod: true,
             isBroadcaster: false,
@@ -87,7 +107,7 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
                 isMod: msg.userInfo.isMod,
                 isBroadcaster: msg.userInfo.isBroadcaster,
                 text,
-                parts: serializeMessageParts(text, msg.emoteOffsets),
+                parts: serializeMessageParts(text, msg.emoteOffsets, getThirdPartyEmote),
                 msg,
                 say,
             });

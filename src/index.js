@@ -7,6 +7,7 @@ import { createApi } from './api.js';
 import { createTwitchApi } from './isLive.js';
 import { createChatFeed, createObs } from './obs.js';
 import { createNowPlaying } from './nowPlaying.js';
+import { createFfzEmotes } from './ffz.js';
 
 function requireEnv(name) {
     const value = process.env[name];
@@ -23,6 +24,7 @@ const store = createStore();
 const obs = createObs();
 const chatFeed = createChatFeed();
 const nowPlaying = createNowPlaying();
+const ffz = createFfzEmotes(channel);
 let twitchApi = null;
 
 const commands = createCommandHandler(store, {
@@ -73,6 +75,7 @@ app.listen(port, '0.0.0.0', async () => {
                 return commands.handleMessage(ctx);
             },
             onBotMessage: (event) => chatFeed.emit(event),
+            getThirdPartyEmote: (name) => ffz.lookup(name),
         });
         await chat.connect();
     } catch (err) {

@@ -61,7 +61,6 @@ export function createCommandHandler(store, { getTwitch, obs } = {}) {
             name: 'so',
             response: 'Shout out a user',
             builtin: true,
-            modOnly: true,
             execute({ say, channel, args }) {
                 const target = String(args[0] ?? '')
                     .replace(/^@/, '')

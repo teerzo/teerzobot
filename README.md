@@ -41,7 +41,7 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!ping` | everyone | Replies `Pong!` |
 | `!commands` / `!help` | everyone | Lists built-in and custom commands |
 | `!lurk` | everyone | Thanks the chatter for lurking |
-| `!so <user>` | broadcaster / mod | Chat shoutout with a Twitch link |
+| `!so <user>` | everyone | Chat shoutout with a Twitch link |
 | `!game` | everyone | Current game |
 | `!title` | everyone | Current stream title |
 | `!uptime` | everyone | How long the stream has been live |

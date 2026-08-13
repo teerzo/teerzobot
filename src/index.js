@@ -5,7 +5,7 @@ import { createStore } from './store.js';
 import { createCommandHandler } from './commands.js';
 import { createApi } from './api.js';
 import { createTwitchApi } from './isLive.js';
-import { createObs } from './obs.js';
+import { createChatFeed, createObs } from './obs.js';
 
 function requireEnv(name) {
     const value = process.env[name];
@@ -20,6 +20,7 @@ const channel = requireEnv('TWITCH_CHANNEL').replace(/^#/, '');
 
 const store = createStore();
 const obs = createObs();
+const chatFeed = createChatFeed();
 let twitchApi = null;
 
 const commands = createCommandHandler(store, {
@@ -35,10 +36,12 @@ const app = createApi({
     getStatus: () => ({
         ...chat.getStatus(),
         obs: obs.getStatus(),
+        chat: chatFeed.getStatus(),
     }),
     commands,
     store,
     obs,
+    chatFeed,
 });
 
 app.listen(port, '0.0.0.0', async () => {
@@ -52,7 +55,17 @@ app.listen(port, '0.0.0.0', async () => {
         });
         chat = createChatClient(authProvider, {
             channel,
-            onMessage: (ctx) => commands.handleMessage(ctx),
+            onMessage: (ctx) => {
+                chatFeed.emit({
+                    type: 'chat',
+                    user: ctx.user,
+                    displayName: ctx.displayName,
+                    text: ctx.text,
+                    isMod: ctx.isMod,
+                    isBroadcaster: ctx.isBroadcaster,
+                });
+                return commands.handleMessage(ctx);
+            },
         });
         await chat.connect();
     } catch (err) {

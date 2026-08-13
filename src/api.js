@@ -6,7 +6,33 @@ import { fileURLToPath } from 'url';
 const NAME_RE = /^[a-z0-9_]+$/;
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
-export function createApi({ getStatus, commands, store, obs }) {
+function attachSse(app, route, hub) {
+    app.get(route, (req, res) => {
+        if (!hub) {
+            res.status(503).json({ error: 'Events are not available' });
+            return;
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        req.socket.setTimeout(0);
+        const unsubscribe = hub.subscribe(res);
+        const heartbeat = setInterval(() => {
+            res.write(': ping\n\n');
+        }, 15000);
+
+        req.on('close', () => {
+            clearInterval(heartbeat);
+            unsubscribe();
+        });
+    });
+}
+
+export function createApi({ getStatus, commands, store, obs, chatFeed }) {
     const app = express();
     const origin = process.env.FRONTEND_ORIGIN || true;
 
@@ -24,6 +50,7 @@ export function createApi({ getStatus, commands, store, obs }) {
             channel: status.channel,
             botUserId: process.env.BOT_USER_ID ?? null,
             obs: status.obs ?? { webhook: false, listeners: 0 },
+            chat: status.chat ?? { listeners: 0 },
         });
     });
 
@@ -31,33 +58,16 @@ export function createApi({ getStatus, commands, store, obs }) {
         res.sendFile(path.join(publicDir, 'obs.html'));
     });
 
+    app.get('/chat', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'chat.html'));
+    });
+
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });
     });
 
-    app.get('/api/obs/events', (req, res) => {
-        if (!obs) {
-            res.status(503).json({ error: 'OBS events are not available' });
-            return;
-        }
-
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders?.();
-
-        req.socket.setTimeout(0);
-        const unsubscribe = obs.subscribe(res);
-        const heartbeat = setInterval(() => {
-            res.write(': ping\n\n');
-        }, 15000);
-
-        req.on('close', () => {
-            clearInterval(heartbeat);
-            unsubscribe();
-        });
-    });
+    attachSse(app, '/api/obs/events', obs);
+    attachSse(app, '/api/chat/events', chatFeed);
 
     app.get('/api/commands', async (_req, res) => {
         res.json({ commands: await commands.list() });

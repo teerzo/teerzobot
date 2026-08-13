@@ -1,3 +1,5 @@
+import { createSseHub } from './sse.js';
+
 export function getSceneMap() {
     const scenes = {};
     for (const [key, value] of Object.entries(process.env)) {
@@ -11,32 +13,17 @@ export function getSceneMap() {
 
 export function createObs() {
     const webhookUrl = process.env.OBS_WEBHOOK_URL?.trim() || '';
-    const listeners = new Set();
+    const hub = createSseHub({ defaultType: 'command' });
 
     function getStatus() {
         return {
             webhook: Boolean(webhookUrl),
-            listeners: listeners.size,
+            listeners: hub.listenerCount,
         };
-    }
-
-    function subscribe(res) {
-        listeners.add(res);
-        res.write(': connected\n\n');
-        return () => listeners.delete(res);
     }
 
     function emit(event) {
-        const payload = {
-            type: 'command',
-            at: new Date().toISOString(),
-            ...event,
-        };
-        const frame = `data: ${JSON.stringify(payload)}\n\n`;
-
-        for (const res of listeners) {
-            res.write(frame);
-        }
+        const payload = hub.emit(event);
 
         if (!webhookUrl) {
             return;
@@ -53,8 +40,18 @@ export function createObs() {
 
     return {
         emit,
-        subscribe,
+        subscribe: hub.subscribe,
         getStatus,
         getConfig: () => ({ scenes: getSceneMap() }),
+    };
+}
+
+export function createChatFeed() {
+    const hub = createSseHub({ defaultType: 'chat' });
+
+    return {
+        emit: hub.emit,
+        subscribe: hub.subscribe,
+        getStatus: () => ({ listeners: hub.listenerCount }),
     };
 }

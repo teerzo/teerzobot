@@ -58,8 +58,9 @@ Commands have a 10 second cooldown.
 
 The bot on Railway cannot open OBS on your PC. Instead it exposes events:
 
-1. **Browser Source (simplest):** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
-2. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
+2. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+3. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
 Map chat commands to OBS scene names with env vars:
 
@@ -89,13 +90,15 @@ Example webhook payload:
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | `{ ok: true }` |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
 | `DELETE` | `/api/commands/:name` | Remove a custom command |
-| `GET` | `/obs` | OBS Browser Source page |
+| `GET` | `/obs` | OBS scene-control Browser Source page |
 | `GET` | `/api/obs/config` | Scene map from `OBS_SCENE_*` |
 | `GET` | `/api/obs/events` | Server-sent command events |
+| `GET` | `/chat` | Chat overlay Browser Source page |
+| `GET` | `/api/chat/events` | Server-sent chat messages |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS.

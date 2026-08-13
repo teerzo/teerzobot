@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot chat</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        #wrap {
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            height: 100%;
+            padding: 12px;
+            font: 18px/1.35 sans-serif;
+            color: #fff;
+            text-shadow: 0 1px 2px #000;
+        }
+        #status {
+            align-self: flex-start;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        #messages {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow: hidden;
+        }
+        .msg {
+            align-self: flex-start;
+            max-width: 100%;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            word-wrap: break-word;
+        }
+        .name {
+            font-weight: 700;
+            margin-right: 6px;
+        }
+        .name.broadcaster { color: #ff6b6b; }
+        .name.mod { color: #7cff9a; }
+    </style>
+</head>
+<body>
+    <div id="wrap">
+        <div id="status">teerzobot chat — connecting…</div>
+        <div id="messages"></div>
+    </div>
+    <script>
+        const MAX = 40;
+        const statusEl = document.getElementById('status');
+        const listEl = document.getElementById('messages');
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function nameClass(data) {
+            if (data.isBroadcaster) {
+                return 'name broadcaster';
+            }
+            if (data.isMod) {
+                return 'name mod';
+            }
+            return 'name';
+        }
+
+        function addMessage(data) {
+            const row = document.createElement('div');
+            row.className = 'msg';
+            row.innerHTML =
+                `<span class="${nameClass(data)}">${escapeHtml(data.displayName || data.user)}</span>` +
+                `<span>${escapeHtml(data.text)}</span>`;
+            listEl.appendChild(row);
+            while (listEl.children.length > MAX) {
+                listEl.removeChild(listEl.firstChild);
+            }
+        }
+
+        const source = new EventSource('/api/chat/events');
+        source.onopen = () => {
+            statusEl.textContent = 'teerzobot chat — connected';
+        };
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'chat' && data.text) {
+                addMessage(data);
+            }
+        };
+        source.onerror = () => {
+            statusEl.textContent = 'teerzobot chat — reconnecting…';
+        };
+    </script>
+</body>
+</html>

@@ -59,8 +59,9 @@ Commands have a 10 second cooldown.
 The bot on Railway cannot open OBS on your PC. Instead it exposes events:
 
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
-2. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
-3. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+2. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
+3. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+4. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
 Map chat commands to OBS scene names with env vars:
 
@@ -90,7 +91,7 @@ Example webhook payload:
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | `{ ok: true }` |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
@@ -100,5 +101,40 @@ Example webhook payload:
 | `GET` | `/api/obs/events` | Server-sent command events |
 | `GET` | `/chat` | Chat overlay Browser Source page |
 | `GET` | `/api/chat/events` | Server-sent chat messages |
+| `GET` | `/now-playing` | Now-playing overlay Browser Source page |
+| `GET` | `/api/now-playing` | Current track (`{ track }` or `{ track: null }`) |
+| `POST` | `/api/now-playing` | Set current track from a Chrome extension |
+| `DELETE` | `/api/now-playing` | Clear current track |
+| `GET` | `/api/now-playing/events` | Server-sent now-playing updates |
 
-Set `FRONTEND_ORIGIN` to the React app origin for CORS.
+Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.
+
+### Chrome extension now playing
+
+Point the extension at the **Railway** API (not localhost). When the side panel track changes, `POST` JSON to:
+
+`https://<your-app>.up.railway.app/api/now-playing`
+
+```json
+{
+  "title": "Song name",
+  "artist": "Artist",
+  "album": "Album",
+  "artwork": "https://example.com/cover.jpg",
+  "url": "https://open.spotify.com/track/…",
+  "source": "spotify",
+  "playing": true
+}
+```
+
+`title` or `artist` is required. In the extension `host_permissions`, add `https://<your-app>.up.railway.app/*`. If `NOW_PLAYING_SECRET` is set on the Railway service, send it as `x-now-playing-key` or `Authorization: Bearer …`.
+
+```js
+await fetch('https://<your-app>.up.railway.app/api/now-playing', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ title, artist, artwork, source: 'sidepanel' }),
+});
+```
+
+OBS overlay: `https://<your-app>.up.railway.app/now-playing`.

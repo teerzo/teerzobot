@@ -2,6 +2,31 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { normalizeTrack } from './nowPlaying.js';
+
+function corsOrigin() {
+    const frontend = process.env.FRONTEND_ORIGIN;
+    return (origin, callback) => {
+        if (!origin || !frontend) {
+            callback(null, true);
+            return;
+        }
+        if (origin === frontend || origin.startsWith('chrome-extension://')) {
+            callback(null, true);
+            return;
+        }
+        callback(null, false);
+    };
+}
+
+function nowPlayingAuthorized(req) {
+    const secret = process.env.NOW_PLAYING_SECRET;
+    if (!secret) {
+        return true;
+    }
+    const header = req.get('x-now-playing-key') || String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    return header === secret;
+}
 
 const NAME_RE = /^[a-z0-9_]+$/;
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -32,11 +57,10 @@ function attachSse(app, route, hub) {
     });
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying }) {
     const app = express();
-    const origin = process.env.FRONTEND_ORIGIN || true;
 
-    app.use(cors({ origin }));
+    app.use(cors({ origin: corsOrigin() }));
     app.use(express.json());
 
     app.get('/health', (_req, res) => {
@@ -51,6 +75,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed }) {
             botUserId: process.env.BOT_USER_ID ?? null,
             obs: status.obs ?? { webhook: false, listeners: 0 },
             chat: status.chat ?? { listeners: 0 },
+            nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
         });
     });
 
@@ -62,12 +87,54 @@ export function createApi({ getStatus, commands, store, obs, chatFeed }) {
         res.sendFile(path.join(publicDir, 'chat.html'));
     });
 
+    app.get('/now-playing', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'now-playing.html'));
+    });
+
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });
     });
 
     attachSse(app, '/api/obs/events', obs);
     attachSse(app, '/api/chat/events', chatFeed);
+    attachSse(app, '/api/now-playing/events', nowPlaying);
+
+    app.get('/api/now-playing', (_req, res) => {
+        res.json({ track: nowPlaying?.get() ?? null });
+    });
+
+    app.post('/api/now-playing', (req, res) => {
+        if (!nowPlaying) {
+            res.status(503).json({ error: 'Now playing is not available' });
+            return;
+        }
+        if (!nowPlayingAuthorized(req)) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const track = normalizeTrack(req.body);
+        if (!track) {
+            res.status(400).json({ error: 'title or artist is required' });
+            return;
+        }
+
+        res.json({ track: nowPlaying.set(track) });
+    });
+
+    app.delete('/api/now-playing', (req, res) => {
+        if (!nowPlaying) {
+            res.status(503).json({ error: 'Now playing is not available' });
+            return;
+        }
+        if (!nowPlayingAuthorized(req)) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        nowPlaying.clear();
+        res.status(204).end();
+    });
 
     app.get('/api/commands', async (_req, res) => {
         res.json({ commands: await commands.list() });

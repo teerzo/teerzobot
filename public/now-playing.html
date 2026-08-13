@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot now playing</title>
+    <style>
+        html, body {
+            margin: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+        #panel {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            font: 16px/1.3 sans-serif;
+            text-shadow: 0 1px 2px #000;
+            max-width: 520px;
+        }
+        #art {
+            width: 56px;
+            height: 56px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: #222;
+            display: none;
+        }
+        #art.show { display: block; }
+        #idle { opacity: 0.85; }
+        #title { font-weight: 700; }
+        #artist { opacity: 0.9; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="panel">
+        <img id="art" alt="">
+        <div>
+            <div id="idle">teerzobot now playing — waiting…</div>
+            <div id="info" class="hidden">
+                <div id="title"></div>
+                <div id="artist"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const artEl = document.getElementById('art');
+        const idleEl = document.getElementById('idle');
+        const infoEl = document.getElementById('info');
+        const titleEl = document.getElementById('title');
+        const artistEl = document.getElementById('artist');
+
+        function escapeText(value) {
+            return String(value ?? '');
+        }
+
+        function render(track) {
+            if (!track || (!track.title && !track.artist)) {
+                idleEl.classList.remove('hidden');
+                infoEl.classList.add('hidden');
+                artEl.classList.remove('show');
+                artEl.removeAttribute('src');
+                idleEl.textContent = 'teerzobot now playing — waiting…';
+                return;
+            }
+
+            idleEl.classList.add('hidden');
+            infoEl.classList.remove('hidden');
+            titleEl.textContent = escapeText(track.title || 'Unknown track');
+            artistEl.textContent = escapeText(track.artist || '');
+            if (track.artwork) {
+                artEl.src = track.artwork;
+                artEl.classList.add('show');
+            } else {
+                artEl.classList.remove('show');
+                artEl.removeAttribute('src');
+            }
+        }
+
+        async function main() {
+            const current = await fetch('/api/now-playing').then((res) => res.json());
+            render(current.track);
+            const source = new EventSource('/api/now-playing/events');
+            source.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'now-playing') {
+                    render(data.track);
+                }
+            };
+            source.onerror = () => {
+                idleEl.classList.remove('hidden');
+                infoEl.classList.add('hidden');
+                idleEl.textContent = 'teerzobot now playing — reconnecting…';
+            };
+        }
+
+        main().catch((err) => {
+            idleEl.textContent = `teerzobot now playing — ${err.message || 'failed to load'}`;
+        });
+    </script>
+</body>
+</html>

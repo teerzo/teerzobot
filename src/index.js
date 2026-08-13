@@ -6,6 +6,7 @@ import { createCommandHandler } from './commands.js';
 import { createApi } from './api.js';
 import { createTwitchApi } from './isLive.js';
 import { createChatFeed, createObs } from './obs.js';
+import { createNowPlaying } from './nowPlaying.js';
 
 function requireEnv(name) {
     const value = process.env[name];
@@ -21,6 +22,7 @@ const channel = requireEnv('TWITCH_CHANNEL').replace(/^#/, '');
 const store = createStore();
 const obs = createObs();
 const chatFeed = createChatFeed();
+const nowPlaying = createNowPlaying();
 let twitchApi = null;
 
 const commands = createCommandHandler(store, {
@@ -37,11 +39,13 @@ const app = createApi({
         ...chat.getStatus(),
         obs: obs.getStatus(),
         chat: chatFeed.getStatus(),
+        nowPlaying: nowPlaying.getStatus(),
     }),
     commands,
     store,
     obs,
     chatFeed,
+    nowPlaying,
 });
 
 app.listen(port, '0.0.0.0', async () => {

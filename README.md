@@ -20,10 +20,10 @@ npm run dev
 
 This loads `.env` and starts `src/index.js` with Node's file watcher. Saving anything under `src/` restarts the process. The API listens on **http://localhost:3000**. When the bot joins chat it posts `Connected` in the channel.
 
-On Railway, set the same variables in the service dashboard (no `.env` file). The token file is gitignored, so seed it with a Railway variable:
+On Railway, set the same variables in the service dashboard (no `.env` file). The token file is gitignored, so seed it with:
 
-- `TWITCH_TOKEN_JSON` — paste the contents of your local `tokens/token.536204553.json`, or
-- `TWITCH_ACCESS_TOKEN` and `TWITCH_REFRESH_TOKEN`
+- `accessToken`
+- `refreshToken`
 
 Attach a volume (for example at `/data`) and set:
 

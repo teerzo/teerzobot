@@ -28,22 +28,15 @@ async function loadTokenData(tokenPath) {
         }
     }
 
-    if (process.env.TWITCH_TOKEN_JSON) {
-        const tokenData = JSON.parse(process.env.TWITCH_TOKEN_JSON);
-        await persistToken(tokenPath, tokenData);
-        console.log(`Seeded Twitch token from TWITCH_TOKEN_JSON to ${tokenPath}`);
-        return tokenData;
-    }
-
-    const accessToken = process.env.TWITCH_ACCESS_TOKEN;
-    const refreshToken = process.env.TWITCH_REFRESH_TOKEN;
+    const accessToken = process.env.accessToken;
+    const refreshToken = process.env.refreshToken;
     if (accessToken && refreshToken) {
         const tokenData = {
             accessToken,
             refreshToken,
             expiresIn: 0,
             obtainmentTimestamp: 0,
-            scope: ['chat:read', 'chat:edit'],
+            scope: ['chat:edit', 'chat:read'],
         };
         await persistToken(tokenPath, tokenData);
         console.log(`Seeded Twitch token from env to ${tokenPath}`);
@@ -51,7 +44,7 @@ async function loadTokenData(tokenPath) {
     }
 
     throw new Error(
-        `No Twitch token at ${tokenPath}. Set TWITCH_TOKEN_JSON, or TWITCH_ACCESS_TOKEN and TWITCH_REFRESH_TOKEN.`,
+        `No Twitch token at ${tokenPath}. Set accessToken and refreshToken, or provide a token file.`,
     );
 }
 

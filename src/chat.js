@@ -1,6 +1,6 @@
 import { ChatClient } from '@twurple/chat';
 
-export function createChatClient(authProvider, { channel, onMessage }) {
+export function createChatClient(authProvider, { channel, onMessage, onBotMessage }) {
     const state = {
         connected: false,
         channel,
@@ -12,6 +12,23 @@ export function createChatClient(authProvider, { channel, onMessage }) {
     });
 
     const botName = (process.env.BOT_USERNAME || 'teerzobot').toLowerCase();
+
+    function emitBotMessage(text) {
+        onBotMessage?.({
+            type: 'chat',
+            user: botName,
+            displayName: process.env.BOT_USERNAME || 'teerzobot',
+            text,
+            isBot: true,
+            isMod: true,
+            isBroadcaster: false,
+        });
+    }
+
+    function say(chan, text, ...rest) {
+        emitBotMessage(text);
+        return chatClient.say(chan, text, ...rest);
+    }
 
     chatClient.onConnect(() => {
         state.connected = true;
@@ -25,7 +42,7 @@ export function createChatClient(authProvider, { channel, onMessage }) {
         }
 
         console.log(`Joined #${channel} as ${user}`);
-        chatClient.say(joinedChannel, 'Connected').catch((err) => {
+        say(joinedChannel, 'Connected').catch((err) => {
             console.error('Failed to announce connection', err);
         });
     });
@@ -50,7 +67,7 @@ export function createChatClient(authProvider, { channel, onMessage }) {
                 isBroadcaster: msg.userInfo.isBroadcaster,
                 text,
                 msg,
-                say: chatClient.say.bind(chatClient),
+                say,
             });
         } catch (err) {
             console.error('Error handling chat message', err);

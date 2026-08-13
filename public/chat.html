@@ -39,6 +39,7 @@
         }
         .name.broadcaster { color: #ff6b6b; }
         .name.mod { color: #7cff9a; }
+        .name.bot { color: #8ab4ff; }
     </style>
 </head>
 <body>
@@ -60,6 +61,9 @@
         }
 
         function nameClass(data) {
+            if (data.isBot) {
+                return 'name bot';
+            }
             if (data.isBroadcaster) {
                 return 'name broadcaster';
             }

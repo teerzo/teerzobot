@@ -71,6 +71,7 @@ app.listen(port, '0.0.0.0', async () => {
                 });
                 return commands.handleMessage(ctx);
             },
+            onBotMessage: (event) => chatFeed.emit(event),
         });
         await chat.connect();
     } catch (err) {

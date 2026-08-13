@@ -17,20 +17,28 @@ const channel = requireEnv('TWITCH_CHANNEL').replace(/^#/, '');
 
 const store = createStore();
 const commands = createCommandHandler(store);
-const { authProvider } = await createAuthProvider();
 
-const chat = createChatClient(authProvider, {
-    channel,
-    onMessage: (ctx) => commands.handleMessage(ctx),
-});
+let chat = {
+    getStatus: () => ({ connected: false, channel }),
+};
 
 const app = createApi({
-    getStatus: chat.getStatus,
+    getStatus: () => chat.getStatus(),
     commands,
     store,
 });
 
 app.listen(port, '0.0.0.0', async () => {
     console.log(`API listening on port ${port}`);
-    await chat.connect();
+
+    try {
+        const { authProvider } = await createAuthProvider();
+        chat = createChatClient(authProvider, {
+            channel,
+            onMessage: (ctx) => commands.handleMessage(ctx),
+        });
+        await chat.connect();
+    } catch (err) {
+        console.error('Failed to connect to Twitch chat', err);
+    }
 });

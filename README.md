@@ -20,7 +20,19 @@ npm run dev
 
 This loads `.env` and starts `src/index.js` with Node's file watcher. Saving anything under `src/` restarts the process. The API listens on **http://localhost:3000**. When the bot joins chat it posts `Connected` in the channel.
 
-On Railway, set the same variables in the service dashboard and use `npm start` (no `.env` file). Attach a volume and point `TOKEN_PATH` (and `COMMANDS_PATH`) at it so refreshed tokens and custom commands survive restarts.
+On Railway, set the same variables in the service dashboard (no `.env` file). The token file is gitignored, so seed it with a Railway variable:
+
+- `TWITCH_TOKEN_JSON` — paste the contents of your local `tokens/token.536204553.json`, or
+- `TWITCH_ACCESS_TOKEN` and `TWITCH_REFRESH_TOKEN`
+
+Attach a volume (for example at `/data`) and set:
+
+```
+TOKEN_PATH=/data/token.536204553.json
+COMMANDS_PATH=/data/commands.json
+```
+
+The first boot writes the env token onto the volume. After that, Twitch refreshes persist across deploys. Without a volume, a refresh can invalidate the env token on the next restart.
 
 ## Chat commands
 

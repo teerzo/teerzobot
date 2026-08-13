@@ -8,6 +8,8 @@ import { createTwitchApi } from './isLive.js';
 import { createChatFeed, createObs } from './obs.js';
 import { createNowPlaying } from './nowPlaying.js';
 import { createFfzEmotes } from './ffz.js';
+import { createAlerts } from './alerts.js';
+import { startFollowAlerts } from './follows.js';
 
 function requireEnv(name) {
     const value = process.env[name];
@@ -25,6 +27,7 @@ const obs = createObs();
 const chatFeed = createChatFeed();
 const nowPlaying = createNowPlaying();
 const ffz = createFfzEmotes(channel);
+const alerts = createAlerts();
 let twitchApi = null;
 
 const commands = createCommandHandler(store, {
@@ -43,12 +46,14 @@ const app = createApi({
         obs: obs.getStatus(),
         chat: chatFeed.getStatus(),
         nowPlaying: nowPlaying.getStatus(),
+        alerts: alerts.getStatus(),
     }),
     commands,
     store,
     obs,
     chatFeed,
     nowPlaying,
+    alerts,
 });
 
 app.listen(port, '0.0.0.0', async () => {
@@ -56,7 +61,8 @@ app.listen(port, '0.0.0.0', async () => {
 
     try {
         const { authProvider, userId } = await createAuthProvider();
-        twitchApi = createTwitchApi(new ApiClient({ authProvider }), {
+        const apiClient = new ApiClient({ authProvider });
+        twitchApi = createTwitchApi(apiClient, {
             channel,
             botUserId: userId,
         });
@@ -78,6 +84,27 @@ app.listen(port, '0.0.0.0', async () => {
             getThirdPartyEmote: (name) => ffz.lookup(name),
         });
         await chat.connect();
+        try {
+            await startFollowAlerts({
+                apiClient,
+                twitchApi,
+                botUserId: userId,
+                onFollow: ({ displayName, user, userId: followerId }) => {
+                    console.log(`New follower: ${displayName}`);
+                    alerts.emit({
+                        type: 'follow',
+                        displayName,
+                        user,
+                        userId: followerId,
+                    });
+                    chat.say(`Thanks for the follow, ${displayName}!`).catch((err) => {
+                        console.error('Follow thank you failed', err);
+                    });
+                },
+            });
+        } catch (err) {
+            console.error('Failed to start follow alerts', err);
+        }
     } catch (err) {
         console.error('Failed to connect to Twitch chat', err);
     }

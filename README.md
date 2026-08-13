@@ -53,16 +53,17 @@ Commands have a 10 second cooldown.
 
 ### !followage
 
-`!followage` needs the Helix scope `moderator:read:followers`. Make **teerzobot** a moderator in the channel, then re-authorize the bot token with that scope and update `accessToken` / `refreshToken` (or the token file). Without that, the bot replies that followage is unavailable.
+`!followage` and follow thank-yous need the Helix scope `moderator:read:followers`. Make **teerzobot** a moderator in the channel, then re-authorize the bot token with that scope and update `accessToken` / `refreshToken` (or the token file). Without that, `!followage` replies that it is unavailable and follow alerts will fail to subscribe.
 
 ## OBS
 
 The bot on Railway cannot open OBS on your PC. Instead it exposes events:
 
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
-2. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
-3. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
-4. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
+3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
+4. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+5. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
 Map chat commands to OBS scene names with env vars:
 
@@ -92,7 +93,7 @@ Example webhook payload:
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | `{ ok: true }` |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
@@ -107,6 +108,9 @@ Example webhook payload:
 | `POST` | `/api/now-playing` | Set current track from a Chrome extension |
 | `DELETE` | `/api/now-playing` | Clear current track |
 | `GET` | `/api/now-playing/events` | Server-sent now-playing updates |
+| `GET` | `/alerts` | Follow-alert Browser Source page |
+| `GET` | `/api/alerts/config` | `{ followImage }` |
+| `GET` | `/api/alerts/events` | Server-sent follow alerts |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.
 

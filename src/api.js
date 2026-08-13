@@ -57,7 +57,7 @@ function attachSse(app, route, hub) {
     });
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts }) {
     const app = express();
 
     app.use(cors({ origin: corsOrigin() }));
@@ -76,6 +76,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             obs: status.obs ?? { webhook: false, listeners: 0 },
             chat: status.chat ?? { listeners: 0 },
             nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
+            alerts: status.alerts ?? { listeners: 0 },
         });
     });
 
@@ -91,6 +92,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'now-playing.html'));
     });
 
+    app.get('/alerts', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'alerts.html'));
+    });
+
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });
     });
@@ -98,6 +103,11 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/obs/events', obs);
     attachSse(app, '/api/chat/events', chatFeed);
     attachSse(app, '/api/now-playing/events', nowPlaying);
+    attachSse(app, '/api/alerts/events', alerts);
+
+    app.get('/api/alerts/config', (_req, res) => {
+        res.json(alerts?.getConfig() ?? { followImage: '' });
+    });
 
     app.get('/api/now-playing', (_req, res) => {
         res.json({ track: nowPlaying?.get() ?? null });

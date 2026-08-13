@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot alerts</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        #alert {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.86);
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+        #alert.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        #graphic {
+            width: 220px;
+            height: 220px;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 24px rgba(255, 80, 140, 0.45));
+        }
+        #graphic.hidden { display: none; }
+        #banner {
+            margin-top: 16px;
+            padding: 10px 22px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.62);
+            color: #fff;
+            font: 700 28px/1.2 sans-serif;
+            text-align: center;
+            text-shadow: 0 2px 8px #000;
+        }
+        #name {
+            color: #ff9ec4;
+        }
+    </style>
+</head>
+<body>
+    <div id="alert">
+        <img id="graphic" alt="">
+        <div id="banner"><span id="label">Thanks for the follow,</span> <span id="name"></span>!</div>
+    </div>
+    <svg id="default-art" width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ff7eb3"/>
+                <stop offset="100%" stop-color="#ff3d7f"/>
+            </linearGradient>
+        </defs>
+        <circle cx="110" cy="110" r="100" fill="rgba(0,0,0,0.35)"/>
+        <path fill="url(#g)" d="M110 178s-54-33-70-64c-14-26 2-54 28-54 16 0 27 10 42 28 15-18 26-28 42-28 26 0 42 28 28 54-16 31-70 64-70 64z"/>
+        <circle cx="58" cy="48" r="6" fill="#fff59d"/>
+        <circle cx="170" cy="62" r="5" fill="#fff59d"/>
+        <circle cx="186" cy="128" r="4" fill="#fff"/>
+        <circle cx="40" cy="120" r="4" fill="#fff"/>
+    </svg>
+    <script>
+        const SHOW_MS = 6000;
+        const alertEl = document.getElementById('alert');
+        const graphicEl = document.getElementById('graphic');
+        const nameEl = document.getElementById('name');
+        const defaultArt = document.getElementById('default-art');
+        const queue = [];
+        let busy = false;
+        let followImage = '';
+
+        function svgDataUrl() {
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(defaultArt.outerHTML.replace('style="display:none"', ''));
+        }
+
+        function showFollow(displayName) {
+            nameEl.textContent = displayName || 'friend';
+            graphicEl.src = followImage || svgDataUrl();
+            graphicEl.classList.remove('hidden');
+            alertEl.classList.add('show');
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    alertEl.classList.remove('show');
+                    setTimeout(resolve, 400);
+                }, SHOW_MS);
+            });
+        }
+
+        async function pump() {
+            if (busy) {
+                return;
+            }
+            const next = queue.shift();
+            if (!next) {
+                return;
+            }
+            busy = true;
+            await showFollow(next.displayName);
+            busy = false;
+            pump();
+        }
+
+        async function main() {
+            const config = await fetch('/api/alerts/config').then((res) => res.json());
+            followImage = config.followImage || '';
+            graphicEl.src = followImage || svgDataUrl();
+
+            if (new URLSearchParams(location.search).has('preview')) {
+                queue.push({ displayName: 'PreviewUser' });
+                pump();
+            }
+
+            const source = new EventSource('/api/alerts/events');
+            source.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'follow') {
+                    queue.push(data);
+                    pump();
+                }
+            };
+        }
+
+        main().catch((err) => {
+            nameEl.textContent = err.message || 'failed';
+            alertEl.classList.add('show');
+        });
+    </script>
+</body>
+</html>

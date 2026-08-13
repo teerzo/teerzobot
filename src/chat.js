@@ -119,5 +119,6 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
     return {
         getStatus: () => ({ ...state }),
         connect: () => chatClient.connect(),
+        say: (text) => say(channel, text),
     };
 }

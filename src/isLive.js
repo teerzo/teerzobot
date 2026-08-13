@@ -59,5 +59,6 @@ export function createTwitchApi(api, { channel, botUserId }) {
                 throw err;
             }
         },
+        getBroadcasterId,
     };
 }

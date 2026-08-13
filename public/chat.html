@@ -14,19 +14,22 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
             height: 100%;
             padding: 12px;
             font: 18px/1.35 sans-serif;
             color: #fff;
+            overflow: hidden;
         }
         #status {
+            flex-shrink: 0;
             margin-bottom: 8px;
             font-size: 14px;
         }
         #messages {
+            flex: 1;
+            min-height: 0;
             display: flex;
-            flex-direction: column;
+            flex-direction: column-reverse;
             gap: 6px;
             overflow: hidden;
         }
@@ -79,9 +82,9 @@
             row.innerHTML =
                 `<span class="${nameClass(data)}">${escapeHtml(data.displayName || data.user)}</span>` +
                 `<span>${escapeHtml(data.text)}</span>`;
-            listEl.appendChild(row);
+            listEl.prepend(row);
             while (listEl.children.length > MAX) {
-                listEl.removeChild(listEl.firstChild);
+                listEl.removeChild(listEl.lastChild);
             }
         }
 

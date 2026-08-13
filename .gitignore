@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Secrets (keep .env.example tracked)
+.env
+.env.local
+.env.*
+
+# Twitch OAuth tokens
+tokens/
+data/tokens.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

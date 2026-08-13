@@ -28,6 +28,7 @@ let twitchApi = null;
 const commands = createCommandHandler(store, {
     getTwitch: () => twitchApi,
     obs,
+    getNowPlaying: () => nowPlaying.get(),
 });
 
 let chat = {

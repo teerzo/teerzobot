@@ -34,6 +34,7 @@
         #idle { opacity: 0.85; }
         #title { font-weight: 700; }
         #artist { opacity: 0.9; }
+        #time { opacity: 0.75; font-size: 14px; }
         .hidden { display: none; }
     </style>
 </head>
@@ -45,6 +46,7 @@
             <div id="info" class="hidden">
                 <div id="title"></div>
                 <div id="artist"></div>
+                <div id="time"></div>
             </div>
         </div>
     </div>
@@ -54,13 +56,14 @@
         const infoEl = document.getElementById('info');
         const titleEl = document.getElementById('title');
         const artistEl = document.getElementById('artist');
+        const timeEl = document.getElementById('time');
 
         function escapeText(value) {
             return String(value ?? '');
         }
 
         function render(track) {
-            if (!track || (!track.title && !track.artist)) {
+            if (!track || (!track.track && !track.title && !track.artist)) {
                 idleEl.classList.remove('hidden');
                 infoEl.classList.add('hidden');
                 artEl.classList.remove('show');
@@ -69,12 +72,20 @@
                 return;
             }
 
+            const paused = track.isPlaying === false || track.playing === false;
             idleEl.classList.add('hidden');
             infoEl.classList.remove('hidden');
-            titleEl.textContent = escapeText(track.title || 'Unknown track');
+            titleEl.textContent = escapeText(track.track || track.title || 'Unknown track');
             artistEl.textContent = escapeText(track.artist || '');
-            if (track.artwork) {
-                artEl.src = track.artwork;
+            if (track.elapsed || track.total) {
+                timeEl.textContent = `${track.elapsed || '0:00'} / ${track.total || ''}`.trim()
+                    + (paused ? ' (paused)' : '');
+            } else {
+                timeEl.textContent = paused ? 'paused' : '';
+            }
+            const artwork = track.image || track.artwork;
+            if (artwork) {
+                artEl.src = artwork;
                 artEl.classList.add('show');
             } else {
                 artEl.classList.remove('show');

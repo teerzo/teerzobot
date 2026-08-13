@@ -1,9 +1,10 @@
 import { formatDuration } from './isLive.js';
 import { getSceneMap } from './obs.js';
+import { formatChatLine } from './nowPlaying.js';
 
 const COOLDOWN_MS = 10_000;
-const ALIASES = { help: 'commands' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage']);
+const ALIASES = { help: 'commands', song: 'currentsong' };
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -18,7 +19,7 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying } = {}) {
     const cooldowns = new Map();
 
     const builtins = [
@@ -164,6 +165,22 @@ export function createCommandHandler(store, { getTwitch, obs } = {}) {
                     console.error('!followage failed', err);
                     return say(channel, 'Could not look up followage.');
                 }
+            },
+        },
+        {
+            name: 'currentsong',
+            response: 'Currently playing song',
+            builtin: true,
+            execute({ say, channel }) {
+                return say(channel, formatChatLine(getNowPlaying?.() ?? null));
+            },
+        },
+        {
+            name: 'song',
+            response: 'Currently playing song',
+            builtin: true,
+            execute({ say, channel }) {
+                return say(channel, formatChatLine(getNowPlaying?.() ?? null));
             },
         },
         ...sceneBuiltins(),

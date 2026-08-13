@@ -26,26 +26,34 @@ function httpUrl(value) {
 }
 
 export function normalizeTrack(body = {}) {
-    const title = trimString(body.title ?? body.track ?? body.song);
+    const track = trimString(body.track ?? body.title ?? body.song);
     const artist = trimString(body.artist ?? body.artists);
     const album = trimString(body.album);
-    const artwork = httpUrl(body.artwork ?? body.albumArt ?? body.image);
+    const image = httpUrl(body.image ?? body.artwork ?? body.albumArt);
     const url = httpUrl(body.url ?? body.link);
     const source = trimString(body.source);
-    const playing = body.playing !== false && body.isPlaying !== false;
+    const videoId = trimString(body.videoId);
+    const elapsed = trimString(body.elapsed);
+    const total = trimString(body.total);
+    const playedAt = trimString(body.playedAt);
+    const isPlaying = body.isPlaying !== false && body.playing !== false;
 
-    if (!title && !artist) {
+    if (!track && !artist) {
         return null;
     }
 
     return {
-        title,
+        source,
+        track,
         artist,
         album,
-        artwork,
         url,
-        source,
-        playing,
+        image,
+        videoId,
+        elapsed,
+        total,
+        isPlaying,
+        playedAt,
     };
 }
 
@@ -76,4 +84,17 @@ export function createNowPlaying() {
         subscribe: hub.subscribe,
         getStatus: () => ({ listeners: hub.listenerCount, track: current }),
     };
+}
+
+export function formatChatLine(track) {
+    if (!track || (!track.track && !track.artist)) {
+        return 'No song is playing right now.';
+    }
+
+    const title = track.track || 'Unknown track';
+    const by = track.artist ? ` by ${track.artist}` : '';
+    const time = track.elapsed && track.total ? ` (${track.elapsed}/${track.total})` : '';
+    const paused = track.isPlaying === false ? ' (paused)' : '';
+    const link = track.url ? ` ${track.url}` : '';
+    return `Now playing: ${title}${by}${time}${paused}${link}`;
 }

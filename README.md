@@ -46,6 +46,7 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!title` | everyone | Current stream title |
 | `!uptime` | everyone | How long the stream has been live |
 | `!followage` | everyone | How long that chatter has followed |
+| `!currentsong` / `!song` | everyone | Currently playing song from the Chrome plugin |
 | `!<name>` | everyone | Any custom command created via the API |
 
 Commands have a 10 second cooldown.
@@ -117,23 +118,27 @@ Point the extension at the **Railway** API (not localhost). When the side panel 
 
 ```json
 {
-  "title": "Song name",
-  "artist": "Artist",
-  "album": "Album",
-  "artwork": "https://example.com/cover.jpg",
-  "url": "https://open.spotify.com/track/…",
-  "source": "spotify",
-  "playing": true
+  "source": "youtube",
+  "track": "Song Title",
+  "artist": "Artist Name",
+  "album": "",
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "image": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+  "videoId": "dQw4w9WgXcQ",
+  "elapsed": "0:12",
+  "total": "3:45",
+  "isPlaying": true,
+  "playedAt": "2026-08-13T16:45:00.000Z"
 }
 ```
 
-`title` or `artist` is required. In the extension `host_permissions`, add `https://<your-app>.up.railway.app/*`. If `NOW_PLAYING_SECRET` is set on the Railway service, send it as `x-now-playing-key` or `Authorization: Bearer …`.
+`track` or `artist` is required. In the extension `host_permissions`, add `https://<your-app>.up.railway.app/*`. If `NOW_PLAYING_SECRET` is set on the Railway service, send it as `x-now-playing-key` or `Authorization: Bearer …`.
 
 ```js
 await fetch('https://<your-app>.up.railway.app/api/now-playing', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ title, artist, artwork, source: 'sidepanel' }),
+  body: JSON.stringify(payload),
 });
 ```
 

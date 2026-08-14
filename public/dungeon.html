@@ -220,21 +220,55 @@
         camera.add(torch);
         scene.add(camera);
 
-        const EXIT_R = 0.22;
-        const exitMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(EXIT_R, 20, 16),
-            new THREE.MeshStandardMaterial({
-                color: 0xd01414,
-                emissive: 0x7a0000,
-                emissiveIntensity: 0.7,
-                roughness: 0.35,
-                metalness: 0.05,
-            }),
-        );
-        exitMesh.castShadow = true;
+        const pillarMat = new THREE.MeshStandardMaterial({
+            color: 0x9a9084,
+            roughness: 0.72,
+            metalness: 0.08,
+        });
+        const goldMat = new THREE.MeshStandardMaterial({
+            color: 0xe2b84a,
+            emissive: 0x6a4808,
+            emissiveIntensity: 0.55,
+            roughness: 0.28,
+            metalness: 0.9,
+        });
+
+        const exitMesh = new THREE.Group();
+        const pillarBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.08, 12), pillarMat);
+        pillarBase.position.y = 0.04;
+        const pillarShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.82, 12), pillarMat);
+        pillarShaft.position.y = 0.49;
+        const pillarCap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.14, 0.08, 12), pillarMat);
+        pillarCap.position.y = 0.94;
+        for (const part of [pillarBase, pillarShaft, pillarCap]) {
+            part.castShadow = true;
+            exitMesh.add(part);
+        }
+
+        const exitCrown = new THREE.Group();
+        exitCrown.position.y = 1.01;
+        const crownBand = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.125, 0.07, 12), goldMat);
+        crownBand.position.y = 0.02;
+        exitCrown.add(crownBand);
+        const spikeGeo = new THREE.ConeGeometry(0.032, 0.15, 6);
+        for (let i = 0; i < 5; i++) {
+            const spike = new THREE.Mesh(spikeGeo, goldMat);
+            const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+            spike.position.set(Math.cos(a) * 0.09, 0.12, Math.sin(a) * 0.09);
+            spike.castShadow = true;
+            exitCrown.add(spike);
+        }
+        const centerSpike = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.2, 6), goldMat);
+        centerSpike.position.y = 0.16;
+        centerSpike.castShadow = true;
+        exitCrown.add(centerSpike);
+        const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), goldMat);
+        jewel.position.y = 0.27;
+        exitCrown.add(jewel);
+        exitMesh.add(exitCrown);
         scene.add(exitMesh);
 
-        const exitSpot = new THREE.SpotLight(0xff2a22, 32, 6.5, Math.PI / 6, 0.35, 1.15);
+        const exitSpot = new THREE.SpotLight(0xffd078, 28, 6.5, Math.PI / 6, 0.4, 1.15);
         exitSpot.castShadow = true;
         exitSpot.shadow.mapSize.set(256, 256);
         exitSpot.shadow.camera.near = 0.1;
@@ -243,6 +277,45 @@
         exitSpot.target = exitTarget;
         scene.add(exitSpot);
         scene.add(exitTarget);
+
+        function makeSpotBeam(topR, bottomR, height, opacity) {
+            const geo = new THREE.CylinderGeometry(topR, bottomR, height, 24, 8, true);
+            const pos = geo.attributes.position;
+            const colors = new Float32Array(pos.count * 3);
+            const tint = new THREE.Color(0xffe19a);
+            for (let i = 0; i < pos.count; i++) {
+                const y = pos.getY(i);
+                const fade = Math.max(0, (y / height + 0.5) ** 1.6);
+                colors[i * 3] = tint.r * fade;
+                colors[i * 3 + 1] = tint.g * fade;
+                colors[i * 3 + 2] = tint.b * fade;
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const mat = new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.renderOrder = 2;
+            mesh.frustumCulled = false;
+            return mesh;
+        }
+
+        const spotAngle = Math.PI / 6;
+        const beamTop = WALL_H - 0.05;
+        const beamBottom = 0.05;
+        const beamHeight = beamTop - beamBottom;
+        const beamRadius = Math.tan(spotAngle) * beamHeight;
+        const exitBeam = makeSpotBeam(0.025, beamRadius, beamHeight, 0.2);
+        const exitBeamCore = makeSpotBeam(0.012, beamRadius * 0.42, beamHeight, 0.32);
+        exitBeam.position.y = (beamTop + beamBottom) / 2;
+        exitBeamCore.position.y = (beamTop + beamBottom) / 2;
+        exitMesh.add(exitBeam);
+        exitMesh.add(exitBeamCore);
 
         function makeStoneCanvas() {
             const size = 32;
@@ -647,7 +720,7 @@
             for (const spot of picked) {
                 const px = spot.wx - spot.dx * 0.54;
                 const pz = spot.wz - spot.dz * 0.54;
-                const py = 1.05;
+                const py = 0.5;
                 const torch = makeTorch();
                 torch.position.set(px, py, pz);
                 torch.rotation.y = Math.atan2(-spot.dx, -spot.dz);
@@ -802,7 +875,7 @@
             }
 
             if (state.exit) {
-                exitMesh.position.set(state.exit.x, EXIT_R, state.exit.y);
+                exitMesh.position.set(state.exit.x, 0, state.exit.y);
                 exitTarget.position.set(state.exit.x, 0, state.exit.y);
                 exitSpot.position.set(state.exit.x, WALL_H - 0.04, state.exit.y);
             }
@@ -867,8 +940,12 @@
                 const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 1.1 + Math.sin(clock.elapsedTime * 23 + i) * 0.6;
                 light.intensity = light.userData.base + flicker;
             }
-            exitMesh.material.emissiveIntensity = 0.55 + Math.sin(clock.elapsedTime * 3) * 0.2;
-            exitSpot.intensity = 28 + Math.sin(clock.elapsedTime * 2.4) * 4;
+            goldMat.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.18;
+            exitCrown.rotation.y = clock.elapsedTime * 0.7;
+            const beamPulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 2.4);
+            exitSpot.intensity = 24 + beamPulse * 8;
+            exitBeam.material.opacity = 0.14 + beamPulse * 0.08;
+            exitBeamCore.material.opacity = 0.22 + beamPulse * 0.12;
 
             if (voteEndsAt) {
                 const left = Math.max(0, (voteEndsAt - Date.now()) / 1000);

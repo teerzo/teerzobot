@@ -58,7 +58,26 @@ function attachSse(app, route, hub) {
     });
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, getAuthProvider }) {
+function normalizeGifUrl(value) {
+    const url = String(value ?? '').trim();
+    if (!url) {
+        return null;
+    }
+    if (url.startsWith('/') && !url.startsWith('//')) {
+        return url;
+    }
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.href;
+        }
+    } catch {
+        return null;
+    }
+    return null;
+}
+
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, getAuthProvider }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -85,6 +104,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
             alerts: status.alerts ?? { listeners: 0 },
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
+            dance: status.dance ?? { listeners: 0 },
         });
     });
 
@@ -108,6 +128,12 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'dvd.html'));
     });
 
+    app.get('/dance', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'dance.html'));
+    });
+
+    app.use('/gifs', express.static(dance?.getDir() || path.join(publicDir, 'gifs')));
+
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });
     });
@@ -117,6 +143,70 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/now-playing/events', nowPlaying);
     attachSse(app, '/api/alerts/events', alerts);
     attachSse(app, '/api/dvd/events', dvd);
+    attachSse(app, '/api/dance/events', dance);
+
+    app.get('/api/dance', async (_req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+        res.json({ items: await dance.list() });
+    });
+
+    app.post('/api/dance', async (req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+
+        const url = normalizeGifUrl(req.body?.url);
+        if (!url) {
+            res.status(400).json({ error: 'url is required' });
+            return;
+        }
+
+        const duration = Number(req.body?.duration);
+        const size = Number(req.body?.size);
+        const x = req.body?.x == null ? undefined : Number(req.body.x);
+        const y = req.body?.y == null ? undefined : Number(req.body.y);
+        const extra = {
+            duration: Number.isFinite(duration) ? duration : undefined,
+            size: Number.isFinite(size) ? size : undefined,
+            x: Number.isFinite(x) ? x : undefined,
+            y: Number.isFinite(y) ? y : undefined,
+        };
+
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            try {
+                const item = await dance.addFromUrl({ url, ...extra });
+                res.json(item);
+            } catch (err) {
+                if (err.code === 'INVALID_URL') {
+                    res.status(400).json({ error: 'url must be http or https' });
+                    return;
+                }
+                if (err.code === 'NOT_IMAGE') {
+                    res.status(400).json({ error: 'URL is not a gif, png, jpg, or webp' });
+                    return;
+                }
+                if (err.code === 'TOO_LARGE') {
+                    res.status(413).json({ error: 'Image is too large' });
+                    return;
+                }
+                if (err.code === 'FETCH_FAILED') {
+                    res.status(502).json({ error: 'Could not download the image' });
+                    return;
+                }
+                throw err;
+            }
+            return;
+        }
+
+        res.json(dance.emit({
+            url,
+            ...extra,
+        }));
+    });
 
     app.get('/api/dvd', (_req, res) => {
         res.json({ speed: dvd?.get() ?? 1 });

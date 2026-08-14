@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot dance</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .gif {
+            position: absolute;
+            object-fit: fill;
+            opacity: 0;
+            transform: scale(0.86);
+            filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .gif.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <script>
+        const MIN_SIZE = 80;
+        const MAX_SIZE = 420;
+        const params = new URLSearchParams(location.search);
+        const stage = document.getElementById('stage');
+        let nextZ = 1;
+
+        function randomSize() {
+            return MIN_SIZE + Math.random() * (MAX_SIZE - MIN_SIZE);
+        }
+
+        function spawnGif(data) {
+            const url = String(data?.url || '').trim();
+            if (!url) {
+                return;
+            }
+
+            const width = randomSize();
+            const height = randomSize();
+            const maxX = Math.max(0, window.innerWidth - width);
+            const maxY = Math.max(0, window.innerHeight - height);
+            const x = Math.random() * maxX;
+            const y = Math.random() * maxY;
+
+            const img = document.createElement('img');
+            img.className = 'gif';
+            img.alt = '';
+            img.src = url;
+            img.style.position = 'absolute';
+            img.style.left = `${x}px`;
+            img.style.top = `${y}px`;
+            img.style.width = `${width}px`;
+            img.style.height = `${height}px`;
+            img.style.zIndex = String(nextZ);
+            nextZ += 1;
+            stage.appendChild(img);
+
+            requestAnimationFrame(() => img.classList.add('show'));
+        }
+
+        if (params.has('preview')) {
+            spawnGif({
+                url: params.get('gif') || '/gifs/preview.gif',
+            });
+        }
+
+        const source = new EventSource('/api/dance/events');
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'gif' && data.url) {
+                spawnGif(data);
+            }
+        };
+    </script>
+</body>
+</html>

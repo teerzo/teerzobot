@@ -5,7 +5,7 @@ import { formatDvdSpeed } from './dvd.js';
 
 const COOLDOWN_MS = 1_000;
 const ALIASES = { help: 'commands', song: 'currentsong' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow']);
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dance']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -20,7 +20,7 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance } = {}) {
     const cooldowns = new Map();
 
     const builtins = [
@@ -212,6 +212,38 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return say(channel, `DVD logo is already at min speed (${formatDvdSpeed(speed)}).`);
                 }
                 return say(channel, `DVD logo slower (${formatDvdSpeed(speed)}).`);
+            },
+        },
+        {
+            name: 'dance',
+            response: 'Saves an image URL and shows it on the dance overlay',
+            builtin: true,
+            async execute({ say, channel, args, user, displayName }) {
+                if (!dance) {
+                    return say(channel, 'Dance overlay is not available.');
+                }
+                const raw = String(args[0] ?? '').trim();
+                if (!raw) {
+                    say(channel, 'Usage: !dance <image url>');
+                    return false;
+                }
+                try {
+                    await dance.addFromUrl({ url: raw, user, displayName });
+                    return say(channel, `Dance GIF saved by ${displayName}.`);
+                } catch (err) {
+                    if (err.code === 'INVALID_URL') {
+                        say(channel, 'Usage: !dance <image url>');
+                        return false;
+                    }
+                    if (err.code === 'NOT_IMAGE') {
+                        return say(channel, 'That URL is not a gif, png, jpg, or webp.');
+                    }
+                    if (err.code === 'TOO_LARGE') {
+                        return say(channel, 'That image is too large (max 8MB).');
+                    }
+                    console.error('!dance failed', err);
+                    return say(channel, 'Could not download that image.');
+                }
             },
         },
         ...sceneBuiltins(),

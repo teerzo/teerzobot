@@ -10,6 +10,9 @@ node_modules/
 tokens/
 data/tokens.json
 
+# User-submitted dance GIFs
+data/gifs/
+
 # Logs
 *.log
 npm-debug.log*

@@ -72,6 +72,16 @@
             requestAnimationFrame(() => img.classList.add('show'));
         }
 
+        function removeRandomGif() {
+            const gifs = [...stage.querySelectorAll('.gif')];
+            if (gifs.length === 0) {
+                return;
+            }
+            const img = gifs[Math.floor(Math.random() * gifs.length)];
+            img.classList.remove('show');
+            setTimeout(() => img.remove(), 280);
+        }
+
         if (params.has('preview')) {
             spawnGif({
                 url: params.get('gif') || '/gifs/preview.gif',
@@ -83,6 +93,9 @@
             const data = JSON.parse(event.data);
             if (data.type === 'gif' && data.url) {
                 spawnGif(data);
+            }
+            if (data.type === 'remove-random') {
+                removeRandomGif();
             }
         };
     </script>

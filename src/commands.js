@@ -5,7 +5,7 @@ import { formatDvdSpeed } from './dvd.js';
 
 const COOLDOWN_MS = 1_000;
 const ALIASES = { help: 'commands', song: 'currentsong' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dance']);
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -215,6 +215,30 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
+            name: 'dvd',
+            response: 'Adds another bouncing DVD logo',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dvd) {
+                    return say(channel, 'DVD overlay is not available.');
+                }
+                dvd.addLogo();
+                return say(channel, 'Added a DVD logo.');
+            },
+        },
+        {
+            name: 'undvd',
+            response: 'Removes a random bouncing DVD logo',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dvd) {
+                    return say(channel, 'DVD overlay is not available.');
+                }
+                dvd.removeRandom();
+                return say(channel, 'Removed a random DVD logo.');
+            },
+        },
+        {
             name: 'dance',
             response: 'Saves an image URL and shows it on the dance overlay',
             builtin: true,
@@ -244,6 +268,18 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     console.error('!dance failed', err);
                     return say(channel, 'Could not download that image.');
                 }
+            },
+        },
+        {
+            name: 'undance',
+            response: 'Removes a random GIF from the dance overlay',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dance) {
+                    return say(channel, 'Dance overlay is not available.');
+                }
+                dance.removeRandom();
+                return say(channel, 'Removed a random dance GIF.');
             },
         },
         ...sceneBuiltins(),

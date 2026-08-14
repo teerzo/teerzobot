@@ -68,7 +68,10 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!currentsong` / `!song` | everyone | Currently playing song from the Chrome plugin |
 | `!dvdfast` | everyone | Speeds up the DVD overlay (`0.25x`–`8x`) |
 | `!dvdslow` | everyone | Slows down the DVD overlay (`0.25x`–`8x`) |
+| `!dvd` | everyone | Adds another bouncing DVD logo |
+| `!undvd` | everyone | Removes a random bouncing DVD logo |
 | `!dance <url>` | everyone | Downloads an image/GIF, saves it, and shows it on `/dance` |
+| `!undance` | everyone | Removes a random GIF from the dance overlay |
 | `!<name>` | everyone | Any custom command created via the API |
 
 Commands have a 10 second cooldown.
@@ -84,7 +87,7 @@ The bot on Railway cannot open OBS on your PC. Instead it exposes events:
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
 2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
 3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
-4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change the bounce speed.
+4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change bounce speed. `!dvd` adds another logo; `!undvd` removes one at random.
 5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` downloads the file to `DANCE_PATH` and shows it on the overlay.
 6. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
 7. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.

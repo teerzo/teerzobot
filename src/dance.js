@@ -250,5 +250,8 @@ export function createDance(dirPath = defaultDir()) {
             return withIndex(async (items) => [...items]);
         },
         addFromUrl,
+        removeRandom() {
+            return hub.emit({ type: 'remove-random' });
+        },
     };
 }

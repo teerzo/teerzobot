@@ -13,7 +13,7 @@
         body.solid {
             background: #000;
         }
-        #logo {
+        .logo {
             position: absolute;
             top: 0;
             left: 0;
@@ -23,13 +23,13 @@
             color: #ff2d55;
             filter: drop-shadow(0 0 10px currentColor);
         }
-        #logo.corner {
+        .logo.corner {
             filter: drop-shadow(0 0 22px #fff) drop-shadow(0 0 10px currentColor);
         }
     </style>
 </head>
 <body>
-    <svg id="logo" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" aria-label="DVD">
+    <svg id="logo-template" class="logo" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" aria-label="DVD" hidden>
         <ellipse cx="140" cy="58" rx="132" ry="50" fill="none" stroke="currentColor" stroke-width="6"/>
         <text x="140" y="72" text-anchor="middle" fill="currentColor"
             font-family="Arial Black, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="2">DVD</text>
@@ -42,49 +42,68 @@
         const colors = ['#ff2d55', '#ffcc00', '#34c759', '#00c7be', '#007aff', '#bf5af2', '#ff6b00'];
         const BASE_VX = 140;
         const BASE_VY = 110;
+        const template = document.getElementById('logo-template');
+        const logos = [];
 
         if (params.has('bg')) {
             document.body.classList.add('solid');
         }
 
-        const logo = document.getElementById('logo');
-        logo.style.width = `${size}px`;
-
         let speed = Math.max(0.2, Number(params.get('speed')) || 1);
-        let x = 40;
-        let y = 40;
-        let vx = BASE_VX * speed;
-        let vy = BASE_VY * speed;
-        let colorIndex = 0;
         let last = 0;
-        let w = 0;
-        let h = 0;
         let ready = false;
 
-        function bounds() {
-            w = Math.max(0, window.innerWidth - logo.clientWidth);
-            h = Math.max(0, window.innerHeight - logo.clientHeight);
-            x = Math.min(Math.max(0, x), w);
-            y = Math.min(Math.max(0, y), h);
+        function addLogo() {
+            const el = template.cloneNode(true);
+            el.removeAttribute('id');
+            el.removeAttribute('hidden');
+            el.style.width = `${size}px`;
+            document.body.appendChild(el);
+
+            const maxX = Math.max(0, window.innerWidth - el.clientWidth);
+            const maxY = Math.max(0, window.innerHeight - el.clientHeight);
+            const logo = {
+                el,
+                x: Math.random() * maxX,
+                y: Math.random() * maxY,
+                vx: BASE_VX * speed * (Math.random() < 0.5 ? -1 : 1),
+                vy: BASE_VY * speed * (Math.random() < 0.5 ? -1 : 1),
+                colorIndex: Math.floor(Math.random() * colors.length),
+            };
+            el.style.color = colors[logo.colorIndex];
+            el.style.transform = `translate(${logo.x}px, ${logo.y}px)`;
+            logos.push(logo);
+            return logo;
+        }
+
+        function removeRandomLogo() {
+            if (logos.length === 0) {
+                return;
+            }
+            const index = Math.floor(Math.random() * logos.length);
+            const [logo] = logos.splice(index, 1);
+            logo.el.remove();
         }
 
         function applySpeed(next) {
             const value = Math.max(0.2, Number(next) || 1);
-            const signX = vx === 0 ? 1 : Math.sign(vx);
-            const signY = vy === 0 ? 1 : Math.sign(vy);
             speed = value;
-            vx = BASE_VX * speed * signX;
-            vy = BASE_VY * speed * signY;
+            for (const logo of logos) {
+                const signX = logo.vx === 0 ? 1 : Math.sign(logo.vx);
+                const signY = logo.vy === 0 ? 1 : Math.sign(logo.vy);
+                logo.vx = BASE_VX * speed * signX;
+                logo.vy = BASE_VY * speed * signY;
+            }
         }
 
-        function nextColor() {
-            colorIndex = (colorIndex + 1) % colors.length;
-            logo.style.color = colors[colorIndex];
+        function nextColor(logo) {
+            logo.colorIndex = (logo.colorIndex + 1) % colors.length;
+            logo.el.style.color = colors[logo.colorIndex];
         }
 
-        function cornerFlash() {
-            logo.classList.add('corner');
-            setTimeout(() => logo.classList.remove('corner'), 450);
+        function cornerFlash(logo) {
+            logo.el.classList.add('corner');
+            setTimeout(() => logo.el.classList.remove('corner'), 450);
         }
 
         function tick(ts) {
@@ -94,39 +113,53 @@
             const dt = Math.min(0.05, (ts - last) / 1000);
             last = ts;
 
-            x += vx * dt;
-            y += vy * dt;
+            for (const logo of logos) {
+                const maxX = Math.max(0, window.innerWidth - logo.el.clientWidth);
+                const maxY = Math.max(0, window.innerHeight - logo.el.clientHeight);
+                logo.x += logo.vx * dt;
+                logo.y += logo.vy * dt;
 
-            let hitX = false;
-            let hitY = false;
-            if (x <= 0) {
-                x = 0;
-                vx = Math.abs(vx);
-                hitX = true;
-            } else if (x >= w) {
-                x = w;
-                vx = -Math.abs(vx);
-                hitX = true;
-            }
-            if (y <= 0) {
-                y = 0;
-                vy = Math.abs(vy);
-                hitY = true;
-            } else if (y >= h) {
-                y = h;
-                vy = -Math.abs(vy);
-                hitY = true;
-            }
-
-            if (hitX || hitY) {
-                nextColor();
-                if (hitX && hitY) {
-                    cornerFlash();
+                let hitX = false;
+                let hitY = false;
+                if (logo.x <= 0) {
+                    logo.x = 0;
+                    logo.vx = Math.abs(logo.vx);
+                    hitX = true;
+                } else if (logo.x >= maxX) {
+                    logo.x = maxX;
+                    logo.vx = -Math.abs(logo.vx);
+                    hitX = true;
                 }
+                if (logo.y <= 0) {
+                    logo.y = 0;
+                    logo.vy = Math.abs(logo.vy);
+                    hitY = true;
+                } else if (logo.y >= maxY) {
+                    logo.y = maxY;
+                    logo.vy = -Math.abs(logo.vy);
+                    hitY = true;
+                }
+
+                if (hitX || hitY) {
+                    nextColor(logo);
+                    if (hitX && hitY) {
+                        cornerFlash(logo);
+                    }
+                }
+
+                logo.el.style.transform = `translate(${logo.x}px, ${logo.y}px)`;
             }
 
-            logo.style.transform = `translate(${x}px, ${y}px)`;
             requestAnimationFrame(tick);
+        }
+
+        function onResize() {
+            for (const logo of logos) {
+                const maxX = Math.max(0, window.innerWidth - logo.el.clientWidth);
+                const maxY = Math.max(0, window.innerHeight - logo.el.clientHeight);
+                logo.x = Math.min(Math.max(0, logo.x), maxX);
+                logo.y = Math.min(Math.max(0, logo.y), maxY);
+            }
         }
 
         function start() {
@@ -134,16 +167,7 @@
                 return;
             }
             ready = true;
-            bounds();
-            x = Math.random() * w;
-            y = Math.random() * h;
-            if (Math.random() < 0.5) {
-                vx = -vx;
-            }
-            if (Math.random() < 0.5) {
-                vy = -vy;
-            }
-            logo.style.color = colors[0];
+            addLogo();
             requestAnimationFrame(tick);
 
             fetch('/api/dvd')
@@ -158,13 +182,21 @@
             const source = new EventSource('/api/dvd/events');
             source.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                if (data.action === 'add') {
+                    addLogo();
+                    return;
+                }
+                if (data.action === 'remove-random') {
+                    removeRandomLogo();
+                    return;
+                }
                 if (data.speed != null) {
                     applySpeed(data.speed);
                 }
             };
         }
 
-        window.addEventListener('resize', bounds);
+        window.addEventListener('resize', onResize);
         if (document.fonts && document.fonts.ready) {
             document.fonts.ready.then(start);
         }

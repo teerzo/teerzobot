@@ -42,5 +42,11 @@ export function createDvd() {
         get: () => speed,
         faster: () => nudge(1),
         slower: () => nudge(-1),
+        addLogo() {
+            return hub.emit({ action: 'add' });
+        },
+        removeRandom() {
+            return hub.emit({ action: 'remove-random' });
+        },
     };
 }

@@ -336,14 +336,14 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'dungeon',
-            response: 'Resets the dungeon crawler overlay to floor 1',
+            response: 'Resets the dungeon crawler overlay to floor 0',
             builtin: true,
             execute({ say, channel }) {
                 if (!dungeon) {
                     return say(channel, 'Dungeon overlay is not available.');
                 }
                 dungeon.reset();
-                return say(channel, 'Dungeon reset to floor 1. Move with !up !down !left !right.');
+                return say(channel, 'Dungeon reset to floor 0. Move with !up !down !left !right.');
             },
         },
         {

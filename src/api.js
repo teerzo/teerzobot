@@ -109,7 +109,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
             ttt: status.ttt ?? { listeners: 0 },
-            dungeon: status.dungeon ?? { listeners: 0, floor: 1, mode: 'anarchy' },
+            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy' },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -194,7 +194,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     });
 
     app.get('/api/dungeon', (_req, res) => {
-        res.json(dungeon?.get() ?? { floor: 1, mode: 'anarchy', grid: [] });
+        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', grid: [] });
     });
 
     app.post('/api/dungeon/reset', (_req, res) => {

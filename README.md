@@ -119,7 +119,7 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!down` / `!d` / `!b` / `!back` | everyone | Dungeon: step backward |
 | `!left` / `!l` | everyone | Dungeon: turn 90° left |
 | `!right` / `!r` | everyone | Dungeon: turn 90° right |
-| `!dungeon` | everyone | Reset the dungeon overlay to floor 1 |
+| `!dungeon` | everyone | Reset the dungeon overlay to floor 0 |
 | `!anarchy` | mods | Dungeon anarchy mode (every command runs immediately) |
 | `!democracy` | mods | Dungeon democracy mode (chat votes for 8 seconds) |
 | `!clear` | everyone | Clears dance GIFs, DVD logos, and the tic-tac-toe board |
@@ -141,7 +141,7 @@ The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open *
 4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change bounce speed. `!dvd` adds another logo; `!undvd` removes one at random.
 5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` queues the file; accept it at `/manage/dance` to show it on the overlay.
 6. **Tic-tac-toe:** add a Browser Source pointed at `https://<your-app>/ttt` (locally `http://localhost:3000/ttt`). `!ttt` starts a game; `!ttt 1-9` places a mark.
-7. **Dungeon:** add a Browser Source pointed at `https://<your-app>/dungeon` (locally `http://localhost:3000/dungeon`). Use a small size in OBS: **480×270**, **640×360**, **640×480**, **854×480**, or **960×540**. Chat moves a shared first-person maze with `!up` `!down` `!left` `!right`. Starts in anarchy; mods can switch with `!anarchy` / `!democracy`. `!dungeon` resets to floor 1. Test walk: `/dungeon?preview=1`.
+7. **Dungeon:** add a Browser Source pointed at `https://<your-app>/dungeon` (locally `http://localhost:3000/dungeon`). Use a small size in OBS: **480×270**, **640×360**, **640×480**, **854×480**, or **960×540**. Chat moves a shared first-person maze with `!up` `!down` `!left` `!right`. Starts on floor 0 (a short corridor). Starts in anarchy; mods can switch with `!anarchy` / `!democracy`. `!dungeon` resets to floor 0. Test walk: `/dungeon?preview=1`.
 8. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
 9. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
@@ -218,7 +218,7 @@ Example webhook payload:
 | `GET` | `/dungeon` | First-person dungeon overlay Browser Source page |
 | `GET` | `/api/dungeon` | Current dungeon game state |
 | `GET` | `/api/dungeon/events` | Server-sent dungeon updates |
-| `POST` | `/api/dungeon/reset` | Reset to floor 1 |
+| `POST` | `/api/dungeon/reset` | Reset to floor 0 |
 | `POST` | `/api/dungeon/input` | Apply a move (`{ "command": "up" }`) |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.

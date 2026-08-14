@@ -137,7 +137,31 @@ function emptyVotes() {
     return { up: 0, down: 0, left: 0, right: 0 };
 }
 
+function generateCorridor() {
+    const width = 7;
+    const height = 5;
+    const grid = Array.from({ length: height }, () => Array(width).fill(WALL));
+    const y = 2;
+    for (let x = 1; x <= 5; x++) {
+        grid[y][x] = FLOOR;
+    }
+    const startX = 1;
+    const startY = y;
+    const exit = { x: 5, y };
+    grid[exit.y][exit.x] = EXIT;
+    return {
+        width,
+        height,
+        grid,
+        player: { x: startX, y: startY, dir: 1 },
+        exit,
+    };
+}
+
 function buildFloor(floor) {
+    if (floor <= 0) {
+        return generateCorridor();
+    }
     const size = sizeForFloor(floor);
     const { grid, startX, startY } = generateMaze(size);
     const exit = farthestCell(grid, startX, startY);
@@ -153,7 +177,7 @@ function buildFloor(floor) {
 
 export function createDungeon() {
     const hub = createSseHub({ defaultType: 'dungeon' });
-    let floor = 1;
+    let floor = 0;
     let mode = 'anarchy';
     let maze = buildFloor(floor);
     let lastAction = null;
@@ -336,7 +360,7 @@ export function createDungeon() {
 
     function reset() {
         clearVotes();
-        floor = 1;
+        floor = 0;
         maze = buildFloor(floor);
         lastAction = null;
         lockedUntil = 0;

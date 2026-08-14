@@ -176,8 +176,18 @@
             <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
         </div>
     </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js"
+            }
+        }
+    </script>
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
+        import * as THREE from 'three';
+        import { RectAreaLightUniformsLib } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/lights/RectAreaLightUniformsLib.js';
+
+        RectAreaLightUniformsLib.init();
 
         const params = new URLSearchParams(location.search);
         const preview = params.has('preview');
@@ -356,14 +366,14 @@
             }
         }
 
-        function canvasToTexture(canvas) {
+        function canvasToTexture(canvas, repeatX = 1, repeatY = 2) {
             const tex = new THREE.CanvasTexture(canvas);
             tex.magFilter = THREE.NearestFilter;
             tex.minFilter = THREE.NearestFilter;
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
             tex.colorSpace = THREE.SRGBColorSpace;
-            tex.repeat.set(1, 2);
+            tex.repeat.set(repeatX, repeatY);
             tex.needsUpdate = true;
             return tex;
         }
@@ -374,14 +384,182 @@
             return canvas;
         }
 
-        const floorMat = new THREE.MeshLambertMaterial({ color: 0x1b1713 });
-        const ceilMat = new THREE.MeshLambertMaterial({ color: 0x100e0c });
-        const wallMat = new THREE.MeshLambertMaterial({ map: canvasToTexture(makeStoneCanvas()) });
-        const vineWallMat = new THREE.MeshLambertMaterial({ map: canvasToTexture(makeVineCanvas()) });
-        let floorMesh = null;
+        function drawCracks(ctx, size) {
+            function px(x, y, color) {
+                const dx = ((x % size) + size) % size;
+                if (y < 0 || y >= size) {
+                    return;
+                }
+                ctx.fillStyle = color;
+                ctx.fillRect(dx, y, 1, 1);
+            }
+
+            function crack(x0, y0, x1, y1, dark, edge) {
+                const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / Math.max(1, steps);
+                    const x = Math.round(x0 + (x1 - x0) * t);
+                    const y = Math.round(y0 + (y1 - y0) * t);
+                    const jag = (i % 3 === 0) ? 1 : 0;
+                    px(x + jag, y, dark);
+                    px(x + jag + 1, y, edge);
+                    if (i % 4 === 0) {
+                        px(x + jag, y + 1, dark);
+                    }
+                    if (i % 5 === 2) {
+                        px(x + jag - 1, y, edge);
+                    }
+                }
+            }
+
+            const dark = '#14110e';
+            const edge = '#3a332c';
+            crack(3, 2, 10, 18, dark, edge);
+            crack(10, 18, 8, 31, dark, edge);
+            crack(18, 1, 28, 14, dark, edge);
+            crack(22, 12, 31, 22, dark, edge);
+            crack(14, 8, 20, 24, dark, edge);
+            crack(1, 22, 12, 28, dark, edge);
+
+            for (let n = 0; n < 18; n++) {
+                px((n * 9 + 4) % size, (n * 5 + 11) % size, n % 2 ? dark : '#1c1814');
+            }
+        }
+
+        function makeCrackedCanvas() {
+            const canvas = makeStoneCanvas();
+            drawCracks(canvas.getContext('2d'), canvas.width);
+            return canvas;
+        }
+
+        function makeFloorCanvas(kind) {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const grout = kind === 'moss' ? '#1c2a18' : '#1a1613';
+            ctx.fillStyle = grout;
+            ctx.fillRect(0, 0, size, size);
+
+            const palettes = {
+                flag: [[92, 82, 70], [108, 96, 82], [80, 72, 62], [118, 104, 88]],
+                worn: [[86, 76, 64], [100, 88, 74], [72, 64, 54], [94, 84, 70]],
+                moss: [[78, 80, 62], [90, 86, 68], [70, 76, 58], [102, 94, 72]],
+                dark: [[58, 52, 46], [70, 62, 54], [48, 44, 40], [64, 58, 50]],
+                gravel: [[84, 74, 62], [96, 86, 72], [74, 66, 56], [108, 96, 80]],
+            }[kind];
+
+            const tile = kind === 'gravel' ? 8 : 16;
+            const gap = 1;
+            let i = 0;
+            for (let y = 0; y < size; y += tile) {
+                for (let x = 0; x < size; x += tile) {
+                    const pal = palettes[(x / tile + (y / tile) * 3 + i) % palettes.length];
+                    const shade = 0.86 + ((x * 9 + y * 5 + i * 13) % 7) * 0.03;
+                    ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
+                    ctx.fillRect(x + gap, y + gap, tile - gap, tile - gap);
+                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                    ctx.fillRect(x + gap, y + gap, tile - gap, 1);
+                    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+                    ctx.fillRect(x + gap, y + tile - 1, tile - gap, 1);
+                    i += 1;
+                }
+            }
+
+            function px(x, y, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(((x % size) + size) % size, ((y % size) + size) % size, 1, 1);
+            }
+
+            if (kind === 'worn') {
+                const cracks = [
+                    [4, 6, 1, 1], [5, 7, 1, 1], [6, 8, 1, 1], [7, 9, 1, 1], [8, 11, 1, 1],
+                    [18, 3, 1, 1], [19, 4, 1, 1], [20, 6, 1, 1], [21, 8, 1, 1],
+                    [10, 20, 1, 1], [11, 21, 1, 1], [12, 22, 1, 1], [13, 24, 1, 1], [14, 25, 1, 1],
+                ];
+                for (const [x, y] of cracks) {
+                    px(x, y, '#151210');
+                    px(x + 1, y, '#2a241e');
+                }
+            }
+
+            if (kind === 'moss') {
+                const moss = ['#2a5c24', '#3d7a32', '#4a8f38', '#1e4a1c'];
+                for (let n = 0; n < 70; n++) {
+                    const x = (n * 11 + 3) % size;
+                    const y = (n * 17 + 5) % size;
+                    const onGrout = x % 16 === 0 || y % 16 === 0 || x % 16 === 15 || y % 16 === 15;
+                    if (onGrout || n % 4 === 0) {
+                        px(x, y, moss[n % moss.length]);
+                        if (n % 3 === 0) {
+                            px(x + 1, y, moss[(n + 1) % moss.length]);
+                        }
+                    }
+                }
+            }
+
+            if (kind === 'gravel') {
+                for (let n = 0; n < 40; n++) {
+                    px((n * 7) % size, (n * 13) % size, n % 2 ? '#5a4e42' : '#3a322c');
+                }
+            }
+
+            const img = ctx.getImageData(0, 0, size, size);
+            for (let p = 0; p < img.data.length; p += 4) {
+                const n = ((p * 13) % 7) - 3;
+                img.data[p] = Math.max(0, Math.min(255, img.data[p] + n));
+                img.data[p + 1] = Math.max(0, Math.min(255, img.data[p + 1] + n));
+                img.data[p + 2] = Math.max(0, Math.min(255, img.data[p + 2] + n));
+            }
+            ctx.putImageData(img, 0, 0);
+            return canvas;
+        }
+
+        const FLOOR_KINDS = ['flag', 'worn', 'moss', 'dark', 'gravel'];
+        const floorMats = FLOOR_KINDS.map((kind) => new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeFloorCanvas(kind), 1, 1),
+            roughness: 0.96,
+            metalness: 0,
+        }));
+        const floorBaseMat = new THREE.MeshStandardMaterial({ color: 0x12100e, roughness: 1, metalness: 0 });
+
+        const ceilMat = new THREE.MeshStandardMaterial({ color: 0x100e0c, roughness: 0.98, metalness: 0 });
+        const wallMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeStoneCanvas()),
+            roughness: 0.92,
+            metalness: 0.04,
+        });
+        const vineWallMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeVineCanvas()),
+            roughness: 0.92,
+            metalness: 0.04,
+        });
+        const crackedWallMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeCrackedCanvas()),
+            roughness: 0.94,
+            metalness: 0.03,
+        });
+        const torchBracketMat = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.8, metalness: 0.35 });
+        const torchFlameMat = new THREE.MeshStandardMaterial({
+            color: 0xffb040,
+            emissive: 0xff6a14,
+            emissiveIntensity: 2.4,
+            roughness: 1,
+            metalness: 0,
+        });
+        const torchBracketGeo = new THREE.BoxGeometry(0.07, 0.28, 0.05);
+        const torchBowlGeo = new THREE.BoxGeometry(0.11, 0.045, 0.09);
+        const torchFlameGeo = new THREE.BoxGeometry(0.055, 0.11, 0.055);
+        const torchTipGeo = new THREE.BoxGeometry(0.03, 0.08, 0.03);
+        let floorBase = null;
+        let floorMeshes = [];
         let ceilMesh = null;
         let wallMesh = null;
         let vineWallMesh = null;
+        let crackedWallMesh = null;
+        let torchRoot = null;
+        let torchLights = [];
         let mazeKey = '';
 
         const camPos = new THREE.Vector3(1, EYE, 1);
@@ -408,19 +586,103 @@
             mesh.geometry.dispose();
         }
 
+        function clearTorches() {
+            if (torchRoot) {
+                scene.remove(torchRoot);
+                torchRoot = null;
+            }
+            for (const light of torchLights) {
+                scene.remove(light);
+            }
+            torchLights = [];
+        }
+
+        function makeTorch() {
+            const group = new THREE.Group();
+            const bracket = new THREE.Mesh(torchBracketGeo, torchBracketMat);
+            bracket.position.set(0, 0, 0.02);
+            const bowl = new THREE.Mesh(torchBowlGeo, torchBracketMat);
+            bowl.position.set(0, 0.12, 0.06);
+            const flame = new THREE.Mesh(torchFlameGeo, torchFlameMat);
+            flame.position.set(0, 0.2, 0.06);
+            const tip = new THREE.Mesh(torchTipGeo, torchFlameMat);
+            tip.position.set(0.008, 0.28, 0.06);
+            group.add(bracket, bowl, flame, tip);
+            return group;
+        }
+
+        function placeTorches(grid, width, height) {
+            clearTorches();
+            const dirs = [
+                { dx: 0, dz: -1 },
+                { dx: 1, dz: 0 },
+                { dx: 0, dz: 1 },
+                { dx: -1, dz: 0 },
+            ];
+            const spots = [];
+            for (let z = 0; z < height; z++) {
+                for (let x = 0; x < width; x++) {
+                    const cell = grid[z][x];
+                    if (cell !== 0 && cell !== 2) {
+                        continue;
+                    }
+                    for (let d = 0; d < 4; d++) {
+                        const { dx, dz } = dirs[d];
+                        const wx = x + dx;
+                        const wz = z + dz;
+                        if (grid[wz]?.[wx] !== 1) {
+                            continue;
+                        }
+                        const hash = Math.abs(x * 17 + z * 23 + d * 41);
+                        if (hash % 5 !== 0) {
+                            continue;
+                        }
+                        spots.push({ wx, wz, dx, dz, hash });
+                    }
+                }
+            }
+            spots.sort((a, b) => a.hash - b.hash);
+            const picked = spots.slice(0, 12);
+            torchRoot = new THREE.Group();
+            for (const spot of picked) {
+                const px = spot.wx - spot.dx * 0.54;
+                const pz = spot.wz - spot.dz * 0.54;
+                const py = 1.05;
+                const torch = makeTorch();
+                torch.position.set(px, py, pz);
+                torch.rotation.y = Math.atan2(-spot.dx, -spot.dz);
+                torchRoot.add(torch);
+
+                const light = new THREE.RectAreaLight(0xff8a3a, 9, 0.16, 0.28);
+                light.position.set(px - spot.dx * 0.06, py + 0.18, pz - spot.dz * 0.06);
+                light.rotation.y = Math.atan2(spot.dx, spot.dz);
+                light.userData.base = 8 + (spot.hash % 5) * 0.4;
+                scene.add(light);
+                torchLights.push(light);
+            }
+            scene.add(torchRoot);
+        }
+
         function rebuildMaze(state) {
-            disposeMesh(floorMesh);
+            disposeMesh(floorBase);
+            for (const mesh of floorMeshes) {
+                disposeMesh(mesh);
+            }
+            floorMeshes = [];
             disposeMesh(ceilMesh);
             disposeMesh(wallMesh);
             disposeMesh(vineWallMesh);
+            disposeMesh(crackedWallMesh);
+            clearTorches();
 
             const w = state.width;
             const h = state.height;
             const floorGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
             floorGeo.rotateX(-Math.PI / 2);
-            floorMesh = new THREE.Mesh(floorGeo, floorMat);
-            floorMesh.position.set((w - 1) / 2, 0, (h - 1) / 2);
-            scene.add(floorMesh);
+            floorBase = new THREE.Mesh(floorGeo, floorBaseMat);
+            floorBase.position.set((w - 1) / 2, -0.02, (h - 1) / 2);
+            floorBase.receiveShadow = true;
+            scene.add(floorBase);
 
             const ceilGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
             ceilGeo.rotateX(Math.PI / 2);
@@ -430,13 +692,17 @@
 
             const stoneWalls = [];
             const vineWalls = [];
+            const crackedWalls = [];
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
                     if (state.grid[y][x] !== 1) {
                         continue;
                     }
-                    if ((x * 7 + y * 13) % 4 === 0) {
+                    const kind = (x * 7 + y * 13) % 5;
+                    if (kind === 0) {
                         vineWalls.push(x, y);
+                    } else if (kind === 1) {
+                        crackedWalls.push(x, y);
                     } else {
                         stoneWalls.push(x, y);
                     }
@@ -469,7 +735,50 @@
 
             wallMesh = stoneWalls.length ? buildWalls(stoneWalls, wallMat) : null;
             vineWallMesh = vineWalls.length ? buildWalls(vineWalls, vineWallMat) : null;
-            floorMesh.receiveShadow = true;
+            crackedWallMesh = crackedWalls.length ? buildWalls(crackedWalls, crackedWallMat) : null;
+
+            const floorBuckets = FLOOR_KINDS.map(() => []);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (state.grid[y][x] === 1) {
+                        continue;
+                    }
+                    const kind = Math.abs(x * 11 + y * 29) % FLOOR_KINDS.length;
+                    floorBuckets[kind].push(x, y);
+                }
+            }
+
+            const tileGeo = new THREE.PlaneGeometry(1, 1);
+            tileGeo.rotateX(-Math.PI / 2);
+            const dummy = new THREE.Object3D();
+            const color = new THREE.Color();
+            for (let k = 0; k < floorBuckets.length; k++) {
+                const positions = floorBuckets[k];
+                if (!positions.length) {
+                    continue;
+                }
+                const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], positions.length / 2);
+                mesh.receiveShadow = true;
+                for (let i = 0; i < positions.length; i += 2) {
+                    const index = i / 2;
+                    dummy.position.set(positions[i], 0.002, positions[i + 1]);
+                    dummy.rotation.y = ((positions[i] + positions[i + 1]) % 4) * (Math.PI / 2);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(index, dummy.matrix);
+                    const shade = 0.9 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;
+                    color.setRGB(shade, shade, shade);
+                    mesh.setColorAt(index, color);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+                if (mesh.instanceColor) {
+                    mesh.instanceColor.needsUpdate = true;
+                }
+                scene.add(mesh);
+                floorMeshes.push(mesh);
+            }
+            tileGeo.dispose();
+
+            placeTorches(state.grid, w, h);
         }
 
         function applyState(state, snap) {
@@ -551,7 +860,13 @@
                 camPos.z + lookZ * bump,
             );
             camera.rotation.y = camYaw;
-            torch.intensity = 2.2 + Math.sin(clock.elapsedTime * 11) * 0.18;
+            torch.intensity = 1.6 + Math.sin(clock.elapsedTime * 11) * 0.12;
+            torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
+            for (let i = 0; i < torchLights.length; i++) {
+                const light = torchLights[i];
+                const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 1.1 + Math.sin(clock.elapsedTime * 23 + i) * 0.6;
+                light.intensity = light.userData.base + flicker;
+            }
             exitMesh.material.emissiveIntensity = 0.55 + Math.sin(clock.elapsedTime * 3) * 0.2;
             exitSpot.intensity = 28 + Math.sin(clock.elapsedTime * 2.4) * 4;
 

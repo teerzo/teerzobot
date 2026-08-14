@@ -168,32 +168,120 @@
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
         const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 80);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         renderer.setSize(innerWidth, innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.BasicShadowMap;
         document.body.prepend(renderer.domElement);
 
-        const ambient = new THREE.AmbientLight(0x2a241c, 0.35);
+        const ambient = new THREE.AmbientLight(0x2a241c, 0.4);
         scene.add(ambient);
         const torch = new THREE.PointLight(0xffd6a0, 2.4, 8, 1.6);
         camera.add(torch);
         scene.add(camera);
 
-        const exitLight = new THREE.PointLight(0x3cf0ff, 2.8, 7, 1.4);
-        scene.add(exitLight);
+        const EXIT_R = 0.22;
         const exitMesh = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.16, 0.16, WALL_H, 16),
+            new THREE.SphereGeometry(EXIT_R, 20, 16),
             new THREE.MeshStandardMaterial({
-                color: 0x145a66,
-                emissive: 0x3cf0ff,
-                emissiveIntensity: 1.4,
+                color: 0xd01414,
+                emissive: 0x7a0000,
+                emissiveIntensity: 0.7,
+                roughness: 0.35,
+                metalness: 0.05,
             }),
         );
+        exitMesh.castShadow = true;
         scene.add(exitMesh);
+
+        const exitSpot = new THREE.SpotLight(0xff2a22, 32, 6.5, Math.PI / 6, 0.35, 1.15);
+        exitSpot.castShadow = true;
+        exitSpot.shadow.mapSize.set(256, 256);
+        exitSpot.shadow.camera.near = 0.1;
+        exitSpot.shadow.camera.far = 7;
+        const exitTarget = new THREE.Object3D();
+        exitSpot.target = exitTarget;
+        scene.add(exitSpot);
+        scene.add(exitTarget);
+
+        function makeStoneTexture() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a2622';
+            ctx.fillRect(0, 0, size, size);
+
+            const palettes = [
+                [118, 104, 90],
+                [96, 86, 74],
+                [132, 116, 98],
+                [84, 76, 66],
+                [108, 96, 82],
+                [124, 112, 96],
+                [90, 82, 70],
+            ];
+            const brickW = 16;
+            const brickH = 8;
+            const grout = 1;
+
+            function paintBrick(x, y, pal, seed) {
+                const shade = 0.82 + (seed % 8) * 0.03;
+                const r = Math.min(255, pal[0] * shade);
+                const g = Math.min(255, pal[1] * shade);
+                const b = Math.min(255, pal[2] * shade);
+                for (const ox of [0, size, -size]) {
+                    for (const oy of [0, size, -size]) {
+                        const dx = x + ox;
+                        const dy = y + oy;
+                        if (dx >= size || dy >= size || dx + brickW - grout <= 0 || dy + brickH - grout <= 0) {
+                            continue;
+                        }
+                        ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+                        ctx.fillRect(dx + grout, dy + grout, brickW - grout, brickH - grout);
+                        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                        ctx.fillRect(dx + grout, dy + brickH - 1, brickW - grout, 1);
+                        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                        ctx.fillRect(dx + grout, dy + grout, brickW - grout, 1);
+                    }
+                }
+            }
+
+            let row = 0;
+            for (let y = 0; y < size; y += brickH) {
+                const offset = (row % 2) * (brickW / 2);
+                for (let x = -offset; x < size; x += brickW) {
+                    const seed = Math.abs((x * 13 + y * 7 + row * 17) | 0);
+                    paintBrick(x, y, palettes[seed % palettes.length], seed);
+                }
+                row += 1;
+            }
+
+            const img = ctx.getImageData(0, 0, size, size);
+            for (let i = 0; i < img.data.length; i += 4) {
+                const n = ((i * 17) % 9) - 4;
+                img.data[i] = Math.max(0, Math.min(255, img.data[i] + n));
+                img.data[i + 1] = Math.max(0, Math.min(255, img.data[i + 1] + n));
+                img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2] + n));
+            }
+            ctx.putImageData(img, 0, 0);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.repeat.set(1, 2);
+            tex.needsUpdate = true;
+            return tex;
+        }
 
         const floorMat = new THREE.MeshLambertMaterial({ color: 0x1b1713 });
         const ceilMat = new THREE.MeshLambertMaterial({ color: 0x100e0c });
-        const wallMat = new THREE.MeshLambertMaterial();
+        const wallMat = new THREE.MeshLambertMaterial({ map: makeStoneTexture() });
         let floorMesh = null;
         let ceilMesh = null;
         let wallMesh = null;
@@ -253,6 +341,8 @@
 
             const count = walls.length / 2 || 1;
             wallMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.02, WALL_H, 1.02), wallMat, count);
+            wallMesh.castShadow = true;
+            wallMesh.receiveShadow = true;
             const dummy = new THREE.Object3D();
             const color = new THREE.Color();
             for (let i = 0; i < walls.length; i += 2) {
@@ -260,8 +350,8 @@
                 dummy.position.set(walls[i], WALL_H / 2, walls[i + 1]);
                 dummy.updateMatrix();
                 wallMesh.setMatrixAt(index, dummy.matrix);
-                const shade = 0.72 + ((walls[i] * 13 + walls[i + 1] * 7) % 9) * 0.025;
-                color.setRGB(0.28 * shade, 0.24 * shade, 0.2 * shade);
+                const shade = 0.88 + ((walls[i] * 13 + walls[i + 1] * 7) % 9) * 0.015;
+                color.setRGB(shade, shade, shade);
                 wallMesh.setColorAt(index, color);
             }
             wallMesh.instanceMatrix.needsUpdate = true;
@@ -269,6 +359,7 @@
                 wallMesh.instanceColor.needsUpdate = true;
             }
             scene.add(wallMesh);
+            floorMesh.receiveShadow = true;
         }
 
         function applyState(state, snap) {
@@ -292,8 +383,9 @@
             }
 
             if (state.exit) {
-                exitMesh.position.set(state.exit.x, WALL_H / 2, state.exit.y);
-                exitLight.position.set(state.exit.x, 0.9, state.exit.y);
+                exitMesh.position.set(state.exit.x, EXIT_R, state.exit.y);
+                exitTarget.position.set(state.exit.x, 0, state.exit.y);
+                exitSpot.position.set(state.exit.x, WALL_H - 0.04, state.exit.y);
             }
 
             if (state.at && state.at !== lastAt && state.lastAction?.bumped) {
@@ -350,7 +442,8 @@
             );
             camera.rotation.y = camYaw;
             torch.intensity = 2.2 + Math.sin(clock.elapsedTime * 11) * 0.18;
-            exitMesh.material.emissiveIntensity = 1.2 + Math.sin(clock.elapsedTime * 3) * 0.25;
+            exitMesh.material.emissiveIntensity = 0.55 + Math.sin(clock.elapsedTime * 3) * 0.2;
+            exitSpot.intensity = 28 + Math.sin(clock.elapsedTime * 2.4) * 4;
 
             if (voteEndsAt) {
                 const left = Math.max(0, (voteEndsAt - Date.now()) / 1000);

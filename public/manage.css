@@ -178,6 +178,27 @@ button:hover, .btn:hover { background: #3b7aef; }
     border: 0;
     background: transparent;
 }
+.preview.ratio-16x9 {
+    height: auto;
+    aspect-ratio: 16 / 9;
+}
+.sizes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+.sizes button {
+    padding: 5px 8px;
+    background: #1e2430;
+    font: 11px/1.2 ui-monospace, Consolas, monospace;
+}
+.sizes button:hover { background: #2a3344; }
+.sizes .hint {
+    flex: 1 1 100%;
+    color: var(--muted);
+    font-size: 12px;
+}
 .profile {
     display: flex;
     gap: 16px;

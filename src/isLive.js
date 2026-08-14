@@ -59,6 +59,31 @@ export function createTwitchApi(api, { channel, botUserId }) {
                 throw err;
             }
         },
+        async getFollowers({ after } = {}) {
+            const broadcasterId = await getBroadcasterId();
+            try {
+                return await api.asUser(botUserId, (ctx) =>
+                    ctx.channels.getChannelFollowers(broadcasterId, undefined, {
+                        after: after || undefined,
+                        limit: 50,
+                    }),
+                );
+            } catch (err) {
+                if (isAuthError(err)) {
+                    const scoped = new Error('FOLLOWAGE_SCOPE');
+                    scoped.code = 'FOLLOWAGE_SCOPE';
+                    throw scoped;
+                }
+                throw err;
+            }
+        },
+        async getBotUser() {
+            const user = await api.users.getUserById(botUserId);
+            if (!user) {
+                throw new Error('Bot user not found');
+            }
+            return user;
+        },
         getBroadcasterId,
     };
 }

@@ -240,7 +240,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'dance',
-            response: 'Saves an image URL and shows it on the dance overlay',
+            response: 'Queues an image URL for dance overlay approval',
             builtin: true,
             async execute({ say, channel, args, user, displayName }) {
                 if (!dance) {
@@ -252,12 +252,15 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return false;
                 }
                 try {
-                    await dance.addFromUrl({ url: raw, user, displayName });
-                    return say(channel, `Dance GIF saved by ${displayName}.`);
+                    await dance.queueFromUrl({ url: raw, user, displayName });
+                    return say(channel, `Dance GIF queued for approval (${displayName}).`);
                 } catch (err) {
                     if (err.code === 'INVALID_URL') {
                         say(channel, 'Usage: !dance <image url>');
                         return false;
+                    }
+                    if (err.code === 'ALREADY_PENDING') {
+                        return say(channel, 'That GIF is already waiting for approval.');
                     }
                     if (err.code === 'NOT_IMAGE') {
                         return say(channel, 'That URL is not a gif, png, jpg, or webp.');

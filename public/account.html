@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot account</title>
+    <link rel="stylesheet" href="/manage.css">
+</head>
+<body>
+    <div id="chrome"></div>
+    <div class="page">
+        <h1>Account</h1>
+        <div class="profile" id="profile">Loading…</div>
+    </div>
+    <script src="/manage.js"></script>
+    <script>
+        bootManageChrome();
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        fetch('/api/account')
+            .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
+            .then(({ ok, body }) => {
+                const el = document.getElementById('profile');
+                if (!ok) {
+                    el.textContent = body.error || 'Could not load account';
+                    return;
+                }
+                const scopes = Array.isArray(body.scopes) && body.scopes.length
+                    ? `<ul class="scopes">${body.scopes.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul>`
+                    : '<p class="muted">No scopes on the current token.</p>';
+                const img = body.profileImage
+                    ? `<img src="${escapeHtml(body.profileImage)}" alt="">`
+                    : '';
+                el.innerHTML =
+                    img +
+                    `<div>` +
+                        `<h2 style="margin:0 0 4px">${escapeHtml(body.displayName || body.login || 'teerzobot')}</h2>` +
+                        `<div class="muted">@${escapeHtml(body.login || '')} · id ${escapeHtml(body.id || '')}</div>` +
+                        scopes +
+                        `<p style="margin:14px 0 0"><a class="btn" href="/oauth/login">Re-authorize bot</a></p>` +
+                    `</div>`;
+            })
+            .catch(() => {
+                document.getElementById('profile').textContent = 'Could not load account';
+            });
+    </script>
+</body>
+</html>

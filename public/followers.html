@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot followers</title>
+    <link rel="stylesheet" href="/manage.css">
+</head>
+<body>
+    <div id="chrome"></div>
+    <div class="page">
+        <h1>Followers</h1>
+        <p class="muted" id="summary">Loading…</p>
+        <ul class="followers" id="list"></ul>
+        <p style="margin-top:14px"><button type="button" id="more" hidden>Load more</button></p>
+    </div>
+    <script src="/manage.js"></script>
+    <script>
+        bootManageChrome();
+
+        const listEl = document.getElementById('list');
+        const moreEl = document.getElementById('more');
+        const summaryEl = document.getElementById('summary');
+        let cursor = '';
+        let total = 0;
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function formatDate(value) {
+            if (!value) {
+                return '';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return '';
+            }
+            return date.toLocaleString();
+        }
+
+        async function loadPage() {
+            moreEl.disabled = true;
+            const params = cursor ? `?after=${encodeURIComponent(cursor)}` : '';
+            const res = await fetch(`/api/followers${params}`);
+            const body = await res.json();
+            if (!res.ok) {
+                summaryEl.textContent = body.error || 'Could not load followers';
+                moreEl.hidden = true;
+                return;
+            }
+
+            for (const item of body.items || []) {
+                const row = document.createElement('li');
+                row.innerHTML =
+                    `<span><strong>${escapeHtml(item.displayName || item.user)}</strong> ` +
+                    `<span class="login">@${escapeHtml(item.user || '')}</span></span>` +
+                    `<span class="login">${escapeHtml(formatDate(item.followedAt))}</span>`;
+                listEl.appendChild(row);
+            }
+
+            total += (body.items || []).length;
+            cursor = body.cursor || '';
+            summaryEl.textContent = total ? `${total} loaded` : 'No followers found';
+            moreEl.hidden = !cursor;
+            moreEl.disabled = false;
+        }
+
+        moreEl.addEventListener('click', () => {
+            loadPage().catch(() => {
+                summaryEl.textContent = 'Could not load followers';
+            });
+        });
+
+        loadPage().catch(() => {
+            summaryEl.textContent = 'Could not load followers';
+        });
+    </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { createSseHub } from './sse.js';
 const MAX_BYTES = 8 * 1024 * 1024;
 const FETCH_MS = 10_000;
 const INDEX_NAME = 'gifs.json';
+const PENDING_NAME = 'pending.json';
 const PUBLIC_PREFIX = '/gifs';
 
 const CONTENT_TYPES = {
@@ -128,7 +129,9 @@ export function createDance(dirPath = defaultDir()) {
     const hub = createSseHub({ defaultType: 'dance' });
     const dir = path.resolve(dirPath);
     const indexPath = path.join(dir, INDEX_NAME);
+    const pendingPath = path.join(dir, PENDING_NAME);
     let itemsPromise;
+    let pendingPromise;
     fs.mkdir(dir, { recursive: true }).catch((err) => {
         console.error('Failed to create dance GIF folder', err);
     });
@@ -161,6 +164,34 @@ export function createDance(dirPath = defaultDir()) {
         return result;
     }
 
+    async function readPending() {
+        try {
+            const raw = await fs.readFile(pendingPath, 'utf-8');
+            const data = JSON.parse(raw);
+            return Array.isArray(data) ? data : [];
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
+    async function writePending(items) {
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(pendingPath, `${JSON.stringify(items, null, 2)}\n`, 'utf-8');
+    }
+
+    async function withPending(mutator) {
+        if (!pendingPromise) {
+            pendingPromise = readPending();
+        }
+        const items = await pendingPromise;
+        const result = await mutator(items);
+        pendingPromise = Promise.resolve(items);
+        return result;
+    }
+
     function emitGif(event) {
         return hub.emit({
             type: 'gif',
@@ -172,22 +203,15 @@ export function createDance(dirPath = defaultDir()) {
         });
     }
 
-    async function addFromUrl({ url, user, displayName, duration, size, x, y } = {}) {
-        const sourceUrl = parseImageUrl(url);
-        if (!sourceUrl) {
-            throw fail('INVALID_URL', 'url must be http or https');
-        }
+    async function emitQueue() {
+        const pending = await withPending(async (items) => [...items]);
+        return hub.emit({ type: 'queue', pending });
+    }
 
-        const existing = await withIndex(async (items) => items.find((item) => item.sourceUrl === sourceUrl));
-        if (existing) {
-            emitGif({
-                url: existing.url,
-                duration,
-                size,
-                x,
-                y,
-            });
-            return existing;
+    async function saveImage(sourceUrl, { user, displayName } = {}) {
+        const approved = await withIndex(async (items) => items.find((item) => item.sourceUrl === sourceUrl));
+        if (approved) {
+            return { ...approved };
         }
 
         let res;
@@ -216,7 +240,7 @@ export function createDance(dirPath = defaultDir()) {
         await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(path.join(dir, filename), bytes);
 
-        const item = {
+        return {
             id,
             filename,
             url: `${PUBLIC_PREFIX}/${filename}`,
@@ -225,19 +249,74 @@ export function createDance(dirPath = defaultDir()) {
             displayName: displayName || null,
             at: new Date().toISOString(),
         };
+    }
+
+    async function queueFromUrl({ url, user, displayName } = {}) {
+        const sourceUrl = parseImageUrl(url);
+        if (!sourceUrl) {
+            throw fail('INVALID_URL', 'url must be http or https');
+        }
+
+        const already = await withPending(async (items) => items.find((item) => item.sourceUrl === sourceUrl));
+        if (already) {
+            throw fail('ALREADY_PENDING', 'That GIF is already waiting for approval');
+        }
+
+        const item = await saveImage(sourceUrl, { user, displayName });
+        await withPending(async (items) => {
+            items.push(item);
+            await writePending(items);
+        });
+        await emitQueue();
+        return item;
+    }
+
+    async function approve(id) {
+        const item = await withPending(async (items) => {
+            const index = items.findIndex((entry) => entry.id === id);
+            if (index === -1) {
+                return null;
+            }
+            const [pending] = items.splice(index, 1);
+            await writePending(items);
+            return pending;
+        });
+        if (!item) {
+            throw fail('NOT_FOUND', 'Pending GIF not found');
+        }
 
         await withIndex(async (items) => {
-            items.push(item);
-            await writeIndex(items);
+            if (!items.some((entry) => entry.id === item.id || entry.sourceUrl === item.sourceUrl)) {
+                items.push(item);
+                await writeIndex(items);
+            }
         });
+        emitGif({ url: item.url });
+        await emitQueue();
+        return item;
+    }
 
-        emitGif({
-            url: item.url,
-            duration,
-            size,
-            x,
-            y,
+    async function reject(id) {
+        const item = await withPending(async (items) => {
+            const index = items.findIndex((entry) => entry.id === id);
+            if (index === -1) {
+                return null;
+            }
+            const [pending] = items.splice(index, 1);
+            await writePending(items);
+            return pending;
         });
+        if (!item) {
+            throw fail('NOT_FOUND', 'Pending GIF not found');
+        }
+
+        const kept = await withIndex(async (items) =>
+            items.some((entry) => entry.filename === item.filename),
+        );
+        if (!kept && item.filename) {
+            await fs.unlink(path.join(dir, item.filename)).catch(() => {});
+        }
+        await emitQueue();
         return item;
     }
 
@@ -249,7 +328,13 @@ export function createDance(dirPath = defaultDir()) {
         async list() {
             return withIndex(async (items) => [...items]);
         },
-        addFromUrl,
+        async listPending() {
+            return withPending(async (items) => [...items]);
+        },
+        queueFromUrl,
+        addFromUrl: queueFromUrl,
+        approve,
+        reject,
         removeRandom() {
             return hub.emit({ type: 'remove-random' });
         },

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot dance queue</title>
+    <link rel="stylesheet" href="/manage.css">
+</head>
+<body>
+    <div id="chrome"></div>
+    <div class="page">
+        <h1>Dance queue</h1>
+        <p class="muted" id="summary">Loading…</p>
+        <div class="queue" id="queue"></div>
+    </div>
+    <script src="/manage.js"></script>
+    <script>
+        bootManageChrome();
+
+        const queueEl = document.getElementById('queue');
+        const summaryEl = document.getElementById('summary');
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function render(items) {
+            const pending = Array.isArray(items) ? items : [];
+            summaryEl.textContent = pending.length
+                ? `${pending.length} waiting for approval`
+                : 'Nothing waiting. Chat !dance <url> to queue a GIF.';
+            queueEl.innerHTML = pending.map((item) => (
+                `<article class="queue-card" data-id="${escapeHtml(item.id)}">` +
+                    `<img src="${escapeHtml(item.url)}" alt="">` +
+                    `<div>` +
+                        `<div><strong>${escapeHtml(item.displayName || item.user || 'unknown')}</strong></div>` +
+                        `<div class="muted">${escapeHtml(item.sourceUrl || '')}</div>` +
+                        `<div class="queue-actions">` +
+                            `<button type="button" class="approve">Accept</button>` +
+                            `<button type="button" class="reject danger">Reject</button>` +
+                        `</div>` +
+                    `</div>` +
+                `</article>`
+            )).join('');
+        }
+
+        async function act(id, action) {
+            const res = await fetch(`/api/dance/pending/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `Could not ${action}`);
+            }
+        }
+
+        queueEl.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            const card = event.target.closest('[data-id]');
+            if (!button || !card) {
+                return;
+            }
+            const action = button.classList.contains('approve') ? 'approve' : 'reject';
+            button.disabled = true;
+            act(card.dataset.id, action).catch((err) => {
+                summaryEl.textContent = err.message;
+                button.disabled = false;
+            });
+        });
+
+        fetch('/api/dance/pending')
+            .then((res) => res.json())
+            .then((data) => render(data.items))
+            .catch(() => {
+                summaryEl.textContent = 'Could not load the dance queue';
+            });
+
+        const source = new EventSource('/api/dance/events');
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'queue') {
+                render(data.pending);
+            }
+        };
+    </script>
+</body>
+</html>

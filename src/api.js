@@ -77,7 +77,7 @@ function normalizeGifUrl(value) {
     return null;
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, getAuthProvider }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, getAuthProvider, getTwitch }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -99,6 +99,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             connected: status.connected,
             channel: status.channel,
             botUserId: process.env.BOT_USER_ID ?? null,
+            botUsername: process.env.BOT_USERNAME ?? null,
             obs: status.obs ?? { webhook: false, listeners: 0 },
             chat: status.chat ?? { listeners: 0 },
             nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
@@ -115,6 +116,19 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
     app.get('/', sendManage);
     app.get('/manage', sendManage);
+    app.get('/manage/overlays', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'overlays.html'));
+    });
+    app.get('/manage/dance', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'dance-queue.html'));
+    });
+    app.get('/manage/account', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'account.html'));
+    });
+    app.get('/manage/followers', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'followers.html'));
+    });
+    app.use(express.static(publicDir, { index: false }));
 
     app.get('/obs', (_req, res) => {
         res.sendFile(path.join(publicDir, 'obs.html'));
@@ -161,6 +175,70 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.json({ items: await dance.list() });
     });
 
+    app.get('/api/dance/pending', async (_req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+        res.json({ items: await dance.listPending() });
+    });
+
+    function sendDanceError(err, res) {
+        if (err.code === 'INVALID_URL') {
+            res.status(400).json({ error: 'url must be http or https' });
+            return true;
+        }
+        if (err.code === 'NOT_IMAGE') {
+            res.status(400).json({ error: 'URL is not a gif, png, jpg, or webp' });
+            return true;
+        }
+        if (err.code === 'TOO_LARGE') {
+            res.status(413).json({ error: 'Image is too large' });
+            return true;
+        }
+        if (err.code === 'FETCH_FAILED') {
+            res.status(502).json({ error: 'Could not download the image' });
+            return true;
+        }
+        if (err.code === 'ALREADY_PENDING') {
+            res.status(409).json({ error: 'That GIF is already waiting for approval' });
+            return true;
+        }
+        if (err.code === 'NOT_FOUND') {
+            res.status(404).json({ error: 'Pending GIF not found' });
+            return true;
+        }
+        return false;
+    }
+
+    app.post('/api/dance/pending/:id/approve', async (req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+        try {
+            res.json(await dance.approve(req.params.id));
+        } catch (err) {
+            if (!sendDanceError(err, res)) {
+                throw err;
+            }
+        }
+    });
+
+    app.post('/api/dance/pending/:id/reject', async (req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+        try {
+            res.json(await dance.reject(req.params.id));
+        } catch (err) {
+            if (!sendDanceError(err, res)) {
+                throw err;
+            }
+        }
+    });
+
     app.post('/api/dance', async (req, res) => {
         if (!dance) {
             res.status(503).json({ error: 'Dance overlay is not available' });
@@ -186,26 +264,12 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
         if (url.startsWith('http://') || url.startsWith('https://')) {
             try {
-                const item = await dance.addFromUrl({ url, ...extra });
+                const item = await dance.queueFromUrl({ url, ...extra });
                 res.json(item);
             } catch (err) {
-                if (err.code === 'INVALID_URL') {
-                    res.status(400).json({ error: 'url must be http or https' });
-                    return;
+                if (!sendDanceError(err, res)) {
+                    throw err;
                 }
-                if (err.code === 'NOT_IMAGE') {
-                    res.status(400).json({ error: 'URL is not a gif, png, jpg, or webp' });
-                    return;
-                }
-                if (err.code === 'TOO_LARGE') {
-                    res.status(413).json({ error: 'Image is too large' });
-                    return;
-                }
-                if (err.code === 'FETCH_FAILED') {
-                    res.status(502).json({ error: 'Could not download the image' });
-                    return;
-                }
-                throw err;
             }
             return;
         }
@@ -222,6 +286,64 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
     app.get('/api/alerts/config', (_req, res) => {
         res.json(alerts?.getConfig() ?? { followImage: '' });
+    });
+
+    app.get('/api/account', async (_req, res) => {
+        const twitch = getTwitch?.();
+        if (!twitch) {
+            res.status(503).json({ error: 'Twitch is not connected' });
+            return;
+        }
+        try {
+            const user = await twitch.getBotUser();
+            let scopes = [];
+            try {
+                const token = await getAuthProvider?.()?.getAccessTokenForUser(String(process.env.BOT_USER_ID || ''));
+                scopes = token?.scope ?? [];
+            } catch {
+                scopes = [];
+            }
+            res.json({
+                id: user.id,
+                login: user.name,
+                displayName: user.displayName,
+                profileImage: user.profilePictureUrl,
+                scopes,
+            });
+        } catch (err) {
+            console.error('GET /api/account failed', err);
+            res.status(502).json({ error: 'Could not load bot account' });
+        }
+    });
+
+    app.get('/api/followers', async (req, res) => {
+        const twitch = getTwitch?.();
+        if (!twitch) {
+            res.status(503).json({ error: 'Twitch is not connected' });
+            return;
+        }
+        const after = typeof req.query.after === 'string' ? req.query.after.trim() : '';
+        try {
+            const page = await twitch.getFollowers({ after: after || undefined });
+            res.json({
+                items: (page.data || []).map((follower) => ({
+                    userId: follower.userId,
+                    user: follower.userName,
+                    displayName: follower.userDisplayName,
+                    followedAt: follower.followDate ? follower.followDate.toISOString() : null,
+                })),
+                cursor: page.cursor || null,
+            });
+        } catch (err) {
+            if (err.code === 'FOLLOWAGE_SCOPE') {
+                res.status(403).json({
+                    error: 'Followers are unavailable. The bot needs moderator:read:followers and to be a channel mod.',
+                });
+                return;
+            }
+            console.error('GET /api/followers failed', err);
+            res.status(502).json({ error: 'Could not load followers' });
+        }
     });
 
     app.get('/api/now-playing', (_req, res) => {

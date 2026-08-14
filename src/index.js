@@ -69,6 +69,7 @@ const app = createApi({
     dvd,
     dance,
     getAuthProvider: () => authProviderRef,
+    getTwitch: () => twitchApi,
 });
 
 app.listen(port, '0.0.0.0', async () => {

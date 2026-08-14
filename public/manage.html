@@ -3,222 +3,46 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>teerzobot overlays</title>
-    <style>
-        :root {
-            --bg: #101114;
-            --card: #1a1c22;
-            --line: #2c303a;
-            --text: #f2f4f8;
-            --muted: #9aa3b5;
-            --accent: #8ab4ff;
-        }
-        html, body {
-            margin: 0;
-            min-height: 100%;
-            background: var(--bg);
-            color: var(--text);
-            font: 15px/1.4 system-ui, sans-serif;
-        }
-        header {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: baseline;
-            gap: 10px 18px;
-            padding: 22px 24px 8px;
-        }
-        h1 {
-            margin: 0;
-            font-size: 22px;
-        }
-        #status {
-            color: var(--muted);
-        }
-        #status.ok { color: #7cff9a; }
-        #status.bad { color: #ff8a8a; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 16px;
-            padding: 16px 24px 32px;
-        }
-        .card {
-            display: flex;
-            flex-direction: column;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: var(--card);
-            overflow: hidden;
-        }
-        .meta {
-            padding: 14px 14px 12px;
-        }
-        .meta h2 {
-            margin: 0 0 4px;
-            font-size: 16px;
-        }
-        .path {
-            color: var(--accent);
-            font-family: ui-monospace, Consolas, monospace;
-            font-size: 13px;
-        }
-        .note, .cmds {
-            margin: 8px 0 0;
-            color: var(--muted);
-            font-size: 13px;
-        }
-        .url-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .url-row input {
-            flex: 1;
-            min-width: 0;
-            padding: 8px 10px;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: #12141a;
-            color: var(--text);
-            font: 12px/1.3 ui-monospace, Consolas, monospace;
-        }
-        .url-row button {
-            padding: 8px 12px;
-            border: 0;
-            border-radius: 8px;
-            background: #2d6cdf;
-            color: #fff;
-            font: 13px/1 system-ui, sans-serif;
-            cursor: pointer;
-        }
-        .url-row button:hover { background: #3b7aef; }
-        .preview {
-            position: relative;
-            height: 220px;
-            border-top: 1px solid var(--line);
-            background:
-                linear-gradient(45deg, #1e2128 25%, transparent 25%) 0 0 / 16px 16px,
-                linear-gradient(-45deg, #1e2128 25%, transparent 25%) 0 8px / 16px 16px,
-                linear-gradient(45deg, transparent 75%, #1e2128 75%) 8px -8px / 16px 16px,
-                linear-gradient(-45deg, transparent 75%, #1e2128 75%) -8px 0 / 16px 16px,
-                #15171c;
-        }
-        .preview iframe {
-            display: block;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            background: transparent;
-        }
-    </style>
+    <title>teerzobot</title>
+    <link rel="stylesheet" href="/manage.css">
 </head>
 <body>
-    <header>
-        <h1>teerzobot overlays</h1>
-        <div id="status">checking status…</div>
-    </header>
-    <div class="grid" id="grid"></div>
+    <div id="chrome"></div>
+    <div class="home">
+        <aside class="status-panel">
+            <h2>Bot status</h2>
+            <dl>
+                <dt>Twitch chat</dt>
+                <dd id="chat-state">loading…</dd>
+                <dt>Channel</dt>
+                <dd id="channel-state">—</dd>
+                <dt>Discord</dt>
+                <dd id="discord-state">—</dd>
+            </dl>
+        </aside>
+        <div class="chat-frame">
+            <iframe id="twitch-chat" title="Twitch chat"></iframe>
+        </div>
+    </div>
+    <script src="/manage.js"></script>
     <script>
-        const overlays = [
-            {
-                name: 'Chat',
-                path: '/chat',
-                note: 'Display-only Browser Source.',
-            },
-            {
-                name: 'Follow alerts',
-                path: '/alerts',
-                note: 'Keep on every scene that should show alerts. Preview: /alerts?preview=1',
-            },
-            {
-                name: 'Now playing',
-                path: '/now-playing',
-                commands: ['!song', '!currentsong'],
-            },
-            {
-                name: 'DVD logo',
-                path: '/dvd',
-                commands: ['!dvd', '!undvd', '!dvdfast', '!dvdslow'],
-            },
-            {
-                name: 'Dance GIFs',
-                path: '/dance',
-                commands: ['!dance <url>', '!undance'],
-            },
-            {
-                name: 'Scene control',
-                path: '/obs',
-                note: 'Set Control Level to Advanced.',
-            },
-        ];
-
-        const grid = document.getElementById('grid');
-        const statusEl = document.getElementById('status');
-
-        function overlayUrl(path) {
-            return `${location.origin}${path}`;
-        }
-
-        async function copyUrl(url, button) {
-            try {
-                await navigator.clipboard.writeText(url);
-            } catch {
-                const input = button.previousElementSibling;
-                input.select();
-                document.execCommand('copy');
-            }
-            const label = button.textContent;
-            button.textContent = 'Copied';
-            setTimeout(() => {
-                button.textContent = label;
-            }, 1200);
-        }
-
-        function renderCard(overlay) {
-            const url = overlayUrl(overlay.path);
-            const card = document.createElement('article');
-            card.className = 'card';
-            const commands = overlay.commands?.length
-                ? `<p class="cmds">${overlay.commands.map((name) => `<code>${name}</code>`).join(' · ')}</p>`
-                : '';
-            const note = overlay.note ? `<p class="note">${overlay.note}</p>` : '';
-            card.innerHTML =
-                `<div class="meta">` +
-                    `<h2>${overlay.name}</h2>` +
-                    `<div class="path">${overlay.path}</div>` +
-                    note +
-                    commands +
-                    `<div class="url-row">` +
-                        `<input readonly value="${url}">` +
-                        `<button type="button">Copy</button>` +
-                    `</div>` +
-                `</div>` +
-                `<div class="preview"><iframe title="${overlay.name}" src="${overlay.path}"></iframe></div>`;
-            card.querySelector('button').addEventListener('click', (event) => {
-                copyUrl(url, event.currentTarget);
-            });
-            return card;
-        }
-
-        for (const overlay of overlays) {
-            grid.appendChild(renderCard(overlay));
-        }
+        bootManageChrome();
 
         fetch('/api/status')
             .then((res) => res.json())
             .then((status) => {
-                const channel = status.channel ? `#${status.channel}` : 'no channel';
-                if (status.connected) {
-                    statusEl.className = 'ok';
-                    statusEl.textContent = `connected · ${channel}`;
-                } else {
-                    statusEl.className = 'bad';
-                    statusEl.textContent = `offline · ${channel}`;
+                const channel = status.channel || '';
+                document.getElementById('chat-state').textContent = status.connected ? 'connected' : 'offline';
+                document.getElementById('channel-state').textContent = channel ? `#${channel}` : 'not set';
+                document.getElementById('discord-state').textContent = status.discord?.connected ? 'connected' : 'offline';
+                if (channel) {
+                    const parent = location.hostname || 'localhost';
+                    document.getElementById('twitch-chat').src =
+                        `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?parent=${encodeURIComponent(parent)}&darkpopout`;
                 }
             })
             .catch(() => {
-                statusEl.className = 'bad';
-                statusEl.textContent = 'could not load status';
+                document.getElementById('chat-state').textContent = 'unavailable';
             });
     </script>
 </body>

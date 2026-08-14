@@ -86,7 +86,8 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!dvdslow` | everyone | Slows down the DVD overlay (`0.25x`–`8x`) |
 | `!dvd` | everyone | Adds another bouncing DVD logo |
 | `!undvd` | everyone | Removes a random bouncing DVD logo |
-| `!dance <url>` | everyone | Downloads an image/GIF, saves it, and shows it on `/dance` |
+| `!dance <url>` | everyone | Queues an image/GIF for approval, then shows it on `/dance` after you accept it |
+| `!undance` | everyone | Removes a random GIF from the dance overlay |
 | `!undance` | everyone | Removes a random GIF from the dance overlay |
 | `!<name>` | everyone | Any custom command created via the API |
 
@@ -98,13 +99,13 @@ Commands have a 10 second cooldown.
 
 ## OBS
 
-The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open **`/manage`** (also `/`) for live previews and copyable Browser Source URLs.
+The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open **`/`** (also `/manage`) for bot status and Twitch chat. Overlay previews and copyable Browser Source URLs are at **`/manage/overlays`**. Dance approval queue: `/manage/dance`. Account: `/manage/account`. Followers: `/manage/followers`.
 
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
 2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
 3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
 4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change bounce speed. `!dvd` adds another logo; `!undvd` removes one at random.
-5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` downloads the file to `DANCE_PATH` and shows it on the overlay.
+5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` queues the file; accept it at `/manage/dance` to show it on the overlay.
 6. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
 7. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
@@ -138,7 +139,13 @@ Example webhook payload:
 | `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
 | `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance, discord }` |
-| `GET` | `/` / `/manage` | Overlay management dashboard (live previews + copyable URLs) |
+| `GET` | `/` / `/manage` | Dashboard (bot status + Twitch chat) |
+| `GET` | `/manage/overlays` | Overlay previews and copyable Browser Source URLs |
+| `GET` | `/manage/dance` | Dance GIF approval queue |
+| `GET` | `/manage/account` | Bot profile and re-authorize |
+| `GET` | `/manage/followers` | Channel follower list |
+| `GET` | `/api/account` | Bot profile (`{ id, login, displayName, profileImage, scopes }`) |
+| `GET` | `/api/followers` | Paginated followers (`{ items, cursor }`) |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
@@ -161,7 +168,10 @@ Example webhook payload:
 | `GET` | `/api/dvd/events` | Server-sent DVD speed changes |
 | `GET` | `/dance` | Dance GIF overlay Browser Source page |
 | `GET` | `/api/dance` | Saved dance GIFs (`{ items }`) |
-| `POST` | `/api/dance` | Show a GIF (`{ "url": "/gifs/name.gif" }` or a remote image URL) |
+| `GET` | `/api/dance/pending` | Pending dance GIFs waiting for approval |
+| `POST` | `/api/dance` | Queue a GIF (`{ "url": "https://…" }`) or show a local `/gifs/…` file |
+| `POST` | `/api/dance/pending/:id/approve` | Accept a queued GIF and show it on `/dance` |
+| `POST` | `/api/dance/pending/:id/reject` | Reject a queued GIF |
 | `GET` | `/api/dance/events` | Server-sent dance GIF events |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.

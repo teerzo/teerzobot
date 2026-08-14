@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot overlays</title>
+    <link rel="stylesheet" href="/manage.css">
+</head>
+<body>
+    <div id="chrome"></div>
+    <div class="page">
+        <h1>Overlays</h1>
+        <p class="muted">Copy a URL into an OBS Browser Source. Previews are live.</p>
+        <div class="grid" id="grid"></div>
+    </div>
+    <script src="/manage.js"></script>
+    <script>
+        bootManageChrome();
+
+        const overlays = [
+            {
+                name: 'Chat',
+                path: '/chat',
+                note: 'Display-only Browser Source.',
+            },
+            {
+                name: 'Follow alerts',
+                path: '/alerts',
+                note: 'Keep on every scene that should show alerts. Preview: /alerts?preview=1',
+            },
+            {
+                name: 'Now playing',
+                path: '/now-playing',
+                commands: ['!song', '!currentsong'],
+            },
+            {
+                name: 'DVD logo',
+                path: '/dvd',
+                commands: ['!dvd', '!undvd', '!dvdfast', '!dvdslow'],
+            },
+            {
+                name: 'Dance GIFs',
+                path: '/dance',
+                commands: ['!dance <url>', '!undance'],
+                note: 'Queued GIFs are approved at /manage/dance.',
+            },
+            {
+                name: 'Scene control',
+                path: '/obs',
+                note: 'Set Control Level to Advanced.',
+            },
+        ];
+
+        const grid = document.getElementById('grid');
+
+        function overlayUrl(path) {
+            return `${location.origin}${path}`;
+        }
+
+        async function copyUrl(url, button) {
+            try {
+                await navigator.clipboard.writeText(url);
+            } catch {
+                const input = button.previousElementSibling;
+                input.select();
+                document.execCommand('copy');
+            }
+            const label = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(() => {
+                button.textContent = label;
+            }, 1200);
+        }
+
+        function renderCard(overlay) {
+            const url = overlayUrl(overlay.path);
+            const card = document.createElement('article');
+            card.className = 'card';
+            const commands = overlay.commands?.length
+                ? `<p class="cmds">${overlay.commands.map((name) => `<code>${name}</code>`).join(' · ')}</p>`
+                : '';
+            const note = overlay.note ? `<p class="note">${overlay.note}</p>` : '';
+            card.innerHTML =
+                `<div class="meta">` +
+                    `<h2>${overlay.name}</h2>` +
+                    `<div class="path">${overlay.path}</div>` +
+                    note +
+                    commands +
+                    `<div class="url-row">` +
+                        `<input readonly value="${url}">` +
+                        `<button type="button">Copy</button>` +
+                    `</div>` +
+                `</div>` +
+                `<div class="preview"><iframe title="${overlay.name}" src="${overlay.path}"></iframe></div>`;
+            card.querySelector('button').addEventListener('click', (event) => {
+                copyUrl(url, event.currentTarget);
+            });
+            return card;
+        }
+
+        for (const overlay of overlays) {
+            grid.appendChild(renderCard(overlay));
+        }
+    </script>
+</body>
+</html>

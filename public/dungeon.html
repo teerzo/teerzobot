@@ -157,6 +157,35 @@
                 padding: 10px 12px;
             }
         }
+        #transition {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        #transition.out {
+            opacity: 1;
+        }
+        #transition-msg {
+            opacity: 0;
+            color: #f3e6c8;
+            font-size: clamp(18px, 5vw, 34px);
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            text-align: center;
+            text-shadow: 0 0 18px rgba(226, 184, 74, 0.45);
+            transition: opacity 0.35s ease;
+        }
+        #transition.title #transition-msg {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -175,6 +204,7 @@
             <div class="vote"><span>!left</span><div class="bar"><i id="bar-left"></i></div><b id="n-left">0</b></div>
             <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
         </div>
+        <div id="transition"><div id="transition-msg">Entering Level 0</div></div>
     </div>
     <script type="importmap">
         {
@@ -201,6 +231,8 @@
         const lastEl = document.getElementById('last');
         const votesEl = document.getElementById('votes');
         const voteTitleEl = document.getElementById('vote-title');
+        const transitionEl = document.getElementById('transition');
+        const transitionMsgEl = document.getElementById('transition-msg');
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x090807);
@@ -634,6 +666,9 @@
         let torchRoot = null;
         let torchLights = [];
         let mazeKey = '';
+        let shownFloor = null;
+        let transitioning = false;
+        let pendingState = null;
 
         const camPos = new THREE.Vector3(1, EYE, 1);
         const targetPos = new THREE.Vector3(1, EYE, 1);
@@ -858,6 +893,49 @@
             if (!state?.grid?.length) {
                 return;
             }
+            if (transitioning) {
+                pendingState = state;
+                return;
+            }
+            const nextFloor = Number(state.floor);
+            const isNewFloor = shownFloor !== null && nextFloor !== shownFloor;
+            if (isNewFloor && !snap) {
+                startLevelTransition(state);
+                return;
+            }
+            commitWorld(state, snap || shownFloor === null);
+            shownFloor = nextFloor;
+        }
+
+        function startLevelTransition(state) {
+            transitioning = true;
+            pendingState = state;
+            transitionMsgEl.textContent = `Entering Level ${state.floor}`;
+            transitionEl.classList.remove('title');
+            transitionEl.classList.add('out');
+
+            window.setTimeout(() => {
+                const next = pendingState || state;
+                commitWorld(next, true);
+                shownFloor = Number(next.floor);
+                transitionEl.classList.add('title');
+            }, 500);
+
+            window.setTimeout(() => {
+                transitionEl.classList.remove('out', 'title');
+            }, 2000);
+
+            window.setTimeout(() => {
+                transitioning = false;
+                const next = pendingState;
+                pendingState = null;
+                if (next) {
+                    applyState(next, false);
+                }
+            }, 2550);
+        }
+
+        function commitWorld(state, snap) {
             const key = `${state.floor}:${state.width}:${state.height}`;
             if (key !== mazeKey) {
                 mazeKey = key;
@@ -885,7 +963,7 @@
             }
             lastAt = state.at || lastAt;
 
-            floorEl.textContent = String(state.floor ?? 1);
+            floorEl.textContent = String(state.floor ?? 0);
             modeEl.textContent = state.mode === 'democracy' ? 'Democracy' : 'Anarchy';
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
 

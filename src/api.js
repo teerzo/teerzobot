@@ -58,7 +58,7 @@ function attachSse(app, route, hub) {
     });
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, getAuthProvider }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, getAuthProvider }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -84,6 +84,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             chat: status.chat ?? { listeners: 0 },
             nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
             alerts: status.alerts ?? { listeners: 0 },
+            dvd: status.dvd ?? { listeners: 0, speed: 1 },
         });
     });
 
@@ -103,6 +104,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'alerts.html'));
     });
 
+    app.get('/dvd', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'dvd.html'));
+    });
+
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });
     });
@@ -111,6 +116,11 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/chat/events', chatFeed);
     attachSse(app, '/api/now-playing/events', nowPlaying);
     attachSse(app, '/api/alerts/events', alerts);
+    attachSse(app, '/api/dvd/events', dvd);
+
+    app.get('/api/dvd', (_req, res) => {
+        res.json({ speed: dvd?.get() ?? 1 });
+    });
 
     app.get('/api/alerts/config', (_req, res) => {
         res.json(alerts?.getConfig() ?? { followImage: '' });

@@ -1,10 +1,11 @@
 import { formatDuration } from './isLive.js';
 import { getSceneMap } from './obs.js';
 import { formatChatLine } from './nowPlaying.js';
+import { formatDvdSpeed } from './dvd.js';
 
-const COOLDOWN_MS = 10_000;
+const COOLDOWN_MS = 1_000;
 const ALIASES = { help: 'commands', song: 'currentsong' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song']);
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -19,7 +20,7 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs, getNowPlaying } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd } = {}) {
     const cooldowns = new Map();
 
     const builtins = [
@@ -181,6 +182,36 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying } = 
             builtin: true,
             execute({ say, channel }) {
                 return say(channel, formatChatLine(getNowPlaying?.() ?? null));
+            },
+        },
+        {
+            name: 'dvdfast',
+            response: 'Speeds up the DVD overlay',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dvd) {
+                    return say(channel, 'DVD overlay is not available.');
+                }
+                const { speed, changed } = dvd.faster();
+                if (!changed) {
+                    return say(channel, `DVD logo is already at max speed (${formatDvdSpeed(speed)}).`);
+                }
+                return say(channel, `DVD logo faster (${formatDvdSpeed(speed)}).`);
+            },
+        },
+        {
+            name: 'dvdslow',
+            response: 'Slows down the DVD overlay',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dvd) {
+                    return say(channel, 'DVD overlay is not available.');
+                }
+                const { speed, changed } = dvd.slower();
+                if (!changed) {
+                    return say(channel, `DVD logo is already at min speed (${formatDvdSpeed(speed)}).`);
+                }
+                return say(channel, `DVD logo slower (${formatDvdSpeed(speed)}).`);
             },
         },
         ...sceneBuiltins(),

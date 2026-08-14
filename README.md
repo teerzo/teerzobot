@@ -65,6 +65,8 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!uptime` | everyone | How long the stream has been live |
 | `!followage` | everyone | How long that chatter has followed |
 | `!currentsong` / `!song` | everyone | Currently playing song from the Chrome plugin |
+| `!dvdfast` | everyone | Speeds up the DVD overlay (`0.25x`–`8x`) |
+| `!dvdslow` | everyone | Slows down the DVD overlay (`0.25x`–`8x`) |
 | `!<name>` | everyone | Any custom command created via the API |
 
 Commands have a 10 second cooldown.
@@ -80,8 +82,9 @@ The bot on Railway cannot open OBS on your PC. Instead it exposes events:
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
 2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
 3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
-4. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
-5. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change the bounce speed.
+5. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+6. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
 Map chat commands to OBS scene names with env vars:
 
@@ -112,7 +115,7 @@ Example webhook payload:
 | --- | --- | --- |
 | `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |
@@ -130,6 +133,9 @@ Example webhook payload:
 | `GET` | `/alerts` | Follow-alert Browser Source page |
 | `GET` | `/api/alerts/config` | `{ followImage }` |
 | `GET` | `/api/alerts/events` | Server-sent follow alerts |
+| `GET` | `/dvd` | Bouncing DVD overlay Browser Source page |
+| `GET` | `/api/dvd` | Current DVD speed (`{ speed }`) |
+| `GET` | `/api/dvd/events` | Server-sent DVD speed changes |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.
 

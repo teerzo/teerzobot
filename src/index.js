@@ -9,6 +9,7 @@ import { createChatFeed, createObs } from './obs.js';
 import { createNowPlaying } from './nowPlaying.js';
 import { createFfzEmotes } from './ffz.js';
 import { createAlerts } from './alerts.js';
+import { createDvd } from './dvd.js';
 import { startFollowAlerts } from './follows.js';
 
 function requireEnv(name) {
@@ -28,6 +29,7 @@ const chatFeed = createChatFeed();
 const nowPlaying = createNowPlaying();
 const ffz = createFfzEmotes(channel);
 const alerts = createAlerts();
+const dvd = createDvd();
 let twitchApi = null;
 let authProviderRef = null;
 
@@ -35,6 +37,7 @@ const commands = createCommandHandler(store, {
     getTwitch: () => twitchApi,
     obs,
     getNowPlaying: () => nowPlaying.get(),
+    dvd,
 });
 
 let chat = {
@@ -48,6 +51,7 @@ const app = createApi({
         chat: chatFeed.getStatus(),
         nowPlaying: nowPlaying.getStatus(),
         alerts: alerts.getStatus(),
+        dvd: dvd.getStatus(),
     }),
     commands,
     store,
@@ -55,6 +59,7 @@ const app = createApi({
     chatFeed,
     nowPlaying,
     alerts,
+    dvd,
     getAuthProvider: () => authProviderRef,
 });
 

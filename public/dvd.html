@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot DVD</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        body.solid {
+            background: #000;
+        }
+        #logo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 220px;
+            height: auto;
+            will-change: transform;
+            color: #ff2d55;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        #logo.corner {
+            filter: drop-shadow(0 0 22px #fff) drop-shadow(0 0 10px currentColor);
+        }
+    </style>
+</head>
+<body>
+    <svg id="logo" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" aria-label="DVD">
+        <ellipse cx="140" cy="58" rx="132" ry="50" fill="none" stroke="currentColor" stroke-width="6"/>
+        <text x="140" y="72" text-anchor="middle" fill="currentColor"
+            font-family="Arial Black, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="2">DVD</text>
+        <text x="140" y="116" text-anchor="middle" fill="currentColor"
+            font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="10">VIDEO</text>
+    </svg>
+    <script>
+        const params = new URLSearchParams(location.search);
+        const size = Math.max(80, Number(params.get('size')) || 220);
+        const colors = ['#ff2d55', '#ffcc00', '#34c759', '#00c7be', '#007aff', '#bf5af2', '#ff6b00'];
+        const BASE_VX = 140;
+        const BASE_VY = 110;
+
+        if (params.has('bg')) {
+            document.body.classList.add('solid');
+        }
+
+        const logo = document.getElementById('logo');
+        logo.style.width = `${size}px`;
+
+        let speed = Math.max(0.2, Number(params.get('speed')) || 1);
+        let x = 40;
+        let y = 40;
+        let vx = BASE_VX * speed;
+        let vy = BASE_VY * speed;
+        let colorIndex = 0;
+        let last = 0;
+        let w = 0;
+        let h = 0;
+        let ready = false;
+
+        function bounds() {
+            w = Math.max(0, window.innerWidth - logo.clientWidth);
+            h = Math.max(0, window.innerHeight - logo.clientHeight);
+            x = Math.min(Math.max(0, x), w);
+            y = Math.min(Math.max(0, y), h);
+        }
+
+        function applySpeed(next) {
+            const value = Math.max(0.2, Number(next) || 1);
+            const signX = vx === 0 ? 1 : Math.sign(vx);
+            const signY = vy === 0 ? 1 : Math.sign(vy);
+            speed = value;
+            vx = BASE_VX * speed * signX;
+            vy = BASE_VY * speed * signY;
+        }
+
+        function nextColor() {
+            colorIndex = (colorIndex + 1) % colors.length;
+            logo.style.color = colors[colorIndex];
+        }
+
+        function cornerFlash() {
+            logo.classList.add('corner');
+            setTimeout(() => logo.classList.remove('corner'), 450);
+        }
+
+        function tick(ts) {
+            if (!last) {
+                last = ts;
+            }
+            const dt = Math.min(0.05, (ts - last) / 1000);
+            last = ts;
+
+            x += vx * dt;
+            y += vy * dt;
+
+            let hitX = false;
+            let hitY = false;
+            if (x <= 0) {
+                x = 0;
+                vx = Math.abs(vx);
+                hitX = true;
+            } else if (x >= w) {
+                x = w;
+                vx = -Math.abs(vx);
+                hitX = true;
+            }
+            if (y <= 0) {
+                y = 0;
+                vy = Math.abs(vy);
+                hitY = true;
+            } else if (y >= h) {
+                y = h;
+                vy = -Math.abs(vy);
+                hitY = true;
+            }
+
+            if (hitX || hitY) {
+                nextColor();
+                if (hitX && hitY) {
+                    cornerFlash();
+                }
+            }
+
+            logo.style.transform = `translate(${x}px, ${y}px)`;
+            requestAnimationFrame(tick);
+        }
+
+        function start() {
+            if (ready) {
+                return;
+            }
+            ready = true;
+            bounds();
+            x = Math.random() * w;
+            y = Math.random() * h;
+            if (Math.random() < 0.5) {
+                vx = -vx;
+            }
+            if (Math.random() < 0.5) {
+                vy = -vy;
+            }
+            logo.style.color = colors[0];
+            requestAnimationFrame(tick);
+
+            fetch('/api/dvd')
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.speed != null) {
+                        applySpeed(data.speed);
+                    }
+                })
+                .catch(() => {});
+
+            const source = new EventSource('/api/dvd/events');
+            source.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.speed != null) {
+                    applySpeed(data.speed);
+                }
+            };
+        }
+
+        window.addEventListener('resize', bounds);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(start);
+        }
+        window.addEventListener('load', start);
+    </script>
+</body>
+</html>

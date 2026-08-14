@@ -88,7 +88,8 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!undvd` | everyone | Removes a random bouncing DVD logo |
 | `!dance <url>` | everyone | Queues an image/GIF for approval, then shows it on `/dance` after you accept it |
 | `!undance` | everyone | Removes a random GIF from the dance overlay |
-| `!undance` | everyone | Removes a random GIF from the dance overlay |
+| `!ttt` | everyone | Starts a tic-tac-toe game on `/ttt` |
+| `!ttt 1-9` | everyone | Places X or O in that cell (first player X, second O) |
 | `!<name>` | everyone | Any custom command created via the API |
 
 Commands have a 10 second cooldown.
@@ -106,8 +107,9 @@ The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open *
 3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
 4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change bounce speed. `!dvd` adds another logo; `!undvd` removes one at random.
 5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` queues the file; accept it at `/manage/dance` to show it on the overlay.
-6. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
-7. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
+6. **Tic-tac-toe:** add a Browser Source pointed at `https://<your-app>/ttt` (locally `http://localhost:3000/ttt`). `!ttt` starts a game; `!ttt 1-9` places a mark.
+7. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
+8. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
 Map chat commands to OBS scene names with env vars:
 
@@ -138,7 +140,7 @@ Example webhook payload:
 | --- | --- | --- |
 | `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance, discord }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance, ttt, discord }` |
 | `GET` | `/` / `/manage` | Dashboard (bot status + Twitch chat) |
 | `GET` | `/manage/overlays` | Overlay previews and copyable Browser Source URLs |
 | `GET` | `/manage/dance` | Dance GIF approval queue |
@@ -173,6 +175,9 @@ Example webhook payload:
 | `POST` | `/api/dance/pending/:id/approve` | Accept a queued GIF and show it on `/dance` |
 | `POST` | `/api/dance/pending/:id/reject` | Reject a queued GIF |
 | `GET` | `/api/dance/events` | Server-sent dance GIF events |
+| `GET` | `/ttt` | Tic-tac-toe overlay Browser Source page |
+| `GET` | `/api/ttt` | Current tic-tac-toe game state |
+| `GET` | `/api/ttt/events` | Server-sent tic-tac-toe updates |
 
 Set `FRONTEND_ORIGIN` to the React app origin for CORS. Chrome extension origins (`chrome-extension://…`) are also allowed.
 

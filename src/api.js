@@ -77,7 +77,7 @@ function normalizeGifUrl(value) {
     return null;
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, getAuthProvider, getTwitch }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, ttt, getAuthProvider, getTwitch }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -106,6 +106,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             alerts: status.alerts ?? { listeners: 0 },
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
+            ttt: status.ttt ?? { listeners: 0 },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -154,6 +155,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'dance.html'));
     });
 
+    app.get('/ttt', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'ttt.html'));
+    });
+
     app.use('/gifs', express.static(dance?.getDir() || path.join(publicDir, 'gifs')));
 
     app.get('/api/obs/config', (_req, res) => {
@@ -166,6 +171,11 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/alerts/events', alerts);
     attachSse(app, '/api/dvd/events', dvd);
     attachSse(app, '/api/dance/events', dance);
+    attachSse(app, '/api/ttt/events', ttt);
+
+    app.get('/api/ttt', (_req, res) => {
+        res.json(ttt?.get() ?? { board: Array(9).fill('') });
+    });
 
     app.get('/api/dance', async (_req, res) => {
         if (!dance) {

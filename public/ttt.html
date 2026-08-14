@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>teerzobot tic-tac-toe</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        body.solid { background: #111; }
+        #wrap {
+            position: absolute;
+            inset: 24px auto auto 24px;
+            width: min(420px, calc(100vw - 48px));
+            padding: 18px;
+            border-radius: 16px;
+            background: rgba(10, 12, 18, 0.72);
+            color: #fff;
+            font: 18px/1.3 sans-serif;
+            text-shadow: 0 1px 2px #000;
+        }
+        #title {
+            margin: 0 0 6px;
+            font-size: 15px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            opacity: 0.75;
+        }
+        #players {
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        #players .x { color: #ff6b6b; }
+        #players .o { color: #7ce0ff; }
+        #status {
+            margin-bottom: 12px;
+            min-height: 1.3em;
+            color: #c9d4e5;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .cell {
+            position: relative;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            font: 700 48px/1 "Trebuchet MS", sans-serif;
+        }
+        .cell .n {
+            position: absolute;
+            top: 6px;
+            left: 8px;
+            font: 12px/1 sans-serif;
+            opacity: 0.45;
+        }
+        .cell.x { color: #ff6b6b; }
+        .cell.o { color: #7ce0ff; }
+        .cell.win {
+            background: rgba(255, 220, 80, 0.28);
+            box-shadow: 0 0 18px rgba(255, 220, 80, 0.35);
+        }
+    </style>
+</head>
+<body>
+    <div id="wrap">
+        <div id="title">Tic-tac-toe · !ttt 1-9</div>
+        <div id="players">Waiting for players</div>
+        <div id="status">Use !ttt to start</div>
+        <div id="board"></div>
+    </div>
+    <script>
+        const params = new URLSearchParams(location.search);
+        if (params.has('bg')) {
+            document.body.classList.add('solid');
+        }
+
+        const playersEl = document.getElementById('players');
+        const statusEl = document.getElementById('status');
+        const boardEl = document.getElementById('board');
+        const cells = [];
+
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.innerHTML = `<span class="n">${i + 1}</span><span class="mark"></span>`;
+            boardEl.appendChild(cell);
+            cells.push(cell);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function nameOf(player, fallback) {
+            return escapeHtml(player?.displayName || player?.user || fallback);
+        }
+
+        function render(state) {
+            const xName = nameOf(state.x, 'X');
+            const oName = nameOf(state.o, 'O');
+            playersEl.innerHTML = `<span class="x">${xName}</span> vs <span class="o">${oName}</span>`;
+
+            if (state.winner) {
+                const winner = state.winner === 'X' ? xName : oName;
+                statusEl.textContent = `${winner} wins!  !ttt for a new game`;
+            } else if (state.draw) {
+                statusEl.textContent = 'Draw!  !ttt for a new game';
+            } else if (!state.x) {
+                statusEl.textContent = 'Waiting for X · !ttt 1-9';
+            } else if (!state.o) {
+                statusEl.textContent = `${xName} is X · next player is O`;
+            } else {
+                const next = state.turn === 'X' ? xName : oName;
+                statusEl.textContent = `${next}'s turn (${state.turn})`;
+            }
+
+            const line = new Set(state.line || []);
+            for (let i = 0; i < 9; i++) {
+                const mark = state.board?.[i] || '';
+                cells[i].className = `cell${mark ? ` ${mark.toLowerCase()}` : ''}${line.has(i) ? ' win' : ''}`;
+                cells[i].querySelector('.mark').textContent = mark;
+            }
+        }
+
+        fetch('/api/ttt')
+            .then((res) => res.json())
+            .then(render)
+            .catch(() => {
+                statusEl.textContent = 'Could not load game';
+            });
+
+        const source = new EventSource('/api/ttt/events');
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'state' || data.board) {
+                render(data);
+            }
+        };
+    </script>
+</body>
+</html>

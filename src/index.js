@@ -11,6 +11,7 @@ import { createFfzEmotes } from './ffz.js';
 import { createAlerts } from './alerts.js';
 import { createDvd } from './dvd.js';
 import { createDance } from './dance.js';
+import { createTtt } from './ttt.js';
 import { createDiscordClient } from './discord.js';
 import { startFollowAlerts } from './follows.js';
 
@@ -33,6 +34,7 @@ const ffz = createFfzEmotes(channel);
 const alerts = createAlerts();
 const dvd = createDvd();
 const dance = createDance();
+const ttt = createTtt();
 const discord = createDiscordClient();
 let twitchApi = null;
 let authProviderRef = null;
@@ -43,6 +45,7 @@ const commands = createCommandHandler(store, {
     getNowPlaying: () => nowPlaying.get(),
     dvd,
     dance,
+    ttt,
 });
 
 let chat = {
@@ -58,6 +61,7 @@ const app = createApi({
         alerts: alerts.getStatus(),
         dvd: dvd.getStatus(),
         dance: dance.getStatus(),
+        ttt: ttt.getStatus(),
         discord: discord.getStatus(),
     }),
     commands,
@@ -68,6 +72,7 @@ const app = createApi({
     alerts,
     dvd,
     dance,
+    ttt,
     getAuthProvider: () => authProviderRef,
     getTwitch: () => twitchApi,
 });

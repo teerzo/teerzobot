@@ -4,8 +4,8 @@ import { formatChatLine } from './nowPlaying.js';
 import { formatDvdSpeed } from './dvd.js';
 
 const COOLDOWN_MS = 1_000;
-const ALIASES = { help: 'commands', song: 'currentsong' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance']);
+const ALIASES = { help: 'commands', song: 'currentsong', tictactoe: 'ttt' };
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance', 'ttt', 'tictactoe']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -20,7 +20,7 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt } = {}) {
     const cooldowns = new Map();
 
     const builtins = [
@@ -283,6 +283,39 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 }
                 dance.removeRandom();
                 return say(channel, 'Removed a random dance GIF.');
+            },
+        },
+        {
+            name: 'ttt',
+            response: 'Play tic-tac-toe on the overlay (!ttt 1-9)',
+            builtin: true,
+            execute({ say, channel, args, user, displayName }) {
+                if (!ttt) {
+                    return say(channel, 'Tic-tac-toe overlay is not available.');
+                }
+                const cell = String(args[0] ?? '').trim();
+                if (!cell || cell === 'start' || cell === 'new') {
+                    ttt.start();
+                    return say(channel, 'Tic-tac-toe started. First player is X, second is O. Play with !ttt 1-9.');
+                }
+                try {
+                    const state = ttt.play({ cell, user, displayName });
+                    const mark = state.lastMove?.mark;
+                    const who = state.lastMove?.displayName || displayName;
+                    if (state.winner) {
+                        return say(channel, `${who} wins tic-tac-toe!`);
+                    }
+                    if (state.draw) {
+                        return say(channel, 'Tic-tac-toe is a draw!');
+                    }
+                    const next = state.turn === 'X' ? state.x?.displayName : state.o?.displayName;
+                    if (!state.o) {
+                        return say(channel, `${who} played ${mark}. Next unique chatter is O. !ttt 1-9`);
+                    }
+                    return say(channel, `${who} played ${mark}. ${next}'s turn.`);
+                } catch (err) {
+                    return say(channel, err.message || 'Could not play that move.');
+                }
             },
         },
         ...sceneBuiltins(),

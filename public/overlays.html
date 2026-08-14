@@ -11,6 +11,7 @@
     <div class="page">
         <h1>Overlays</h1>
         <p class="muted">Copy a URL into an OBS Browser Source. Previews are live.</p>
+        <p><button type="button" class="danger" id="clear-all">Clear dance, DVD &amp; tic-tac-toe</button></p>
         <div class="grid" id="grid"></div>
     </div>
     <script src="/manage.js"></script>
@@ -37,18 +38,21 @@
                 name: 'DVD logo',
                 path: '/dvd',
                 commands: ['!dvd', '!undvd', '!dvdfast', '!dvdslow'],
+                clearPath: '/api/dvd/clear',
             },
             {
                 name: 'Dance GIFs',
                 path: '/dance',
                 commands: ['!dance <url>', '!undance'],
                 note: 'Queued GIFs are approved at /manage/dance.',
+                clearPath: '/api/dance/clear',
             },
             {
                 name: 'Tic-tac-toe',
                 path: '/ttt',
                 commands: ['!ttt', '!ttt 1-9'],
                 note: 'First chatter is X, second is O.',
+                clearPath: '/api/ttt/clear',
             },
             {
                 name: 'Scene control',
@@ -86,6 +90,9 @@
                 ? `<p class="cmds">${overlay.commands.map((name) => `<code>${name}</code>`).join(' · ')}</p>`
                 : '';
             const note = overlay.note ? `<p class="note">${overlay.note}</p>` : '';
+            const clear = overlay.clearPath
+                ? `<button type="button" class="danger clear">Clear</button>`
+                : '';
             card.innerHTML =
                 `<div class="meta">` +
                     `<h2>${overlay.name}</h2>` +
@@ -94,19 +101,45 @@
                     commands +
                     `<div class="url-row">` +
                         `<input readonly value="${url}">` +
-                        `<button type="button">Copy</button>` +
+                        `<button type="button" class="copy">Copy</button>` +
+                        clear +
                     `</div>` +
                 `</div>` +
                 `<div class="preview"><iframe title="${overlay.name}" src="${overlay.path}"></iframe></div>`;
-            card.querySelector('button').addEventListener('click', (event) => {
+            card.querySelector('.copy').addEventListener('click', (event) => {
                 copyUrl(url, event.currentTarget);
             });
+            const clearBtn = card.querySelector('.clear');
+            if (clearBtn && overlay.clearPath) {
+                clearBtn.addEventListener('click', async () => {
+                    clearBtn.disabled = true;
+                    try {
+                        await fetch(overlay.clearPath, { method: 'POST' });
+                    } finally {
+                        clearBtn.disabled = false;
+                    }
+                });
+            }
             return card;
         }
 
         for (const overlay of overlays) {
             grid.appendChild(renderCard(overlay));
         }
+
+        const clearAll = document.getElementById('clear-all');
+        clearAll.addEventListener('click', async () => {
+            clearAll.disabled = true;
+            try {
+                await Promise.all([
+                    fetch('/api/dance/clear', { method: 'POST' }),
+                    fetch('/api/dvd/clear', { method: 'POST' }),
+                    fetch('/api/ttt/clear', { method: 'POST' }),
+                ]);
+            } finally {
+                clearAll.disabled = false;
+            }
+        });
     </script>
 </body>
 </html>

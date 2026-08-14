@@ -338,5 +338,8 @@ export function createDance(dirPath = defaultDir()) {
         removeRandom() {
             return hub.emit({ type: 'remove-random' });
         },
+        clear() {
+            return hub.emit({ type: 'clear' });
+        },
     };
 }

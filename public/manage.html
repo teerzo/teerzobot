@@ -18,6 +18,8 @@
                 <dd id="channel-state">—</dd>
                 <dt>Discord</dt>
                 <dd id="discord-state">—</dd>
+                <dt>Discord install</dt>
+                <dd id="discord-install">—</dd>
             </dl>
         </aside>
         <div class="chat-frame">
@@ -35,6 +37,18 @@
                 document.getElementById('chat-state').textContent = status.connected ? 'connected' : 'offline';
                 document.getElementById('channel-state').textContent = channel ? `#${channel}` : 'not set';
                 document.getElementById('discord-state').textContent = status.discord?.connected ? 'connected' : 'offline';
+                const installEl = document.getElementById('discord-install');
+                const installUrl = status.discord?.installUrl;
+                if (installUrl) {
+                    const link = document.createElement('a');
+                    link.href = installUrl;
+                    link.textContent = 'Add to Discord';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    installEl.replaceChildren(link);
+                } else {
+                    installEl.textContent = 'not configured';
+                }
                 if (channel) {
                     const parent = location.hostname || 'localhost';
                     document.getElementById('twitch-chat').src =

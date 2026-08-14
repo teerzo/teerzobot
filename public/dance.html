@@ -97,6 +97,11 @@
             if (data.type === 'remove-random') {
                 removeRandomGif();
             }
+            if (data.type === 'clear') {
+                for (const img of [...stage.querySelectorAll('.gif')]) {
+                    img.remove();
+                }
+            }
         };
     </script>
 </body>

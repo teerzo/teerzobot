@@ -129,6 +129,9 @@ export function createTtt() {
         get: () => snapshot(game),
         start,
         play,
+        clear() {
+            return start();
+        },
         getStatus: () => ({ listeners: hub.listenerCount, inGame: Boolean(game.x) }),
     };
 }

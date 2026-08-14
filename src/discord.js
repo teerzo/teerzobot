@@ -13,6 +13,52 @@ const pingCommand = new SlashCommandBuilder()
     .setDescription('Replies with Pong!')
     .toJSON();
 
+function htmlPage(title, body) {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>body{font:16px/1.4 sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;color:#eee;background:#111}</style>
+</head><body>${body}</body></html>`;
+}
+
+export function buildDiscordInstallUrl() {
+    const clientId = process.env.DISCORD_CLIENT_ID;
+    if (!clientId) {
+        return null;
+    }
+
+    const url = new URL('https://discord.com/oauth2/authorize');
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('scope', 'bot applications.commands');
+    url.searchParams.set('permissions', process.env.DISCORD_BOT_PERMISSIONS || '0');
+    url.searchParams.set('integration_type', '0');
+    return url.toString();
+}
+
+function redirectToInstall(_req, res) {
+    const installUrl = buildDiscordInstallUrl();
+    if (!installUrl) {
+        res.status(500).type('html').send(htmlPage('Discord', '<p>DISCORD_CLIENT_ID is not set.</p>'));
+        return;
+    }
+    res.redirect(installUrl);
+}
+
+export function attachDiscordRoutes(app) {
+    app.get('/discord/install', redirectToInstall);
+    app.get('/discord/invite', redirectToInstall);
+
+    app.get('/discord/callback', (req, res) => {
+        const error = req.query.error;
+        if (error) {
+            const description = req.query.error_description || '';
+            res.status(400).type('html').send(htmlPage('Discord OAuth error', `<p>${error}: ${description}</p>`));
+            return;
+        }
+        res.type('html').send(
+            htmlPage('Discord', '<p>Bot authorized. You can close this tab. Restart the service if it was already running so it joins the server.</p>'),
+        );
+    });
+}
+
 async function registerCommands(token, clientId, guildId) {
     const rest = new REST({ version: '10' }).setToken(token);
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
@@ -99,6 +145,6 @@ export function createDiscordClient() {
 
     return {
         connect,
-        getStatus: () => ({ ...state }),
+        getStatus: () => ({ ...state, installUrl: buildDiscordInstallUrl() }),
     };
 }

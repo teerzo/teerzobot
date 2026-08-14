@@ -85,6 +85,13 @@
             logo.el.remove();
         }
 
+        function clearLogos() {
+            for (const logo of logos) {
+                logo.el.remove();
+            }
+            logos.length = 0;
+        }
+
         function applySpeed(next) {
             const value = Math.max(0.2, Number(next) || 1);
             speed = value;
@@ -188,6 +195,10 @@
                 }
                 if (data.action === 'remove-random') {
                     removeRandomLogo();
+                    return;
+                }
+                if (data.action === 'clear') {
+                    clearLogos();
                     return;
                 }
                 if (data.speed != null) {

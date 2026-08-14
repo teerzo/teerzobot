@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { normalizeTrack } from './nowPlaying.js';
 import { attachOAuthRoutes } from './auth.js';
+import { attachDiscordRoutes } from './discord.js';
 
 function corsOrigin() {
     const frontend = process.env.FRONTEND_ORIGIN;
@@ -88,6 +89,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         getAuthProvider,
         botUserId: process.env.BOT_USER_ID,
     });
+    attachDiscordRoutes(app);
 
     app.get('/health', (_req, res) => {
         res.json({ ok: true });
@@ -175,6 +177,30 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
     app.get('/api/ttt', (_req, res) => {
         res.json(ttt?.get() ?? { board: Array(9).fill('') });
+    });
+
+    app.post('/api/ttt/clear', (_req, res) => {
+        if (!ttt) {
+            res.status(503).json({ error: 'Tic-tac-toe overlay is not available' });
+            return;
+        }
+        res.json(ttt.clear());
+    });
+
+    app.post('/api/dvd/clear', (_req, res) => {
+        if (!dvd) {
+            res.status(503).json({ error: 'DVD overlay is not available' });
+            return;
+        }
+        res.json(dvd.clear());
+    });
+
+    app.post('/api/dance/clear', (_req, res) => {
+        if (!dance) {
+            res.status(503).json({ error: 'Dance overlay is not available' });
+            return;
+        }
+        res.json(dance.clear());
     });
 
     app.get('/api/dance', async (_req, res) => {

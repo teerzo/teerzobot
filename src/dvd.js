@@ -48,5 +48,8 @@ export function createDvd() {
         removeRandom() {
             return hub.emit({ action: 'remove-random' });
         },
+        clear() {
+            return hub.emit({ action: 'clear' });
+        },
     };
 }

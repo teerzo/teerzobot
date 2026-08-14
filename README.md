@@ -34,14 +34,39 @@ On Railway, set `OAUTH_SECRET` and `TWITCH_REDIRECT_URI`, and keep `TOKEN_PATH` 
 
 Optional. If `DISCORD_TOKEN` is unset, Twitch still runs.
 
-1. In the [Discord Developer Portal](https://discord.com/developers/applications), open the bot application and copy the bot token, application ID, and your server ID.
-2. Invite the bot with scopes `bot` and `applications.commands`. The **Guilds** gateway intent is enough for `/ping` (Message Content is not required).
-3. Set in `.env` (or Railway):
+Copy the bot token, application ID, and server ID into `.env` (or Railway):
 
 ```
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
 DISCORD_GUILD_ID=
+```
+
+### Custom install URL
+
+In the [Discord Developer Portal](https://discord.com/developers/applications) → **Installation** → **Install Link**, choose **Custom URL** and paste the Discord authorize URL (replace `YOUR_APP_ID` with `DISCORD_CLIENT_ID`):
+
+```
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=0&integration_type=0&scope=bot+applications.commands
+```
+
+Or paste your public install redirect (Railway):
+
+```
+https://<your-app>.up.railway.app/discord/install
+```
+
+Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands` and guild install (`integration_type=0`). The **Guilds** gateway intent is enough for `/ping` (Message Content is not required).
+
+`GET /api/status` includes `discord.installUrl` with the same authorize URL.
+
+### OAuth redirect (optional)
+
+If you also use Discord’s OAuth2 **Redirects**, add:
+
+```
+http://localhost:3000/discord/callback
+https://<your-app>.up.railway.app/discord/callback
 ```
 
 On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping`, and reports connection state on `GET /api/status` as `discord`.
@@ -140,6 +165,9 @@ Example webhook payload:
 | --- | --- | --- |
 | `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
+| `GET` | `/discord/install` | Discord bot install (`bot` + `applications.commands`, guild) |
+| `GET` | `/discord/invite` | Alias of `/discord/install` |
+| `GET` | `/discord/callback` | Discord OAuth redirect |
 | `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance, ttt, discord }` |
 | `GET` | `/` / `/manage` | Dashboard (bot status + Twitch chat) |
 | `GET` | `/manage/overlays` | Overlay previews and copyable Browser Source URLs |

@@ -5,7 +5,7 @@ import { formatDvdSpeed } from './dvd.js';
 
 const COOLDOWN_MS = 1_000;
 const ALIASES = { help: 'commands', song: 'currentsong', tictactoe: 'ttt' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance', 'ttt', 'tictactoe']);
+const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance', 'ttt', 'tictactoe', 'clear']);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -316,6 +316,17 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 } catch (err) {
                     return say(channel, err.message || 'Could not play that move.');
                 }
+            },
+        },
+        {
+            name: 'clear',
+            response: 'Clears dance GIFs, DVD logos, and tic-tac-toe from the overlays',
+            builtin: true,
+            execute({ say, channel }) {
+                dance?.clear();
+                dvd?.clear();
+                ttt?.clear();
+                return say(channel, 'Cleared dance, DVD, and tic-tac-toe overlays.');
             },
         },
         ...sceneBuiltins(),

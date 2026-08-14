@@ -115,6 +115,7 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | `!undance` | everyone | Removes a random GIF from the dance overlay |
 | `!ttt` | everyone | Starts a tic-tac-toe game on `/ttt` |
 | `!ttt 1-9` | everyone | Places X or O in that cell (first player X, second O) |
+| `!clear` | everyone | Clears dance GIFs, DVD logos, and the tic-tac-toe board |
 | `!<name>` | everyone | Any custom command created via the API |
 
 Commands have a 10 second cooldown.

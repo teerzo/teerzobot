@@ -10,10 +10,13 @@
             background: transparent;
             overflow: hidden;
         }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         body.solid { background: #111; }
         #wrap {
-            position: absolute;
-            inset: 24px auto auto 24px;
             width: min(420px, calc(100vw - 48px));
             padding: 18px;
             border-radius: 16px;

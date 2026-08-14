@@ -11,7 +11,7 @@
     <div class="page">
         <h1>Overlays</h1>
         <p class="muted">Copy a URL into an OBS Browser Source. Previews are live.</p>
-        <p><button type="button" class="danger" id="clear-all">Clear dance, DVD &amp; tic-tac-toe</button></p>
+        <p><button type="button" class="danger" id="clear-all">Clear dance, DVD, tic-tac-toe &amp; dungeon</button></p>
         <div class="grid" id="grid"></div>
     </div>
     <script src="/manage.js"></script>
@@ -53,6 +53,13 @@
                 commands: ['!ttt', '!ttt 1-9'],
                 note: 'First chatter is X, second is O.',
                 clearPath: '/api/ttt/clear',
+            },
+            {
+                name: 'Dungeon',
+                path: '/dungeon',
+                commands: ['!up', '!down', '!left', '!right', '!dungeon', '!anarchy', '!democracy'],
+                note: 'Chat walks a shared first-person maze. Preview walk: /dungeon?preview=1',
+                clearPath: '/api/dungeon/reset',
             },
             {
                 name: 'Scene control',
@@ -135,6 +142,7 @@
                     fetch('/api/dance/clear', { method: 'POST' }),
                     fetch('/api/dvd/clear', { method: 'POST' }),
                     fetch('/api/ttt/clear', { method: 'POST' }),
+                    fetch('/api/dungeon/reset', { method: 'POST' }),
                 ]);
             } finally {
                 clearAll.disabled = false;

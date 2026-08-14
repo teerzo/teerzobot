@@ -2,10 +2,45 @@ import { formatDuration } from './isLive.js';
 import { getSceneMap } from './obs.js';
 import { formatChatLine } from './nowPlaying.js';
 import { formatDvdSpeed } from './dvd.js';
+import { DUNGEON_ALIASES } from './dungeon.js';
 
 const COOLDOWN_MS = 1_000;
-const ALIASES = { help: 'commands', song: 'currentsong', tictactoe: 'ttt' };
-const RESERVED = new Set(['ping', 'commands', 'help', 'lurk', 'so', 'game', 'title', 'uptime', 'followage', 'currentsong', 'song', 'dvdfast', 'dvdslow', 'dvd', 'undvd', 'dance', 'undance', 'ttt', 'tictactoe', 'clear']);
+const ALIASES = {
+    help: 'commands',
+    song: 'currentsong',
+    tictactoe: 'ttt',
+    ...DUNGEON_ALIASES,
+};
+const RESERVED = new Set([
+    'ping',
+    'commands',
+    'help',
+    'lurk',
+    'so',
+    'game',
+    'title',
+    'uptime',
+    'followage',
+    'currentsong',
+    'song',
+    'dvdfast',
+    'dvdslow',
+    'dvd',
+    'undvd',
+    'dance',
+    'undance',
+    'ttt',
+    'tictactoe',
+    'clear',
+    'dungeon',
+    'anarchy',
+    'democracy',
+    'up',
+    'down',
+    'left',
+    'right',
+    ...Object.keys(DUNGEON_ALIASES),
+]);
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -20,8 +55,22 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt, dungeon } = {}) {
     const cooldowns = new Map();
+
+    function moveDungeon(command) {
+        return ({ user, displayName }) => {
+            if (!dungeon) {
+                return false;
+            }
+            try {
+                const result = dungeon.input({ command, user, displayName });
+                return result.ignored ? false : true;
+            } catch {
+                return false;
+            }
+        };
+    }
 
     const builtins = [
         {
@@ -286,6 +335,78 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
+            name: 'dungeon',
+            response: 'Resets the dungeon crawler overlay to floor 1',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                dungeon.reset();
+                return say(channel, 'Dungeon reset to floor 1. Move with !up !down !left !right.');
+            },
+        },
+        {
+            name: 'anarchy',
+            response: 'Switch the dungeon to anarchy mode (mods)',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                const state = dungeon.setMode('anarchy');
+                if (!state.changed) {
+                    return say(channel, 'Already in anarchy mode.');
+                }
+                return say(channel, 'Anarchy mode. Every command runs immediately.');
+            },
+        },
+        {
+            name: 'democracy',
+            response: 'Switch the dungeon to democracy mode (mods)',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                const state = dungeon.setMode('democracy');
+                if (!state.changed) {
+                    return say(channel, 'Already in democracy mode.');
+                }
+                return say(channel, 'Democracy mode. Vote with !up !down !left !right.');
+            },
+        },
+        {
+            name: 'up',
+            response: 'Dungeon: step forward',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('up'),
+        },
+        {
+            name: 'down',
+            response: 'Dungeon: step backward',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('down'),
+        },
+        {
+            name: 'left',
+            response: 'Dungeon: turn left',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('left'),
+        },
+        {
+            name: 'right',
+            response: 'Dungeon: turn right',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('right'),
+        },
+        {
             name: 'ttt',
             response: 'Play tic-tac-toe on the overlay (!ttt 1-9)',
             builtin: true,
@@ -381,11 +502,12 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             return;
         }
 
-        if (onCooldown(command.name)) {
-            return;
+        if (!command.skipCooldown) {
+            if (onCooldown(command.name)) {
+                return;
+            }
+            cooldowns.set(command.name, Date.now());
         }
-
-        cooldowns.set(command.name, Date.now());
 
         const result = await command.execute({ ...ctx, args });
         if (result === false) {

@@ -26,16 +26,21 @@
         .logo.corner {
             filter: drop-shadow(0 0 22px #fff) drop-shadow(0 0 10px currentColor);
         }
+        #logo-template {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <svg id="logo-template" class="logo" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" aria-label="DVD" hidden>
-        <ellipse cx="140" cy="58" rx="132" ry="50" fill="none" stroke="currentColor" stroke-width="6"/>
-        <text x="140" y="72" text-anchor="middle" fill="currentColor"
-            font-family="Arial Black, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="2">DVD</text>
-        <text x="140" y="116" text-anchor="middle" fill="currentColor"
-            font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="10">VIDEO</text>
-    </svg>
+    <template id="logo-template">
+        <svg class="logo" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" aria-label="DVD">
+            <ellipse cx="140" cy="58" rx="132" ry="50" fill="none" stroke="currentColor" stroke-width="6"/>
+            <text x="140" y="72" text-anchor="middle" fill="currentColor"
+                font-family="Arial Black, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="2">DVD</text>
+            <text x="140" y="116" text-anchor="middle" fill="currentColor"
+                font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="10">VIDEO</text>
+        </svg>
+    </template>
     <script>
         const params = new URLSearchParams(location.search);
         const size = Math.max(80, Number(params.get('size')) || 220);
@@ -54,9 +59,7 @@
         let ready = false;
 
         function addLogo() {
-            const el = template.cloneNode(true);
-            el.removeAttribute('id');
-            el.removeAttribute('hidden');
+            const el = template.content.firstElementChild.cloneNode(true);
             el.style.width = `${size}px`;
             document.body.appendChild(el);
 

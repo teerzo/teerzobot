@@ -78,7 +78,7 @@ function normalizeGifUrl(value) {
     return null;
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, ttt, getAuthProvider, getTwitch }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, ttt, dungeon, getAuthProvider, getTwitch }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -109,6 +109,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
             ttt: status.ttt ?? { listeners: 0 },
+            dungeon: status.dungeon ?? { listeners: 0, floor: 1, mode: 'anarchy' },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -161,6 +162,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'ttt.html'));
     });
 
+    app.get('/dungeon', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'dungeon.html'));
+    });
+
     app.use('/gifs', express.static(dance?.getDir() || path.join(publicDir, 'gifs')));
 
     app.get('/api/obs/config', (_req, res) => {
@@ -174,6 +179,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/dvd/events', dvd);
     attachSse(app, '/api/dance/events', dance);
     attachSse(app, '/api/ttt/events', ttt);
+    attachSse(app, '/api/dungeon/events', dungeon);
 
     app.get('/api/ttt', (_req, res) => {
         res.json(ttt?.get() ?? { board: Array(9).fill('') });
@@ -185,6 +191,38 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             return;
         }
         res.json(ttt.clear());
+    });
+
+    app.get('/api/dungeon', (_req, res) => {
+        res.json(dungeon?.get() ?? { floor: 1, mode: 'anarchy', grid: [] });
+    });
+
+    app.post('/api/dungeon/reset', (_req, res) => {
+        if (!dungeon) {
+            res.status(503).json({ error: 'Dungeon overlay is not available' });
+            return;
+        }
+        res.json(dungeon.reset());
+    });
+
+    app.post('/api/dungeon/input', (req, res) => {
+        if (!dungeon) {
+            res.status(503).json({ error: 'Dungeon overlay is not available' });
+            return;
+        }
+        try {
+            res.json(dungeon.input({
+                command: req.body?.command,
+                user: req.body?.user || 'preview',
+                displayName: req.body?.displayName || 'preview',
+            }));
+        } catch (err) {
+            if (err.code === 'USAGE') {
+                res.status(400).json({ error: err.message });
+                return;
+            }
+            throw err;
+        }
     });
 
     app.post('/api/dvd/clear', (_req, res) => {

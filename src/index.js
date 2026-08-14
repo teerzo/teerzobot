@@ -12,6 +12,7 @@ import { createAlerts } from './alerts.js';
 import { createDvd } from './dvd.js';
 import { createDance } from './dance.js';
 import { createTtt } from './ttt.js';
+import { createDungeon } from './dungeon.js';
 import { createDiscordClient } from './discord.js';
 import { startFollowAlerts } from './follows.js';
 
@@ -35,6 +36,7 @@ const alerts = createAlerts();
 const dvd = createDvd();
 const dance = createDance();
 const ttt = createTtt();
+const dungeon = createDungeon();
 const discord = createDiscordClient();
 let twitchApi = null;
 let authProviderRef = null;
@@ -46,6 +48,7 @@ const commands = createCommandHandler(store, {
     dvd,
     dance,
     ttt,
+    dungeon,
 });
 
 let chat = {
@@ -62,6 +65,7 @@ const app = createApi({
         dvd: dvd.getStatus(),
         dance: dance.getStatus(),
         ttt: ttt.getStatus(),
+        dungeon: dungeon.getStatus(),
         discord: discord.getStatus(),
     }),
     commands,
@@ -73,6 +77,7 @@ const app = createApi({
     dvd,
     dance,
     ttt,
+    dungeon,
     getAuthProvider: () => authProviderRef,
     getTwitch: () => twitchApi,
 });
@@ -112,6 +117,11 @@ app.listen(port, '0.0.0.0', async () => {
             getThirdPartyEmote: (name) => ffz.lookup(name),
         });
         await chat.connect();
+        dungeon.setOnFloorClear(({ previousFloor, floor }) => {
+            chat.say(`Floor ${previousFloor} cleared! Entering floor ${floor}.`).catch((err) => {
+                console.error('Dungeon floor announce failed', err);
+            });
+        });
         try {
             await startFollowAlerts({
                 apiClient,

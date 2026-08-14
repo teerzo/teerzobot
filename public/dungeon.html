@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot dungeon</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: #090807;
+            overflow: hidden;
+            color: #f2ebe3;
+            font: 15px/1.3 "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            text-shadow: 0 1px 2px #000;
+        }
+        #top {
+            position: absolute;
+            top: 18px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        #floor {
+            font-size: 13px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            opacity: 0.85;
+        }
+        #floor strong {
+            font-size: 22px;
+            letter-spacing: 0.04em;
+            font-weight: 700;
+        }
+        #mode {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 90, 70, 0.28);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+        #mode.democracy {
+            background: rgba(70, 170, 255, 0.32);
+        }
+        #last {
+            position: absolute;
+            left: 20px;
+            bottom: 22px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        #last span {
+            opacity: 0.7;
+            font-weight: 400;
+            font-size: 14px;
+        }
+        #votes {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: min(240px, 42vw);
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(8, 8, 10, 0.62);
+            display: none;
+        }
+        #votes.open {
+            display: block;
+        }
+        #votes h2 {
+            margin: 0 0 8px;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            opacity: 0.75;
+        }
+        .vote {
+            display: grid;
+            grid-template-columns: 52px 1fr 22px;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px;
+            font-size: 13px;
+        }
+        .bar {
+            height: 8px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.12);
+            overflow: hidden;
+        }
+        .bar i {
+            display: block;
+            height: 100%;
+            width: 0;
+            background: #7ce0ff;
+            transition: width 0.2s ease;
+        }
+        #vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.55) 100%);
+        }
+        #help {
+            position: absolute;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0.55;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div id="vignette"></div>
+        <div id="top">
+            <div id="floor">Floor<br><strong>1</strong></div>
+            <div id="mode">Anarchy</div>
+        </div>
+        <div id="help">!up !down !left !right</div>
+        <div id="last"><span>Waiting for chat</span></div>
+        <div id="votes">
+            <h2 id="vote-title">Democracy</h2>
+            <div class="vote"><span>!up</span><div class="bar"><i id="bar-up"></i></div><b id="n-up">0</b></div>
+            <div class="vote"><span>!down</span><div class="bar"><i id="bar-down"></i></div><b id="n-down">0</b></div>
+            <div class="vote"><span>!left</span><div class="bar"><i id="bar-left"></i></div><b id="n-left">0</b></div>
+            <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
+        </div>
+    </div>
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
+
+        const params = new URLSearchParams(location.search);
+        const preview = params.has('preview');
+        const CELL = 1;
+        const EYE = 0.52;
+        const WALL_H = 1.55;
+        const YAWS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+
+        const floorEl = document.querySelector('#floor strong');
+        const modeEl = document.getElementById('mode');
+        const lastEl = document.getElementById('last');
+        const votesEl = document.getElementById('votes');
+        const voteTitleEl = document.getElementById('vote-title');
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x090807);
+        scene.fog = new THREE.FogExp2(0x090807, 0.42);
+
+        const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 80);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        renderer.setSize(innerWidth, innerHeight);
+        document.body.prepend(renderer.domElement);
+
+        const ambient = new THREE.AmbientLight(0x2a241c, 0.35);
+        scene.add(ambient);
+        const torch = new THREE.PointLight(0xffd6a0, 2.4, 8, 1.6);
+        camera.add(torch);
+        scene.add(camera);
+
+        const exitLight = new THREE.PointLight(0x3cf0ff, 2.8, 7, 1.4);
+        scene.add(exitLight);
+        const exitMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.16, WALL_H, 16),
+            new THREE.MeshStandardMaterial({
+                color: 0x145a66,
+                emissive: 0x3cf0ff,
+                emissiveIntensity: 1.4,
+            }),
+        );
+        scene.add(exitMesh);
+
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x1b1713 });
+        const ceilMat = new THREE.MeshLambertMaterial({ color: 0x100e0c });
+        const wallMat = new THREE.MeshLambertMaterial();
+        let floorMesh = null;
+        let ceilMesh = null;
+        let wallMesh = null;
+        let mazeKey = '';
+
+        const camPos = new THREE.Vector3(1, EYE, 1);
+        const targetPos = new THREE.Vector3(1, EYE, 1);
+        let camYaw = 0;
+        let targetYaw = 0;
+        let bump = 0;
+        let lastAt = '';
+        let voteEndsAt = 0;
+        const clock = new THREE.Clock();
+
+        function lerpAngle(a, b, t) {
+            let diff = b - a;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            return a + diff * t;
+        }
+
+        function disposeMesh(mesh) {
+            if (!mesh) {
+                return;
+            }
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+        }
+
+        function rebuildMaze(state) {
+            disposeMesh(floorMesh);
+            disposeMesh(ceilMesh);
+            disposeMesh(wallMesh);
+
+            const w = state.width;
+            const h = state.height;
+            const floorGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
+            floorGeo.rotateX(-Math.PI / 2);
+            floorMesh = new THREE.Mesh(floorGeo, floorMat);
+            floorMesh.position.set((w - 1) / 2, 0, (h - 1) / 2);
+            scene.add(floorMesh);
+
+            const ceilGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
+            ceilGeo.rotateX(Math.PI / 2);
+            ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
+            ceilMesh.position.set((w - 1) / 2, WALL_H, (h - 1) / 2);
+            scene.add(ceilMesh);
+
+            const walls = [];
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (state.grid[y][x] === 1) {
+                        walls.push(x, y);
+                    }
+                }
+            }
+
+            const count = walls.length / 2 || 1;
+            wallMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.02, WALL_H, 1.02), wallMat, count);
+            const dummy = new THREE.Object3D();
+            const color = new THREE.Color();
+            for (let i = 0; i < walls.length; i += 2) {
+                const index = i / 2;
+                dummy.position.set(walls[i], WALL_H / 2, walls[i + 1]);
+                dummy.updateMatrix();
+                wallMesh.setMatrixAt(index, dummy.matrix);
+                const shade = 0.72 + ((walls[i] * 13 + walls[i + 1] * 7) % 9) * 0.025;
+                color.setRGB(0.28 * shade, 0.24 * shade, 0.2 * shade);
+                wallMesh.setColorAt(index, color);
+            }
+            wallMesh.instanceMatrix.needsUpdate = true;
+            if (wallMesh.instanceColor) {
+                wallMesh.instanceColor.needsUpdate = true;
+            }
+            scene.add(wallMesh);
+        }
+
+        function applyState(state, snap) {
+            if (!state?.grid?.length) {
+                return;
+            }
+            const key = `${state.floor}:${state.width}:${state.height}`;
+            if (key !== mazeKey) {
+                mazeKey = key;
+                rebuildMaze(state);
+                snap = true;
+            }
+
+            const player = state.player;
+            targetPos.set(player.x * CELL, EYE, player.y * CELL);
+            targetYaw = YAWS[player.dir] ?? 0;
+            if (snap) {
+                camPos.copy(targetPos);
+                camYaw = targetYaw;
+                bump = 0;
+            }
+
+            if (state.exit) {
+                exitMesh.position.set(state.exit.x, WALL_H / 2, state.exit.y);
+                exitLight.position.set(state.exit.x, 0.9, state.exit.y);
+            }
+
+            if (state.at && state.at !== lastAt && state.lastAction?.bumped) {
+                bump = state.lastAction.command === 'down' ? -0.14 : 0.14;
+            }
+            lastAt = state.at || lastAt;
+
+            floorEl.textContent = String(state.floor ?? 1);
+            modeEl.textContent = state.mode === 'democracy' ? 'Democracy' : 'Anarchy';
+            modeEl.classList.toggle('democracy', state.mode === 'democracy');
+
+            const action = state.lastAction;
+            if (action?.displayName) {
+                const extra = action.vote ? ' · voting' : action.bumped ? ' · wall' : '';
+                lastEl.innerHTML = `${escapeHtml(action.displayName)} <span>!${escapeHtml(action.command)}${extra}</span>`;
+            } else {
+                lastEl.innerHTML = '<span>Waiting for chat</span>';
+            }
+
+            const voting = state.mode === 'democracy' && state.votes;
+            votesEl.classList.toggle('open', Boolean(voting));
+            voteEndsAt = voting && state.voteEndsAt ? Date.parse(state.voteEndsAt) : 0;
+            if (voting) {
+                const total = Math.max(1, Object.values(state.votes).reduce((sum, n) => sum + n, 0));
+                for (const command of ['up', 'down', 'left', 'right']) {
+                    const n = state.votes[command] || 0;
+                    document.getElementById(`n-${command}`).textContent = String(n);
+                    document.getElementById(`bar-${command}`).style.width = `${(n / total) * 100}%`;
+                }
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function tick() {
+            const dt = clock.getDelta();
+            const t = 1 - Math.exp(-dt * 9);
+            camPos.lerp(targetPos, t);
+            camYaw = lerpAngle(camYaw, targetYaw, t);
+            bump *= Math.exp(-dt * 9);
+
+            const bob = Math.sin(clock.elapsedTime * 2.1) * 0.018;
+            const lookX = -Math.sin(camYaw);
+            const lookZ = -Math.cos(camYaw);
+            camera.position.set(
+                camPos.x + lookX * bump,
+                camPos.y + bob,
+                camPos.z + lookZ * bump,
+            );
+            camera.rotation.y = camYaw;
+            torch.intensity = 2.2 + Math.sin(clock.elapsedTime * 11) * 0.18;
+            exitMesh.material.emissiveIntensity = 1.2 + Math.sin(clock.elapsedTime * 3) * 0.25;
+
+            if (voteEndsAt) {
+                const left = Math.max(0, (voteEndsAt - Date.now()) / 1000);
+                voteTitleEl.textContent = `Democracy · ${left.toFixed(1)}s`;
+            }
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(tick);
+        }
+
+        addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        });
+
+        fetch('/api/dungeon')
+            .then((res) => res.json())
+            .then((state) => applyState(state, true))
+            .catch(() => {
+                lastEl.innerHTML = '<span>Could not load dungeon</span>';
+            });
+
+        const source = new EventSource('/api/dungeon/events');
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'state' || data.grid) {
+                applyState(data, false);
+            }
+        };
+
+        if (preview) {
+            let next = 'up';
+            const send = async () => {
+                try {
+                    const res = await fetch('/api/dungeon/input', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: next, user: 'preview', displayName: 'preview' }),
+                    });
+                    const state = await res.json();
+                    if (state.bumped || state.lastAction?.bumped) {
+                        next = Math.random() < 0.5 ? 'left' : 'right';
+                    } else if (state.lastAction?.command === 'left' || state.lastAction?.command === 'right') {
+                        next = 'up';
+                    } else if (Math.random() < 0.12) {
+                        next = Math.random() < 0.5 ? 'left' : 'right';
+                    } else {
+                        next = 'up';
+                    }
+                } catch {
+                    next = 'up';
+                }
+            };
+            send();
+            setInterval(send, 800);
+        }
+
+        tick();
+    </script>
+</body>
+</html>

@@ -30,6 +30,22 @@ Log in as **teerzobot**. That saves a token with `chat:read`, `chat:edit`, and `
 
 On Railway, set `OAUTH_SECRET` and `TWITCH_REDIRECT_URI`, and keep `TOKEN_PATH` on a volume so the new token survives restarts.
 
+## Discord
+
+Optional. If `DISCORD_TOKEN` is unset, Twitch still runs.
+
+1. In the [Discord Developer Portal](https://discord.com/developers/applications), open the bot application and copy the bot token, application ID, and your server ID.
+2. Invite the bot with scopes `bot` and `applications.commands`. The **Guilds** gateway intent is enough for `/ping` (Message Content is not required).
+3. Set in `.env` (or Railway):
+
+```
+DISCORD_TOKEN=
+DISCORD_CLIENT_ID=
+DISCORD_GUILD_ID=
+```
+
+On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping`, and reports connection state on `GET /api/status` as `discord`.
+
 ## Run locally
 
 ```bash
@@ -82,7 +98,7 @@ Commands have a 10 second cooldown.
 
 ## OBS
 
-The bot on Railway cannot open OBS on your PC. Instead it exposes events:
+The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open **`/manage`** (also `/`) for live previews and copyable Browser Source URLs.
 
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
 2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
@@ -121,7 +137,8 @@ Example webhook payload:
 | --- | --- | --- |
 | `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
-| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance }` |
+| `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts, dvd, dance, discord }` |
+| `GET` | `/` / `/manage` | Overlay management dashboard (live previews + copyable URLs) |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |
 | `PATCH` | `/api/commands/:name` | `{ "response": "..." }` |

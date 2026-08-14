@@ -11,6 +11,7 @@ import { createFfzEmotes } from './ffz.js';
 import { createAlerts } from './alerts.js';
 import { createDvd } from './dvd.js';
 import { createDance } from './dance.js';
+import { createDiscordClient } from './discord.js';
 import { startFollowAlerts } from './follows.js';
 
 function requireEnv(name) {
@@ -32,6 +33,7 @@ const ffz = createFfzEmotes(channel);
 const alerts = createAlerts();
 const dvd = createDvd();
 const dance = createDance();
+const discord = createDiscordClient();
 let twitchApi = null;
 let authProviderRef = null;
 
@@ -56,6 +58,7 @@ const app = createApi({
         alerts: alerts.getStatus(),
         dvd: dvd.getStatus(),
         dance: dance.getStatus(),
+        discord: discord.getStatus(),
     }),
     commands,
     store,
@@ -70,6 +73,12 @@ const app = createApi({
 
 app.listen(port, '0.0.0.0', async () => {
     console.log(`API listening on port ${port}`);
+
+    try {
+        await discord.connect();
+    } catch (err) {
+        console.error('Failed to connect to Discord', err);
+    }
 
     try {
         const { authProvider, userId } = await createAuthProvider();

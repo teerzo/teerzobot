@@ -105,8 +105,16 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             alerts: status.alerts ?? { listeners: 0 },
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
+            discord: status.discord ?? { connected: false },
         });
     });
+
+    function sendManage(_req, res) {
+        res.sendFile(path.join(publicDir, 'manage.html'));
+    }
+
+    app.get('/', sendManage);
+    app.get('/manage', sendManage);
 
     app.get('/obs', (_req, res) => {
         res.sendFile(path.join(publicDir, 'obs.html'));

@@ -19,6 +19,7 @@
     "@twurple/chat": "^8.1.4",
     "@twurple/eventsub-ws": "^8.1.4",
     "cors": "^2.8.6",
+    "discord.js": "^14.27.0",
     "express": "^5.2.1"
   }
 }

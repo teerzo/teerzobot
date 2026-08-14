@@ -29,6 +29,7 @@ const nowPlaying = createNowPlaying();
 const ffz = createFfzEmotes(channel);
 const alerts = createAlerts();
 let twitchApi = null;
+let authProviderRef = null;
 
 const commands = createCommandHandler(store, {
     getTwitch: () => twitchApi,
@@ -54,6 +55,7 @@ const app = createApi({
     chatFeed,
     nowPlaying,
     alerts,
+    getAuthProvider: () => authProviderRef,
 });
 
 app.listen(port, '0.0.0.0', async () => {
@@ -61,6 +63,7 @@ app.listen(port, '0.0.0.0', async () => {
 
     try {
         const { authProvider, userId } = await createAuthProvider();
+        authProviderRef = authProvider;
         const apiClient = new ApiClient({ authProvider });
         twitchApi = createTwitchApi(apiClient, {
             channel,

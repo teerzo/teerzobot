@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { normalizeTrack } from './nowPlaying.js';
+import { attachOAuthRoutes } from './auth.js';
 
 function corsOrigin() {
     const frontend = process.env.FRONTEND_ORIGIN;
@@ -57,11 +58,17 @@ function attachSse(app, route, hub) {
     });
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, getAuthProvider }) {
     const app = express();
+    app.set('trust proxy', 1);
 
     app.use(cors({ origin: corsOrigin() }));
     app.use(express.json());
+
+    attachOAuthRoutes(app, {
+        getAuthProvider,
+        botUserId: process.env.BOT_USER_ID,
+    });
 
     app.get('/health', (_req, res) => {
         res.json({ ok: true });

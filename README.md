@@ -10,7 +10,25 @@ Requires **Node.js 20.6+**.
 npm install
 ```
 
-Copy `.env.example` to `.env` and fill in `CLIENT_ID` / `CLIENT_SECRET`. Keep the existing teerzobot token file at `tokens/token.536204553.json`.
+Copy `.env.example` to `.env` and fill in `CLIENT_ID` / `CLIENT_SECRET`. Keep the existing teerzobot token file at `tokens/token.536204553.json`, or open `/oauth/login` while logged in as teerzobot.
+
+## Twitch OAuth
+
+In the Twitch developer console, add these **OAuth Redirect URLs** (exact match):
+
+```
+http://localhost:3000/oauth/callback
+https://<your-app>.up.railway.app/oauth/callback
+```
+
+Set `TWITCH_REDIRECT_URI` to the URL you are using. Then visit:
+
+- Local: `http://localhost:3000/oauth/login`
+- Railway: `https://<your-app>.up.railway.app/oauth/login?key=YOUR_OAUTH_SECRET`
+
+Log in as **teerzobot**. That saves a token with `chat:read`, `chat:edit`, and `moderator:read:followers`. Restart the service afterward so follow alerts reconnect.
+
+On Railway, set `OAUTH_SECRET` and `TWITCH_REDIRECT_URI`, and keep `TOKEN_PATH` on a volume so the new token survives restarts.
 
 ## Run locally
 
@@ -53,7 +71,7 @@ Commands have a 10 second cooldown.
 
 ### !followage
 
-`!followage` and follow thank-yous need the Helix scope `moderator:read:followers`. Make **teerzobot** a moderator in the channel, then re-authorize the bot token with that scope and update `accessToken` / `refreshToken` (or the token file). Without that, `!followage` replies that it is unavailable and follow alerts will fail to subscribe.
+`!followage` and follow thank-yous need `moderator:read:followers`. Make teerzobot a channel mod, then authorize at `/oauth/login` while logged in as teerzobot.
 
 ## OBS
 
@@ -92,7 +110,8 @@ Example webhook payload:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | `{ ok: true }` |
+| `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
+| `GET` | `/oauth/callback` | Twitch OAuth redirect |
 | `GET` | `/api/status` | `{ connected, channel, botUserId, obs, chat, nowPlaying, alerts }` |
 | `GET` | `/api/commands` | Built-in and custom commands |
 | `POST` | `/api/commands` | `{ "name": "discord", "response": "..." }` |

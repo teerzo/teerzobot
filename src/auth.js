@@ -67,10 +67,18 @@ function oauthRedirectUri(req) {
     if (process.env.TWITCH_REDIRECT_URI) {
         return process.env.TWITCH_REDIRECT_URI.replace(/\/$/, '');
     }
-    const host = req.get('x-forwarded-host') || req.get('host');
-    const proto = String(req.get('x-forwarded-proto') || req.protocol || 'http')
+    const host = String(req.get('x-forwarded-host') || req.get('host') || '')
+        .split(',')[0]
+        .trim()
+        .replace(/:443$/, '')
+        .replace(/:80$/, '');
+    const forwarded = String(req.get('x-forwarded-proto') || '')
         .split(',')[0]
         .trim();
+    let proto = forwarded || req.protocol || 'http';
+    if (host.endsWith('railway.app') || host.endsWith('railway.internal')) {
+        proto = 'https';
+    }
     return `${proto}://${host}/oauth/callback`;
 }
 
@@ -92,9 +100,12 @@ export function attachOAuthRoutes(app, { getAuthProvider, botUserId }) {
         const state = randomBytes(16).toString('hex');
         pendingStates.set(state, Date.now());
 
+        const redirectUri = oauthRedirectUri(req);
+        console.log('OAuth authorize redirect_uri', redirectUri);
+
         const url = new URL('https://id.twitch.tv/oauth2/authorize');
         url.searchParams.set('client_id', requireEnv('CLIENT_ID'));
-        url.searchParams.set('redirect_uri', oauthRedirectUri(req));
+        url.searchParams.set('redirect_uri', redirectUri);
         url.searchParams.set('response_type', 'code');
         url.searchParams.set('scope', BOT_SCOPES.join(' '));
         url.searchParams.set('state', state);

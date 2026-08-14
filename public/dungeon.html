@@ -657,6 +657,26 @@
         const torchBowlGeo = new THREE.BoxGeometry(0.11, 0.045, 0.09);
         const torchFlameGeo = new THREE.BoxGeometry(0.055, 0.11, 0.055);
         const torchTipGeo = new THREE.BoxGeometry(0.03, 0.08, 0.03);
+
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.86, metalness: 0.04 });
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
+        const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
+        const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
+        const voidMat = new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1, metalness: 0, emissive: 0x000000 });
+        const paintMats = [0x6b2d2d, 0x2d4a6b, 0x4a6b2d, 0x6b5a2d, 0x4a2d6b].map((color) =>
+            new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.02 }),
+        );
+        const clothMats = [0x6b1c1c, 0x1c3a6b, 0x3a1c4a, 0x1c4a2a].map((color) =>
+            new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0 }),
+        );
+
+        const WALL_DIRS = [
+            { dx: 0, dz: -1 },
+            { dx: 1, dz: 0 },
+            { dx: 0, dz: 1 },
+            { dx: -1, dz: 0 },
+        ];
+
         let floorBase = null;
         let floorMeshes = [];
         let ceilMesh = null;
@@ -665,6 +685,7 @@
         let crackedWallMesh = null;
         let torchRoot = null;
         let torchLights = [];
+        let propRoot = null;
         let mazeKey = '';
         let shownFloor = null;
         let transitioning = false;
@@ -705,6 +726,58 @@
             torchLights = [];
         }
 
+        function clearProps() {
+            if (propRoot) {
+                scene.remove(propRoot);
+                propRoot = null;
+            }
+        }
+
+        function faceKey(wx, wz, dx, dz) {
+            return `${wx},${wz},${dx},${dz}`;
+        }
+
+        function collectFaces(grid, width, height) {
+            const faces = [];
+            for (let z = 0; z < height; z++) {
+                for (let x = 0; x < width; x++) {
+                    const cell = grid[z][x];
+                    if (cell !== 0 && cell !== 2) {
+                        continue;
+                    }
+                    for (let d = 0; d < 4; d++) {
+                        const { dx, dz } = WALL_DIRS[d];
+                        const wx = x + dx;
+                        const wz = z + dz;
+                        if (grid[wz]?.[wx] !== 1) {
+                            continue;
+                        }
+                        faces.push({
+                            x,
+                            z,
+                            wx,
+                            wz,
+                            dx,
+                            dz,
+                            hash: Math.abs(x * 17 + z * 23 + d * 41),
+                            propHash: Math.abs(x * 19 + z * 31 + d * 43),
+                        });
+                    }
+                }
+            }
+            return faces;
+        }
+
+        function isReservedCell(x, z, player, exit) {
+            if (player && player.x === x && player.y === z) {
+                return true;
+            }
+            if (exit && exit.x === x && exit.y === z) {
+                return true;
+            }
+            return false;
+        }
+
         function makeTorch() {
             const group = new THREE.Group();
             const bracket = new THREE.Mesh(torchBracketGeo, torchBracketMat);
@@ -719,40 +792,132 @@
             return group;
         }
 
+        function makeHole() {
+            const group = new THREE.Group();
+            const lip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.38, 0.05), ironMat);
+            const hole = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.28, 0.1), voidMat);
+            hole.position.z = 0.02;
+            group.add(lip, hole);
+            return group;
+        }
+
+        function makePainting(hash) {
+            const group = new THREE.Group();
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.04), woodMat);
+            const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.03), paintMats[hash % paintMats.length]);
+            canvas.position.z = 0.025;
+            group.add(frame, canvas);
+            return group;
+        }
+
+        function makeWeapons(hash) {
+            const group = new THREE.Group();
+            if (hash % 2 === 0) {
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.44, 0.02), ironMat);
+                const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.03), ironMat);
+                guard.position.y = -0.1;
+                const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.03), woodMat);
+                hilt.position.y = -0.18;
+                group.add(blade, guard, hilt);
+            } else {
+                const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.04, 10), ironMat);
+                shield.rotation.x = Math.PI / 2;
+                const boss = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), ironMat);
+                boss.position.z = 0.04;
+                group.add(shield, boss);
+            }
+            return group;
+        }
+
+        function makeBanner(hash) {
+            const group = new THREE.Group();
+            const rod = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.03), woodMat);
+            rod.position.y = 0.2;
+            const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.4, 0.02), clothMats[hash % clothMats.length]);
+            cloth.position.set(0, -0.02, 0.01);
+            group.add(rod, cloth);
+            return group;
+        }
+
+        function makePlant() {
+            const group = new THREE.Group();
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.12, 8), potMat);
+            pot.position.y = 0.06;
+            const leaf1 = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), plantMat);
+            leaf1.position.y = 0.2;
+            const leaf2 = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), plantMat);
+            leaf2.position.set(0.04, 0.16, 0.02);
+            const leaf3 = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.1, 6), plantMat);
+            leaf3.position.set(-0.03, 0.15, -0.02);
+            group.add(pot, leaf1, leaf2, leaf3);
+            return group;
+        }
+
+        function makeBarrel() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.22, 10), woodMat);
+            body.position.y = 0.11;
+            const band = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.03, 10), ironMat);
+            band.position.y = 0.11;
+            group.add(body, band);
+            return group;
+        }
+
+        function makeCrate() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.22), woodMat);
+            box.position.y = 0.1;
+            box.rotation.y = 0.18;
+            group.add(box);
+            return group;
+        }
+
+        function makeChair() {
+            const group = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, 0.18), woodMat);
+            seat.position.y = 0.18;
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.04), woodMat);
+            back.position.set(0, 0.3, -0.07);
+            const legGeo = new THREE.BoxGeometry(0.03, 0.16, 0.03);
+            for (const [lx, lz] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) {
+                const leg = new THREE.Mesh(legGeo, woodMat);
+                leg.position.set(lx, 0.08, lz);
+                group.add(leg);
+            }
+            group.add(seat, back);
+            return group;
+        }
+
+        function makePit() {
+            const group = new THREE.Group();
+            const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 12), ironMat);
+            ring.position.y = 0.014;
+            const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.03, 12), voidMat);
+            hole.position.y = 0.008;
+            group.add(ring, hole);
+            return group;
+        }
+
+        function makeRug(hash) {
+            const group = new THREE.Group();
+            const rug = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.018, 0.34), clothMats[hash % clothMats.length]);
+            rug.position.y = 0.012;
+            group.add(rug);
+            return group;
+        }
+
+        const WALL_PROP_MAKERS = [makeHole, makePainting, makeWeapons, makeBanner];
+        const FLOOR_PROP_MAKERS = [makePlant, makeBarrel, makeCrate, makeChair];
+        const DETAIL_PROP_MAKERS = [makePit, makeRug];
+
         function placeTorches(grid, width, height) {
             clearTorches();
-            const dirs = [
-                { dx: 0, dz: -1 },
-                { dx: 1, dz: 0 },
-                { dx: 0, dz: 1 },
-                { dx: -1, dz: 0 },
-            ];
-            const spots = [];
-            for (let z = 0; z < height; z++) {
-                for (let x = 0; x < width; x++) {
-                    const cell = grid[z][x];
-                    if (cell !== 0 && cell !== 2) {
-                        continue;
-                    }
-                    for (let d = 0; d < 4; d++) {
-                        const { dx, dz } = dirs[d];
-                        const wx = x + dx;
-                        const wz = z + dz;
-                        if (grid[wz]?.[wx] !== 1) {
-                            continue;
-                        }
-                        const hash = Math.abs(x * 17 + z * 23 + d * 41);
-                        if (hash % 5 !== 0) {
-                            continue;
-                        }
-                        spots.push({ wx, wz, dx, dz, hash });
-                    }
-                }
-            }
-            spots.sort((a, b) => a.hash - b.hash);
-            const picked = spots.slice(0, 12);
+            const faces = collectFaces(grid, width, height);
+            const spots = faces.filter((face) => face.hash % 5 === 0).sort((a, b) => a.hash - b.hash).slice(0, 12);
+            const used = new Set();
             torchRoot = new THREE.Group();
-            for (const spot of picked) {
+            for (const spot of spots) {
+                used.add(faceKey(spot.wx, spot.wz, spot.dx, spot.dz));
                 const px = spot.wx - spot.dx * 0.54;
                 const pz = spot.wz - spot.dz * 0.54;
                 const py = 0.5;
@@ -769,6 +934,75 @@
                 torchLights.push(light);
             }
             scene.add(torchRoot);
+            return used;
+        }
+
+        function placeProps(grid, width, height, player, exit, torchFaces) {
+            clearProps();
+            propRoot = new THREE.Group();
+            const faces = collectFaces(grid, width, height);
+            const wallSpots = faces
+                .filter((face) => !torchFaces.has(faceKey(face.wx, face.wz, face.dx, face.dz)))
+                .filter((face) => !isReservedCell(face.x, face.z, player, exit))
+                .filter((face) => face.propHash % 4 === 0)
+                .sort((a, b) => a.propHash - b.propHash)
+                .slice(0, 16);
+
+            const usedCells = new Set();
+            for (const spot of wallSpots) {
+                const maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
+                const prop = maker(spot.propHash);
+                const px = spot.wx - spot.dx * 0.54;
+                const pz = spot.wz - spot.dz * 0.54;
+                const heights = [0.72, 0.92, 0.78, 0.95];
+                prop.position.set(px, heights[spot.propHash % heights.length], pz);
+                prop.rotation.y = Math.atan2(-spot.dx, -spot.dz);
+                propRoot.add(prop);
+                usedCells.add(`${spot.x},${spot.z}`);
+            }
+
+            const floorCells = [];
+            for (let z = 0; z < height; z++) {
+                for (let x = 0; x < width; x++) {
+                    const cell = grid[z][x];
+                    if (cell !== 0 && cell !== 2) {
+                        continue;
+                    }
+                    if (isReservedCell(x, z, player, exit) || usedCells.has(`${x},${z}`)) {
+                        continue;
+                    }
+                    const hash = Math.abs(x * 37 + z * 53);
+                    floorCells.push({ x, z, hash });
+                }
+            }
+            floorCells.sort((a, b) => a.hash - b.hash);
+
+            const furniture = floorCells.filter((cell) => cell.hash % 7 === 0).slice(0, 12);
+            const furnitureCells = new Set(furniture.map((cell) => `${cell.x},${cell.z}`));
+            for (const cell of furniture) {
+                const walls = WALL_DIRS.filter((dir) => grid[cell.z + dir.dz]?.[cell.x + dir.dx] === 1);
+                const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 1 };
+                const maker = FLOOR_PROP_MAKERS[cell.hash % FLOOR_PROP_MAKERS.length];
+                const prop = maker(cell.hash);
+                prop.position.set(cell.x + dir.dx * 0.32, 0, cell.z + dir.dz * 0.32);
+                prop.rotation.y = Math.atan2(-dir.dx, -dir.dz);
+                propRoot.add(prop);
+            }
+
+            const details = floorCells
+                .filter((cell) => !furnitureCells.has(`${cell.x},${cell.z}`) && cell.hash % 11 === 0)
+                .slice(0, 8);
+            for (const cell of details) {
+                const maker = DETAIL_PROP_MAKERS[cell.hash % DETAIL_PROP_MAKERS.length];
+                const prop = maker(cell.hash);
+                const ox = ((cell.hash % 5) - 2) * 0.06;
+                const oz = ((cell.hash % 3) - 1) * 0.06;
+                prop.position.set(cell.x + ox, 0, cell.z + oz);
+                prop.rotation.y = (cell.hash % 4) * (Math.PI / 2);
+                propRoot.add(prop);
+            }
+
+            scene.add(propRoot);
         }
 
         function rebuildMaze(state) {
@@ -782,6 +1016,7 @@
             disposeMesh(vineWallMesh);
             disposeMesh(crackedWallMesh);
             clearTorches();
+            clearProps();
 
             const w = state.width;
             const h = state.height;
@@ -886,7 +1121,8 @@
             }
             tileGeo.dispose();
 
-            placeTorches(state.grid, w, h);
+            const torchFaces = placeTorches(state.grid, w, h);
+            placeProps(state.grid, w, h, state.player, state.exit, torchFaces);
         }
 
         function applyState(state, snap) {

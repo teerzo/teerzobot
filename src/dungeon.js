@@ -119,16 +119,82 @@ function farthestCell(grid, startX, startY) {
     return { x: best[0], y: best[1] };
 }
 
+function isOpen(cell) {
+    return cell === FLOOR || cell === EXIT;
+}
+
 function openDir(grid, x, y) {
     for (let dir = 0; dir < 4; dir++) {
         const nx = x + DIRS[dir].dx;
         const ny = y + DIRS[dir].dy;
-        const cell = grid[ny]?.[nx];
-        if (cell === FLOOR || cell === EXIT) {
+        if (isOpen(grid[ny]?.[nx])) {
             return dir;
         }
     }
     return 0;
+}
+
+function distFrom(grid, ox, oy) {
+    const height = grid.length;
+    const width = grid[0].length;
+    const dist = Array.from({ length: height }, () => Array(width).fill(-1));
+    if (!isOpen(grid[oy]?.[ox])) {
+        return dist;
+    }
+    dist[oy][ox] = 0;
+    const queue = [[ox, oy]];
+    for (let i = 0; i < queue.length; i++) {
+        const [x, y] = queue[i];
+        for (const { dx, dy } of DIRS) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (ny < 0 || nx < 0 || ny >= height || nx >= width) {
+                continue;
+            }
+            if (dist[ny][nx] >= 0 || !isOpen(grid[ny][nx])) {
+                continue;
+            }
+            dist[ny][nx] = dist[y][x] + 1;
+            queue.push([nx, ny]);
+        }
+    }
+    return dist;
+}
+
+function bestDirToward(grid, x, y, tx, ty, facing) {
+    const dist = distFrom(grid, tx, ty);
+    if ((dist[y]?.[x] ?? -1) < 0) {
+        return null;
+    }
+    let bestDir = null;
+    let best = Infinity;
+    for (let dir = 0; dir < 4; dir++) {
+        const nx = x + DIRS[dir].dx;
+        const ny = y + DIRS[dir].dy;
+        const d = dist[ny]?.[nx];
+        if (d == null || d < 0) {
+            continue;
+        }
+        if (d < best || (d === best && dir === facing)) {
+            best = d;
+            bestDir = dir;
+        }
+    }
+    return bestDir;
+}
+
+function turnToward(facing, targetDir) {
+    const delta = (targetDir - facing + 4) % 4;
+    if (delta === 0) {
+        return 'up';
+    }
+    if (delta === 1) {
+        return 'right';
+    }
+    if (delta === 3) {
+        return 'left';
+    }
+    return Math.random() < 0.5 ? 'left' : 'right';
 }
 
 function cloneGrid(grid) {
@@ -309,14 +375,30 @@ export function createDungeon() {
     }
 
     function pickNextAuto(bumped, command) {
-        if (bumped) {
-            return Math.random() < 0.5 ? 'left' : 'right';
-        }
+        const { player, exit, grid } = maze;
+        const goal = bestDirToward(grid, player.x, player.y, exit.x, exit.y, player.dir);
+
         if (command === 'left' || command === 'right') {
             return 'up';
         }
-        if (Math.random() < 0.12) {
-            return Math.random() < 0.5 ? 'left' : 'right';
+
+        const randomTurn = () => (Math.random() < 0.5 ? 'left' : 'right');
+        const seekTurn = (chance) => {
+            if (goal == null || Math.random() > chance) {
+                return randomTurn();
+            }
+            const next = turnToward(player.dir, goal);
+            return next === 'up' ? randomTurn() : next;
+        };
+
+        if (bumped) {
+            return seekTurn(0.85);
+        }
+        if (goal != null && goal !== player.dir && Math.random() < 0.42) {
+            return turnToward(player.dir, goal);
+        }
+        if (Math.random() < 0.08) {
+            return seekTurn(0.55);
         }
         return 'up';
     }

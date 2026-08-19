@@ -108,12 +108,22 @@ app.listen(port, '0.0.0.0', async () => {
                     displayName: ctx.displayName,
                     text: ctx.text,
                     parts: ctx.parts,
+                    messageId: ctx.messageId,
                     isMod: ctx.isMod,
                     isBroadcaster: ctx.isBroadcaster,
                 });
                 return commands.handleMessage(ctx);
             },
             onBotMessage: (event) => chatFeed.emit(event),
+            onMessageRemove: ({ messageId }) => {
+                chatFeed.emit({ type: 'chat-delete', messageId });
+            },
+            onUserClear: ({ user }) => {
+                chatFeed.emit({ type: 'chat-user-clear', user });
+            },
+            onChatClear: () => {
+                chatFeed.emit({ type: 'chat-clear' });
+            },
             getThirdPartyEmote: (name) => ffz.lookup(name),
         });
         await chat.connect();

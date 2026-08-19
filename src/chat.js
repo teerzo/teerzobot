@@ -40,7 +40,15 @@ function serializeMessageParts(text, emoteOffsets, lookup) {
     });
 }
 
-export function createChatClient(authProvider, { channel, onMessage, onBotMessage, getThirdPartyEmote }) {
+export function createChatClient(authProvider, {
+    channel,
+    onMessage,
+    onBotMessage,
+    onMessageRemove,
+    onUserClear,
+    onChatClear,
+    getThirdPartyEmote,
+}) {
     const state = {
         connected: false,
         channel,
@@ -104,6 +112,7 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
                 user,
                 displayName: msg.userInfo.displayName || user,
                 userId: msg.userInfo.userId,
+                messageId: msg.id,
                 isMod: msg.userInfo.isMod,
                 isBroadcaster: msg.userInfo.isBroadcaster,
                 text,
@@ -113,6 +122,38 @@ export function createChatClient(authProvider, { channel, onMessage, onBotMessag
             });
         } catch (err) {
             console.error('Error handling chat message', err);
+        }
+    });
+
+    chatClient.onMessageRemove((_chan, messageId) => {
+        try {
+            onMessageRemove?.({ messageId });
+        } catch (err) {
+            console.error('Error handling chat message remove', err);
+        }
+    });
+
+    chatClient.onTimeout((_chan, user) => {
+        try {
+            onUserClear?.({ user });
+        } catch (err) {
+            console.error('Error handling chat timeout', err);
+        }
+    });
+
+    chatClient.onBan((_chan, user) => {
+        try {
+            onUserClear?.({ user });
+        } catch (err) {
+            console.error('Error handling chat ban', err);
+        }
+    });
+
+    chatClient.onChatClear(() => {
+        try {
+            onChatClear?.();
+        } catch (err) {
+            console.error('Error handling chat clear', err);
         }
     });
 

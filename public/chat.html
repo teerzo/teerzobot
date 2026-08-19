@@ -98,6 +98,12 @@
         function addMessage(data) {
             const row = document.createElement('div');
             row.className = 'msg';
+            if (data.messageId) {
+                row.dataset.id = data.messageId;
+            }
+            if (data.user) {
+                row.dataset.user = String(data.user).toLowerCase();
+            }
             row.innerHTML =
                 `<span class="${nameClass(data)}">${escapeHtml(data.displayName || data.user)}</span>` +
                 `<span>${renderText(data)}</span>`;
@@ -105,6 +111,34 @@
             while (listEl.children.length > MAX) {
                 listEl.removeChild(listEl.lastChild);
             }
+        }
+
+        function removeMessage(messageId) {
+            if (!messageId) {
+                return;
+            }
+            for (const row of [...listEl.children]) {
+                if (row.dataset.id === messageId) {
+                    row.remove();
+                    return;
+                }
+            }
+        }
+
+        function removeUserMessages(user) {
+            if (!user) {
+                return;
+            }
+            const login = String(user).toLowerCase();
+            for (const row of [...listEl.children]) {
+                if (row.dataset.user === login) {
+                    row.remove();
+                }
+            }
+        }
+
+        function clearMessages() {
+            listEl.replaceChildren();
         }
 
         const source = new EventSource('/api/chat/events');
@@ -115,6 +149,18 @@
             const data = JSON.parse(event.data);
             if (data.type === 'chat' && data.text) {
                 addMessage(data);
+                return;
+            }
+            if (data.type === 'chat-delete') {
+                removeMessage(data.messageId);
+                return;
+            }
+            if (data.type === 'chat-user-clear') {
+                removeUserMessages(data.user);
+                return;
+            }
+            if (data.type === 'chat-clear') {
+                clearMessages();
             }
         };
         source.onerror = () => {

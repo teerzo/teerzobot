@@ -59,6 +59,9 @@
         #mode.democracy {
             background: rgba(20, 90, 160, 0.82);
         }
+        #mode.autoplay {
+            background: rgba(160, 110, 20, 0.88);
+        }
         #last {
             position: absolute;
             left: clamp(8px, 2.4vw, 20px);
@@ -1200,8 +1203,9 @@
             lastAt = state.at || lastAt;
 
             floorEl.textContent = String(state.floor ?? 0);
-            modeEl.textContent = state.mode === 'democracy' ? 'Democracy' : 'Anarchy';
+            modeEl.textContent = state.mode === 'democracy' ? 'Democracy' : state.mode === 'autoplay' ? 'Autoplay' : 'Anarchy';
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
+            modeEl.classList.toggle('autoplay', state.mode === 'autoplay');
 
             const action = state.lastAction;
             if (action?.displayName) {

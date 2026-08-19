@@ -14,6 +14,8 @@ const DIRS = [
 const MOVES = new Set(['up', 'down', 'left', 'right']);
 const ANARCHY_LOCK_MS = 350;
 const DEMOCRACY_MS = 8_000;
+const IDLE_MS = 60_000;
+const AUTOPLAY_MS = 800;
 const MIN_SIZE = 11;
 const MAX_SIZE = 21;
 
@@ -186,6 +188,11 @@ export function createDungeon() {
     let voteEndsAt = null;
     let voteTimer = null;
     let onFloorClear = null;
+    let onAutoplay = null;
+    let resumeMode = 'anarchy';
+    let idleTimer = null;
+    let autoplayTimer = null;
+    let nextAutoCommand = 'up';
 
     function snapshot() {
         return {
@@ -272,6 +279,93 @@ export function createDungeon() {
         return { floorCleared, previousFloor, bumped };
     }
 
+    function isSyntheticUser(user) {
+        const name = String(user ?? '').toLowerCase();
+        return name === 'preview' || name === 'autoplay';
+    }
+
+    function stopAutoplayLoop() {
+        if (autoplayTimer) {
+            clearInterval(autoplayTimer);
+            autoplayTimer = null;
+        }
+    }
+
+    function clearIdle() {
+        if (idleTimer) {
+            clearTimeout(idleTimer);
+            idleTimer = null;
+        }
+    }
+
+    function scheduleIdle() {
+        clearIdle();
+        if (mode === 'autoplay') {
+            return;
+        }
+        idleTimer = setTimeout(() => {
+            startAutoplay({ idle: true });
+        }, IDLE_MS);
+    }
+
+    function pickNextAuto(bumped, command) {
+        if (bumped) {
+            return Math.random() < 0.5 ? 'left' : 'right';
+        }
+        if (command === 'left' || command === 'right') {
+            return 'up';
+        }
+        if (Math.random() < 0.12) {
+            return Math.random() < 0.5 ? 'left' : 'right';
+        }
+        return 'up';
+    }
+
+    function autoplayStep() {
+        if (mode !== 'autoplay' || Date.now() < lockedUntil) {
+            return;
+        }
+        const moved = applyCommand(nextAutoCommand, { user: 'autoplay', displayName: 'Autoplay' });
+        lockedUntil = Date.now() + ANARCHY_LOCK_MS;
+        nextAutoCommand = pickNextAuto(moved.bumped, nextAutoCommand);
+        emit();
+    }
+
+    function startAutoplay({ idle = false } = {}) {
+        const already = mode === 'autoplay' && autoplayTimer;
+        if (mode !== 'autoplay') {
+            resumeMode = mode === 'democracy' ? 'democracy' : 'anarchy';
+        }
+        clearVotes();
+        clearIdle();
+        mode = 'autoplay';
+        lockedUntil = 0;
+        if (!autoplayTimer) {
+            nextAutoCommand = 'up';
+            autoplayTimer = setInterval(autoplayStep, AUTOPLAY_MS);
+            autoplayStep();
+        } else {
+            emit();
+        }
+        if (idle && !already) {
+            try {
+                onAutoplay?.();
+            } catch (err) {
+                console.error('Dungeon autoplay announce failed', err);
+            }
+        }
+        return { ...snapshot(), changed: !already };
+    }
+
+    function leaveAutoplay(nextMode) {
+        stopAutoplayLoop();
+        const restored = nextMode === 'democracy' ? 'democracy' : 'anarchy';
+        resumeMode = restored;
+        mode = restored;
+        lockedUntil = 0;
+        scheduleIdle();
+    }
+
     function resolveWinner() {
         const votes = tally();
         const max = Math.max(...Object.values(votes));
@@ -311,6 +405,26 @@ export function createDungeon() {
         }
 
         const actor = { user: user || 'anon', displayName: displayName || user || 'anon' };
+        const synthetic = isSyntheticUser(actor.user);
+
+        if (synthetic && mode === 'autoplay') {
+            return {
+                ...snapshot(),
+                applied: false,
+                ignored: true,
+                bumped: false,
+                floorCleared: false,
+                voted: false,
+            };
+        }
+
+        if (!synthetic) {
+            if (mode === 'autoplay') {
+                leaveAutoplay(resumeMode);
+            } else {
+                scheduleIdle();
+            }
+        }
 
         if (mode === 'democracy') {
             const isFirst = ballots.size === 0 && !voteTimer;
@@ -364,26 +478,38 @@ export function createDungeon() {
         maze = buildFloor(floor);
         lastAction = null;
         lockedUntil = 0;
+        nextAutoCommand = 'up';
+        if (mode === 'autoplay') {
+            stopAutoplayLoop();
+            autoplayTimer = setInterval(autoplayStep, AUTOPLAY_MS);
+        } else {
+            scheduleIdle();
+        }
         emit();
         return snapshot();
     }
 
     function setMode(next) {
         const value = String(next ?? '').trim().toLowerCase();
-        if (value !== 'anarchy' && value !== 'democracy') {
-            const err = new Error('Mode must be anarchy or democracy');
+        if (value !== 'anarchy' && value !== 'democracy' && value !== 'autoplay') {
+            const err = new Error('Mode must be anarchy, democracy, or autoplay');
             err.code = 'USAGE';
             throw err;
         }
-        if (mode === value) {
+        if (value === 'autoplay') {
+            return startAutoplay({ idle: false });
+        }
+        if (mode === value && !autoplayTimer) {
             return { ...snapshot(), changed: false };
         }
+        const changed = mode !== value;
+        leaveAutoplay(value);
         clearVotes();
-        mode = value;
-        lockedUntil = 0;
         emit();
-        return { ...snapshot(), changed: true };
+        return { ...snapshot(), changed };
     }
+
+    scheduleIdle();
 
     return {
         subscribe: hub.subscribe,
@@ -394,6 +520,9 @@ export function createDungeon() {
         setMode,
         setOnFloorClear(fn) {
             onFloorClear = typeof fn === 'function' ? fn : null;
+        },
+        setOnAutoplay(fn) {
+            onAutoplay = typeof fn === 'function' ? fn : null;
         },
         getStatus: () => ({
             listeners: hub.listenerCount,

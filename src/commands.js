@@ -35,6 +35,7 @@ const RESERVED = new Set([
     'dungeon',
     'anarchy',
     'democracy',
+    'autoplay',
     'up',
     'down',
     'left',
@@ -376,6 +377,22 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return say(channel, 'Already in democracy mode.');
                 }
                 return say(channel, 'Democracy mode. Vote with !up !down !left !right.');
+            },
+        },
+        {
+            name: 'autoplay',
+            response: 'Switch the dungeon to autoplay mode (mods)',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                const state = dungeon.setMode('autoplay');
+                if (!state.changed) {
+                    return say(channel, 'Already in autoplay mode.');
+                }
+                return say(channel, 'Autoplay mode. Chat with !up !down !left !right to take over.');
             },
         },
         {

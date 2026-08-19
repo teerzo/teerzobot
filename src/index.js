@@ -122,6 +122,11 @@ app.listen(port, '0.0.0.0', async () => {
                 console.error('Dungeon floor announce failed', err);
             });
         });
+        dungeon.setOnAutoplay(() => {
+            chat.say('Dungeon is autoplaying. Chat with !up !down !left !right to take over.').catch((err) => {
+                console.error('Dungeon autoplay announce failed', err);
+            });
+        });
         try {
             await startFollowAlerts({
                 apiClient,

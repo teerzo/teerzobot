@@ -707,10 +707,6 @@ export function createDungeon() {
         const { player, exit, grid } = maze;
         const goal = bestDirToward(grid, player.x, player.y, exit.x, exit.y, player.dir);
 
-        if (command === 'left' || command === 'right') {
-            return 'up';
-        }
-
         const randomTurn = () => (Math.random() < 0.5 ? 'left' : 'right');
         const seekTurn = (chance) => {
             if (goal == null || Math.random() > chance) {
@@ -720,8 +716,20 @@ export function createDungeon() {
             return next === 'up' ? randomTurn() : next;
         };
 
+        if (command === 'fire') {
+            const { dx, dy } = DIRS[player.dir];
+            if (!isOpen(grid[player.y + dy]?.[player.x + dx])) {
+                return seekTurn(0.85);
+            }
+            return 'up';
+        }
+
+        if (command === 'left' || command === 'right') {
+            return Math.random() < 0.22 ? 'fire' : 'up';
+        }
+
         if (bumped) {
-            return seekTurn(0.85);
+            return Math.random() < 0.28 ? 'fire' : seekTurn(0.85);
         }
         if (goal != null && goal !== player.dir && Math.random() < 0.42) {
             return turnToward(player.dir, goal);
@@ -729,16 +737,17 @@ export function createDungeon() {
         if (Math.random() < 0.08) {
             return seekTurn(0.55);
         }
-        return 'up';
+        return Math.random() < 0.16 ? 'fire' : 'up';
     }
 
     function autoplayStep() {
         if (!visible || mode !== 'autoplay' || Date.now() < lockedUntil) {
             return;
         }
-        const moved = applyCommand(nextAutoCommand, { user: 'autoplay', displayName: 'Autoplay' });
-        lockedUntil = Date.now() + ANARCHY_LOCK_MS;
-        nextAutoCommand = pickNextAuto(moved.bumped, nextAutoCommand);
+        const command = nextAutoCommand;
+        const moved = applyCommand(command, { user: 'autoplay', displayName: 'Autoplay' });
+        lockedUntil = Date.now() + (command === 'fire' ? FIRE_LOCK_MS : ANARCHY_LOCK_MS);
+        nextAutoCommand = pickNextAuto(moved.bumped, command);
         emit();
     }
 

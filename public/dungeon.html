@@ -1151,7 +1151,7 @@
             }
 
             const dist = Math.max(0.12, start.distanceTo(impact));
-            const duration = Math.min(0.55, Math.max(0.09, dist * 0.09));
+            const duration = Math.min(1.35, Math.max(0.22, dist * 0.22));
 
             const group = new THREE.Group();
             group.position.copy(start);
@@ -2661,7 +2661,9 @@
 
             const action = state.lastAction;
             if (autoplaying && action?.user === 'autoplay') {
-                lastEl.innerHTML = `Autoplay <span>walking</span>`;
+                lastEl.innerHTML = action.command === 'fire'
+                    ? `Autoplay <span>!fire</span>`
+                    : `Autoplay <span>walking</span>`;
             } else if (action?.displayName) {
                 const extra = action.vote
                     ? ' · voting'

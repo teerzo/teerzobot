@@ -33,15 +33,72 @@ const RESERVED = new Set([
     'tictactoe',
     'clear',
     'dungeon',
+    'dc',
     'anarchy',
     'democracy',
     'autoplay',
+    'resize',
     'up',
     'down',
     'left',
     'right',
     ...Object.keys(DUNGEON_ALIASES),
 ]);
+
+function formatDungeonLayout(state) {
+    const size = `${state.canvasWidth}×${state.canvasHeight}`;
+    const corner = String(state.anchor || 'top-left').replace('-', ' ');
+    if (state.action === 'anchor') {
+        if (!state.changed) {
+            return `Dungeon is already ${corner}.`;
+        }
+        return `Dungeon ${corner}.`;
+    }
+    if (state.atLimit) {
+        return `Dungeon is already ${size}.`;
+    }
+    if (state.action === 'status' || !state.changed) {
+        return `Dungeon ${size}, ${corner}.`;
+    }
+    return `Dungeon ${size}, ${corner}.`;
+}
+
+const HELP_TOPICS = {
+    dc: {
+        aliases: ['dungeon'],
+        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !anarchy !democracy !autoplay (mods) · !clear hides',
+    },
+    ttt: {
+        aliases: ['tictactoe'],
+        text: 'Tic-tac-toe: !ttt start · !ttt 1-9 play · !clear hides',
+    },
+    dance: {
+        aliases: [],
+        text: 'Dance: !dance <image url> queues a GIF · !undance removes one · !clear hides',
+    },
+    dvd: {
+        aliases: [],
+        text: 'DVD: !dvd add logo · !undvd remove · !dvdfast / !dvdslow speed · !clear hides',
+    },
+};
+
+function helpTopicNames() {
+    return Object.keys(HELP_TOPICS);
+}
+
+function resolveHelpTopic(raw) {
+    const key = String(raw ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/^!/, '');
+    if (!key) {
+        return null;
+    }
+    if (HELP_TOPICS[key]) {
+        return HELP_TOPICS[key];
+    }
+    return Object.values(HELP_TOPICS).find((topic) => topic.aliases.includes(key)) ?? null;
+}
 
 function sceneBuiltins() {
     return Object.entries(getSceneMap())
@@ -84,12 +141,25 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'commands',
-            response: 'Lists available commands',
+            response: 'Lists available commands, or !commands dc for dungeon help',
             builtin: true,
-            async execute({ say, channel }) {
+            async execute({ say, channel, args }) {
+                const topic = resolveHelpTopic(args[0]);
+                if (args[0]) {
+                    if (!topic) {
+                        return say(
+                            channel,
+                            `Unknown topic. Try: ${helpTopicNames().map((name) => `!commands ${name}`).join(', ')}`,
+                        );
+                    }
+                    return say(channel, topic.text);
+                }
                 const all = await list();
                 const names = [...new Set(all.map((command) => command.name))].sort();
-                return say(channel, `Commands: ${names.map((name) => `!${name}`).join(', ')}`);
+                return say(
+                    channel,
+                    `Commands: ${names.map((name) => `!${name}`).join(', ')} · details: !commands dc`,
+                );
             },
         },
         {
@@ -348,6 +418,30 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
+            name: 'dc',
+            response: 'Dungeon layout: !dc size bigger|smaller|full · !dc position topleft',
+            builtin: true,
+            execute({ say, channel, args, isMod, isBroadcaster }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                const sub = String(args[0] ?? '').trim().toLowerCase();
+                if (!sub || sub === 'reset' || sub === 'show' || sub === 'start') {
+                    dungeon.reset();
+                    return say(channel, 'Dungeon overlay is on. Reset to floor 0. Move with !up !down !left !right.');
+                }
+                if (!isMod && !isBroadcaster) {
+                    return;
+                }
+                try {
+                    const state = dungeon.applyLayoutArgs(args);
+                    return say(channel, formatDungeonLayout(state));
+                } catch (err) {
+                    return say(channel, err.message || 'Usage: !dc size bigger|smaller|full or !dc position topleft');
+                }
+            },
+        },
+        {
             name: 'anarchy',
             response: 'Switch the dungeon to anarchy mode (mods)',
             builtin: true,
@@ -393,6 +487,23 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return say(channel, 'Already in autoplay mode.');
                 }
                 return say(channel, 'Autoplay mode. Chat with !up !down !left !right to take over.');
+            },
+        },
+        {
+            name: 'resize',
+            response: 'Resize the dungeon canvas (mods): !resize bigger|smaller|full',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel, args }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                try {
+                    const state = dungeon.applyLayoutArgs(['size', ...args]);
+                    return say(channel, formatDungeonLayout(state));
+                } catch (err) {
+                    return say(channel, err.message || 'Usage: !resize bigger|smaller|full');
+                }
             },
         },
         {

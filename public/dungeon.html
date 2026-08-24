@@ -8,17 +8,37 @@
         html, body {
             margin: 0;
             height: 100%;
-            background: #090807;
+            background: transparent;
             overflow: hidden;
             color: #fff;
-            font: clamp(13px, 2.4vw, 16px)/1.3 "Trebuchet MS", "Segoe UI", sans-serif;
+            font: 16px/1.3 "Trebuchet MS", "Segoe UI", sans-serif;
         }
+        #stage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 640px;
+            height: 480px;
+            background: #090807;
+            overflow: hidden;
+            container-type: size;
+            container-name: dungeon;
+            --ui-scale: 1;
+            font-size: calc(16px * var(--ui-scale));
+        }
+        #stage.anchor-top-left { top: 0; left: 0; right: auto; bottom: auto; }
+        #stage.anchor-top-right { top: 0; right: 0; left: auto; bottom: auto; }
+        #stage.anchor-bottom-left { bottom: 0; left: 0; top: auto; right: auto; }
+        #stage.anchor-bottom-right { bottom: 0; right: 0; top: auto; left: auto; }
         html.paused,
-        html.paused body {
+        html.paused body,
+        html.paused #stage {
             background: transparent;
         }
         canvas {
             display: block;
+            width: 100%;
+            height: 100%;
             opacity: 1;
         }
         html.paused canvas,
@@ -33,32 +53,32 @@
         }
         #top {
             position: absolute;
-            top: clamp(6px, 3.2vh, 18px);
-            left: clamp(8px, 2.4vw, 20px);
-            right: clamp(8px, 2.4vw, 20px);
+            top: clamp(0.35em, 3.2cqh, 1.1em);
+            left: clamp(0.5em, 2.4cqw, 1.25em);
+            right: clamp(0.5em, 2.4cqw, 1.25em);
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 8px;
+            gap: 0.5em;
         }
         #floor, #mode, #last, #votes {
             background: rgba(0, 0, 0, 0.62);
-            border-radius: 8px;
+            border-radius: 0.5em;
         }
         #floor {
-            padding: 6px 10px;
+            padding: 0.35em 0.6em;
             font-size: 0.9em;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
         #floor strong {
             display: block;
-            font-size: clamp(18px, 3.8vw, 24px);
+            font-size: clamp(1.1em, 3.8cqw, 1.5em);
             letter-spacing: 0.02em;
             font-weight: 700;
         }
         #mode {
-            padding: 6px 10px;
+            padding: 0.35em 0.6em;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             font-size: 0.95em;
@@ -73,7 +93,7 @@
         }
         #mode-hint {
             display: none;
-            margin-top: 2px;
+            margin-top: 0.12em;
             font-size: 0.68em;
             font-weight: 700;
             letter-spacing: 0.04em;
@@ -85,27 +105,27 @@
         }
         #mode.autoplay {
             background: rgba(196, 132, 24, 0.92);
-            box-shadow: 0 0 12px rgba(226, 184, 74, 0.45);
+            box-shadow: 0 0 0.75em rgba(226, 184, 74, 0.45);
             animation: autoplayPulse 1.6s ease-in-out infinite;
         }
         #mode.autoplay #mode-hint {
             display: block;
         }
         @keyframes autoplayPulse {
-            0%, 100% { box-shadow: 0 0 8px rgba(226, 184, 74, 0.3); }
-            50% { box-shadow: 0 0 18px rgba(226, 184, 74, 0.75); }
+            0%, 100% { box-shadow: 0 0 0.5em rgba(226, 184, 74, 0.3); }
+            50% { box-shadow: 0 0 1.1em rgba(226, 184, 74, 0.75); }
         }
         #hud.autoplay #vignette {
             background: radial-gradient(ellipse at center, transparent 42%, rgba(48, 24, 0, 0.58) 100%);
         }
         #last {
             position: absolute;
-            left: clamp(8px, 2.4vw, 20px);
-            bottom: clamp(8px, 4vh, 22px);
-            font-size: clamp(15px, 2.8vw, 20px);
+            left: clamp(0.5em, 2.4cqw, 1.25em);
+            bottom: clamp(0.5em, 4cqh, 1.4em);
+            font-size: clamp(0.95em, 2.8cqw, 1.25em);
             font-weight: 700;
             max-width: 54%;
-            padding: 6px 10px;
+            padding: 0.35em 0.6em;
         }
         #last span {
             opacity: 0.92;
@@ -114,10 +134,10 @@
         }
         #votes {
             position: absolute;
-            right: clamp(8px, 2.4vw, 20px);
-            bottom: clamp(8px, 3.6vh, 20px);
-            width: min(240px, 38vw);
-            padding: clamp(6px, 1.4vh, 12px) clamp(8px, 1.2vw, 14px);
+            right: clamp(0.5em, 2.4cqw, 1.25em);
+            bottom: clamp(0.5em, 3.6cqh, 1.25em);
+            width: min(15em, 38cqw);
+            padding: clamp(0.35em, 1.4cqh, 0.75em) clamp(0.5em, 1.2cqw, 0.9em);
             display: none;
         }
         #votes.open {
@@ -132,14 +152,14 @@
         .vote {
             display: grid;
             grid-template-columns: 2.8em 1fr 1.5em;
-            gap: 6px;
+            gap: 0.4em;
             align-items: center;
-            margin-top: 4px;
+            margin-top: 0.25em;
             font-size: 0.95em;
             font-weight: 700;
         }
         .bar {
-            height: clamp(6px, 1.4vh, 8px);
+            height: clamp(0.35em, 1.4cqh, 0.5em);
             border-radius: 99px;
             background: rgba(255, 255, 255, 0.18);
             overflow: hidden;
@@ -158,7 +178,7 @@
         }
         #help {
             position: absolute;
-            top: clamp(6px, 3.2vh, 18px);
+            top: clamp(0.35em, 3.2cqh, 1.1em);
             left: 50%;
             transform: translateX(-50%);
             opacity: 0.9;
@@ -166,35 +186,15 @@
             letter-spacing: 0.06em;
             text-transform: uppercase;
             white-space: nowrap;
-            padding: 6px 10px;
-            border-radius: 8px;
+            padding: 0.35em 0.6em;
+            border-radius: 0.5em;
             background: rgba(0, 0, 0, 0.62);
         }
-        @media (max-width: 680px), (max-height: 500px) {
-            html, body { font-size: 16px; }
+        @container dungeon (max-width: 680px) {
             #help { display: none; }
-            #top {
-                top: 8px;
-                left: 8px;
-                right: 8px;
-            }
-            #floor { font-size: 13px; padding: 7px 10px; }
-            #floor strong { font-size: 22px; }
-            #mode { font-size: 14px; padding: 8px 12px; }
-            #last {
-                left: 8px;
-                bottom: 8px;
-                max-width: calc(100% - 16px);
-                font-size: 18px;
-                padding: 8px 12px;
-            }
-            #votes {
-                right: 8px;
-                bottom: 52px;
-                width: min(230px, calc(100% - 16px));
-                font-size: 15px;
-                padding: 10px 12px;
-            }
+        }
+        @container dungeon (max-height: 500px) {
+            #help { display: none; }
         }
         #transition {
             position: absolute;
@@ -214,12 +214,12 @@
         #transition-msg {
             opacity: 0;
             color: #f3e6c8;
-            font-size: clamp(18px, 5vw, 34px);
+            font-size: clamp(1.1em, 5cqw, 2.1em);
             font-weight: 700;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             text-align: center;
-            text-shadow: 0 0 18px rgba(226, 184, 74, 0.45);
+            text-shadow: 0 0 1.1em rgba(226, 184, 74, 0.45);
             transition: opacity 0.35s ease;
         }
         #transition.title #transition-msg {
@@ -228,6 +228,7 @@
     </style>
 </head>
 <body>
+    <div id="stage" class="anchor-top-left">
     <div id="hud">
         <div id="vignette"></div>
         <div id="top">
@@ -244,6 +245,7 @@
             <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
         </div>
         <div id="transition"><div id="transition-msg">Entering Level 0</div></div>
+    </div>
     </div>
     <script type="importmap">
         {
@@ -267,6 +269,7 @@
 
         const floorEl = document.querySelector('#floor strong');
         const hudEl = document.getElementById('hud');
+        const stageEl = document.getElementById('stage');
         const modeEl = document.getElementById('mode');
         const modeNameEl = document.getElementById('mode-name');
         const modeHintEl = document.getElementById('mode-hint');
@@ -281,13 +284,13 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 80);
+        const camera = new THREE.PerspectiveCamera(72, 640 / 480, 0.05, 80);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-        renderer.setSize(innerWidth, innerHeight);
+        renderer.setSize(640, 480);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.BasicShadowMap;
-        document.body.prepend(renderer.domElement);
+        document.getElementById('stage').prepend(renderer.domElement);
 
         const ambient = new THREE.AmbientLight(0x2a241c, 0.4);
         scene.add(ambient);
@@ -743,6 +746,8 @@
         let voteEndsAt = 0;
         let overlayOn = true;
         let rafId = 0;
+        let canvasW = 0;
+        let canvasH = 0;
         const clock = new THREE.Clock();
 
         function lerpAngle(a, b, t) {
@@ -1174,6 +1179,7 @@
             if (!state) {
                 return;
             }
+            applyCanvasSize(state.canvasWidth, state.canvasHeight, state.anchor);
             const showing = state.visible !== false;
             const resume = showing && document.documentElement.classList.contains('paused');
             setOverlayVisible(showing);
@@ -1195,6 +1201,32 @@
             }
             commitWorld(state, snap || resume || shownFloor === null);
             shownFloor = nextFloor;
+        }
+
+        function applyCanvasSize(width, height, corner) {
+            const w = Number(width) > 0 ? Math.round(Number(width)) : 640;
+            const h = Number(height) > 0 ? Math.round(Number(height)) : 480;
+            canvasW = w;
+            canvasH = h;
+            stageEl.style.width = `${w}px`;
+            stageEl.style.height = `${h}px`;
+            stageEl.style.setProperty('--ui-scale', String(w / 640));
+            const anchor = corner === 'top-right' || corner === 'bottom-left' || corner === 'bottom-right'
+                ? corner
+                : 'top-left';
+            stageEl.classList.toggle('anchor-top-left', anchor === 'top-left');
+            stageEl.classList.toggle('anchor-top-right', anchor === 'top-right');
+            stageEl.classList.toggle('anchor-bottom-left', anchor === 'bottom-left');
+            stageEl.classList.toggle('anchor-bottom-right', anchor === 'bottom-right');
+            syncRendererSize();
+        }
+
+        function syncRendererSize() {
+            const w = canvasW || 640;
+            const h = canvasH || 480;
+            camera.aspect = w / Math.max(1, h);
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
         }
 
         function setOverlayVisible(on) {
@@ -1363,9 +1395,7 @@
         }
 
         addEventListener('resize', () => {
-            camera.aspect = innerWidth / innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(innerWidth, innerHeight);
+            syncRendererSize();
         });
 
         fetch('/api/dungeon')

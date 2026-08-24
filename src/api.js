@@ -109,7 +109,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
             ttt: status.ttt ?? { listeners: 0, visible: true },
-            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true },
+            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true, canvasWidth: 640, canvasHeight: 480, anchor: 'top-left' },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -194,7 +194,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     });
 
     app.get('/api/dungeon', (_req, res) => {
-        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, grid: [] });
+        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, canvasWidth: 640, canvasHeight: 480, anchor: 'top-left', grid: [] });
     });
 
     app.post('/api/dungeon/reset', (_req, res) => {
@@ -211,6 +211,35 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             return;
         }
         res.json(dungeon.clear());
+    });
+
+    app.post('/api/dungeon/size', (req, res) => {
+        if (!dungeon) {
+            res.status(503).json({ error: 'Dungeon overlay is not available' });
+            return;
+        }
+        try {
+            if (req.body?.anchor) {
+                res.json(dungeon.setAnchor(req.body.anchor));
+                return;
+            }
+            if (req.body?.step) {
+                res.json(dungeon.stepSize(Number(req.body.step)));
+                return;
+            }
+            if (req.body?.size || req.body?.position) {
+                const args = [req.body.size, req.body.position].filter(Boolean);
+                res.json(dungeon.applyLayoutArgs(args));
+                return;
+            }
+            res.json(dungeon.setSize(req.body?.width, req.body?.height));
+        } catch (err) {
+            if (err.code === 'USAGE') {
+                res.status(400).json({ error: err.message });
+                return;
+            }
+            throw err;
+        }
     });
 
     app.post('/api/dungeon/input', (req, res) => {

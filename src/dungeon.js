@@ -18,6 +18,29 @@ const IDLE_MS = 60_000;
 const AUTOPLAY_MS = 800;
 const MIN_SIZE = 11;
 const MAX_SIZE = 21;
+const DEFAULT_CANVAS = { width: 640, height: 480 };
+const CANVAS_STEPS = [
+    { width: 480, height: 270 },
+    { width: 640, height: 360 },
+    { width: 640, height: 480 },
+    { width: 854, height: 480 },
+    { width: 960, height: 540 },
+    { width: 1920, height: 1080 },
+];
+const ANCHORS = {
+    'top-left': 'top-left',
+    topleft: 'top-left',
+    tl: 'top-left',
+    'top-right': 'top-right',
+    topright: 'top-right',
+    tr: 'top-right',
+    'bottom-left': 'bottom-left',
+    bottomleft: 'bottom-left',
+    bl: 'bottom-left',
+    'bottom-right': 'bottom-right',
+    bottomright: 'bottom-right',
+    br: 'bottom-right',
+};
 
 export const DUNGEON_ALIASES = {
     u: 'up',
@@ -260,12 +283,18 @@ export function createDungeon() {
     let autoplayTimer = null;
     let nextAutoCommand = 'up';
     let visible = true;
+    let canvasWidth = DEFAULT_CANVAS.width;
+    let canvasHeight = DEFAULT_CANVAS.height;
+    let anchor = 'top-left';
 
     function snapshot() {
         return {
             floor,
             mode,
             visible,
+            canvasWidth,
+            canvasHeight,
+            anchor,
             width: maze.width,
             height: maze.height,
             grid: cloneGrid(maze.grid),
@@ -615,6 +644,152 @@ export function createDungeon() {
         return { ...snapshot(), changed };
     }
 
+    function setSize(rawWidth, rawHeight) {
+        const nextWidth = Math.round(Number(rawWidth));
+        const nextHeight = Math.round(Number(rawHeight));
+        if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth < 1 || nextHeight < 1) {
+            const err = new Error('Usage: !dc size bigger|smaller|full');
+            err.code = 'USAGE';
+            throw err;
+        }
+        const width = Math.min(1920, Math.max(160, nextWidth));
+        const height = Math.min(1080, Math.max(90, nextHeight));
+        if (canvasWidth === width && canvasHeight === height) {
+            return { ...snapshot(), changed: false, action: 'size' };
+        }
+        canvasWidth = width;
+        canvasHeight = height;
+        emit();
+        return { ...snapshot(), changed: true, action: 'size' };
+    }
+
+    function currentStepIndex() {
+        return CANVAS_STEPS.findIndex((step) => step.width === canvasWidth && step.height === canvasHeight);
+    }
+
+    function nearestStepIndex() {
+        const area = (canvasWidth || DEFAULT_CANVAS.width) * (canvasHeight || DEFAULT_CANVAS.height);
+        let best = 0;
+        let bestDelta = Infinity;
+        for (let i = 0; i < CANVAS_STEPS.length; i++) {
+            const delta = Math.abs(CANVAS_STEPS[i].width * CANVAS_STEPS[i].height - area);
+            if (delta < bestDelta) {
+                best = i;
+                bestDelta = delta;
+            }
+        }
+        return best;
+    }
+
+    function stepSize(delta) {
+        let index = currentStepIndex();
+        if (index < 0) {
+            index = nearestStepIndex();
+        }
+        const next = index + delta;
+        if (next < 0 || next >= CANVAS_STEPS.length) {
+            return { ...snapshot(), changed: false, atLimit: true, action: 'size' };
+        }
+        return setSize(CANVAS_STEPS[next].width, CANVAS_STEPS[next].height);
+    }
+
+    function setAnchor(name) {
+        const key = String(name ?? '')
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_]+/g, '');
+        const next = ANCHORS[key];
+        if (!next) {
+            const err = new Error('Usage: !dc position topleft|topright|bottomleft|bottomright');
+            err.code = 'USAGE';
+            throw err;
+        }
+        if (anchor === next) {
+            return { ...snapshot(), changed: false, action: 'anchor' };
+        }
+        anchor = next;
+        emit();
+        return { ...snapshot(), changed: true, action: 'anchor' };
+    }
+
+    function applyLayoutArgs(args) {
+        const parts = (Array.isArray(args) ? args : [args])
+            .map((part) => String(part ?? '').trim().toLowerCase())
+            .filter(Boolean);
+        if (!parts.length) {
+            return { ...snapshot(), changed: false, action: 'status' };
+        }
+
+        const joined = parts.join('');
+        if (ANCHORS[joined] || ANCHORS[parts[0]]) {
+            return setAnchor(joined || parts[0]);
+        }
+
+        const head = parts[0];
+        const rest = parts.slice(1);
+
+        if (head === 'bigger' || head === 'larger') {
+            return stepSize(1);
+        }
+        if (head === 'smaller') {
+            return stepSize(-1);
+        }
+        if (head === 'full' || head === 'fill') {
+            return setSize(1920, 1080);
+        }
+
+        if (head === 'size') {
+            const spec = rest.join(' ');
+            if (!spec) {
+                return { ...snapshot(), changed: false, action: 'status' };
+            }
+            if (spec === 'bigger' || spec === 'larger' || spec === 'up') {
+                return stepSize(1);
+            }
+            if (spec === 'smaller' || spec === 'down') {
+                return stepSize(-1);
+            }
+            if (spec === 'full' || spec === 'fill') {
+                return setSize(1920, 1080);
+            }
+            return setSizeFromArgs(rest);
+        }
+
+        if (head === 'position' || head === 'pos' || head === 'anchor') {
+            return setAnchor(rest.join('') || rest[0]);
+        }
+
+        const err = new Error('Usage: !dc size bigger|smaller|full or !dc position topleft');
+        err.code = 'USAGE';
+        throw err;
+    }
+
+    function setSizeFromArgs(args) {
+        const text = (Array.isArray(args) ? args : [args])
+            .map((part) => String(part ?? '').trim())
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        if (!text || text === 'full' || text === 'fill') {
+            return setSize(1920, 1080);
+        }
+        if (text === 'bigger' || text === 'smaller' || text === 'larger' || ANCHORS[text.replace(/\s+/g, '')]) {
+            return applyLayoutArgs(Array.isArray(args) ? args : [text]);
+        }
+        const compact = text.replace(/\s+/g, '');
+        const preset = CANVAS_STEPS.find((step) => `${step.width}x${step.height}` === compact);
+        if (preset) {
+            return setSize(preset.width, preset.height);
+        }
+        const match = text.match(/^(\d+)\s*[x×,]\s*(\d+)$/) || text.match(/^(\d+)\s+(\d+)$/);
+        if (!match) {
+            const err = new Error('Usage: !dc size bigger|smaller|full');
+            err.code = 'USAGE';
+            throw err;
+        }
+        return setSize(match[1], match[2]);
+    }
+
     scheduleIdle();
 
     return {
@@ -626,6 +801,11 @@ export function createDungeon() {
         hide,
         clear: hide,
         setMode,
+        setSize,
+        setSizeFromArgs,
+        setAnchor,
+        stepSize,
+        applyLayoutArgs,
         setOnFloorClear(fn) {
             onFloorClear = typeof fn === 'function' ? fn : null;
         },
@@ -637,6 +817,9 @@ export function createDungeon() {
             floor,
             mode,
             visible,
+            canvasWidth,
+            canvasHeight,
+            anchor,
         }),
     };
 }

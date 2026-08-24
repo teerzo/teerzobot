@@ -13,6 +13,7 @@ import { createDvd } from './dvd.js';
 import { createDance } from './dance.js';
 import { createTtt } from './ttt.js';
 import { createDungeon } from './dungeon.js';
+import { createArtwork } from './artwork.js';
 import { createDiscordClient } from './discord.js';
 import { startFollowAlerts } from './follows.js';
 
@@ -37,6 +38,11 @@ const dvd = createDvd();
 const dance = createDance();
 const ttt = createTtt();
 const dungeon = createDungeon();
+const artwork = createArtwork();
+artwork.setOnChange((urls) => dungeon.setArtwork(urls));
+artwork.listUrls().then((urls) => dungeon.setArtwork(urls)).catch((err) => {
+    console.error('Failed to load dungeon artwork', err);
+});
 const discord = createDiscordClient({
     onBridgeMessage: ({ displayName, text }) => {
         if (typeof chat.say !== 'function') {
@@ -52,6 +58,8 @@ const discord = createDiscordClient({
         });
     },
     onDanceImage: ({ url, user, displayName }) => dance.queueFromUrl({ url, user, displayName }),
+    onArtworkImage: ({ url, silent }) => artwork.addFromUrl(url, { silent }),
+    onArtworkReady: () => artwork.flush(),
 });
 let twitchApi = null;
 let authProviderRef = null;
@@ -93,6 +101,7 @@ const app = createApi({
     dance,
     ttt,
     dungeon,
+    artwork,
     getAuthProvider: () => authProviderRef,
     getTwitch: () => twitchApi,
 });

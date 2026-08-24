@@ -469,6 +469,7 @@ export function createDungeon() {
     let canvasWidth = DEFAULT_CANVAS.width;
     let canvasHeight = DEFAULT_CANVAS.height;
     let anchor = 'top-left';
+    let artwork = [];
 
     function snapshot() {
         return {
@@ -478,6 +479,7 @@ export function createDungeon() {
             canvasWidth,
             canvasHeight,
             anchor,
+            artwork: [...artwork],
             width: maze.width,
             height: maze.height,
             grid: cloneGrid(maze.grid),
@@ -989,6 +991,12 @@ export function createDungeon() {
         setAnchor,
         stepSize,
         applyLayoutArgs,
+        setArtwork(urls) {
+            artwork = (Array.isArray(urls) ? urls : [])
+                .map((url) => String(url || '').trim())
+                .filter(Boolean);
+            emit();
+        },
         setOnFloorClear(fn) {
             onFloorClear = typeof fn === 'function' ? fn : null;
         },

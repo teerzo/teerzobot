@@ -13,6 +13,9 @@ data/tokens.json
 # User-submitted dance GIFs
 data/gifs/
 
+# Discord artwork used as dungeon paintings
+data/artwork/
+
 # Logs
 *.log
 npm-debug.log*

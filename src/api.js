@@ -78,7 +78,7 @@ function normalizeGifUrl(value) {
     return null;
 }
 
-export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, ttt, dungeon, getAuthProvider, getTwitch }) {
+export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlaying, alerts, dvd, dance, ttt, dungeon, artwork, getAuthProvider, getTwitch }) {
     const app = express();
     app.set('trust proxy', 1);
 
@@ -167,6 +167,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     });
 
     app.use('/gifs', express.static(dance?.getDir() || path.join(publicDir, 'gifs')));
+    app.use('/artwork', express.static(artwork?.getDir() || path.join(process.cwd(), 'data', 'artwork')));
 
     app.get('/api/obs/config', (_req, res) => {
         res.json(obs?.getConfig() ?? { scenes: {} });

@@ -753,6 +753,8 @@
         let shownFloor = null;
         let transitioning = false;
         let pendingState = null;
+        let artworkUrls = [];
+        const textureLoader = new THREE.TextureLoader();
 
         const camPos = new THREE.Vector3(1, EYE, 1);
         const targetPos = new THREE.Vector3(1, EYE, 1);
@@ -895,8 +897,33 @@
         function makePainting(hash) {
             const group = new THREE.Group();
             const frame = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.04), woodMat);
-            const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.03), paintMats[hash % paintMats.length]);
+            const fallback = paintMats[hash % paintMats.length];
+            const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.03), fallback);
             canvas.position.z = 0.025;
+            const url = artworkUrls.length ? artworkUrls[hash % artworkUrls.length] : '';
+            if (url) {
+                const artMat = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.72,
+                    metalness: 0.02,
+                });
+                canvas.material = artMat;
+                textureLoader.load(
+                    url,
+                    (tex) => {
+                        tex.colorSpace = THREE.SRGBColorSpace;
+                        tex.wrapS = THREE.ClampToEdgeWrapping;
+                        tex.wrapT = THREE.ClampToEdgeWrapping;
+                        tex.minFilter = THREE.LinearFilter;
+                        artMat.map = tex;
+                        artMat.needsUpdate = true;
+                    },
+                    undefined,
+                    () => {
+                        canvas.material = fallback;
+                    },
+                );
+            }
             group.add(frame, canvas);
             return group;
         }
@@ -1471,6 +1498,9 @@
         function applyState(state, snap) {
             if (!state) {
                 return;
+            }
+            if (Array.isArray(state.artwork)) {
+                artworkUrls = state.artwork.map((url) => String(url || '').trim()).filter(Boolean);
             }
             applyCanvasSize(state.canvasWidth, state.canvasHeight, state.anchor);
             const showing = state.visible !== false;

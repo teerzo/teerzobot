@@ -11,7 +11,9 @@ import {
 } from 'discord.js';
 
 const DEFAULT_BOT_PERMISSIONS = String(
-    PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ViewChannel
+    | PermissionFlagsBits.SendMessages
+    | PermissionFlagsBits.ReadMessageHistory,
 );
 
 const slashCommands = [
@@ -101,6 +103,14 @@ function isDanceChannelName(name) {
     return normalizeChannelName(name) === danceChannelName();
 }
 
+function artworkChannelName() {
+    return 'artwork';
+}
+
+function isArtworkChannelName(name) {
+    return normalizeChannelName(name) === artworkChannelName();
+}
+
 function isImageAttachment(attachment) {
     const type = String(attachment.contentType || '').toLowerCase();
     if (type.startsWith('image/')) {
@@ -169,7 +179,7 @@ async function postJoinMessage(guild) {
     }
 }
 
-export function createDiscordClient({ onBridgeMessage, onDanceImage } = {}) {
+export function createDiscordClient({ onBridgeMessage, onDanceImage, onArtworkImage, onArtworkReady } = {}) {
     const token = process.env.DISCORD_TOKEN;
     const clientId = process.env.DISCORD_CLIENT_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
@@ -223,6 +233,100 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage } = {}) {
             }
         }
         return null;
+    }
+
+    async function resolveNamedTextChannel(matchName) {
+        if (!client?.isReady()) {
+            return null;
+        }
+        for (const guild of guildsToSearch()) {
+            try {
+                await guild.channels.fetch();
+            } catch (err) {
+                console.error(`Failed to fetch channels for ${guild.name}`, err);
+            }
+            const found = guild.channels.cache.find((ch) => (
+                ch.isTextBased()
+                && ch.type === ChannelType.GuildText
+                && matchName(ch.name)
+            ));
+            if (found) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    async function ingestArtworkUrls(urls, { silent = false } = {}) {
+        if (!urls.length) {
+            return 0;
+        }
+        if (!onArtworkImage) {
+            console.log('Discord artwork image ignored; dungeon artwork is not wired up');
+            return 0;
+        }
+        let added = 0;
+        for (const url of urls) {
+            try {
+                await onArtworkImage({ url, silent });
+                added += 1;
+            } catch (err) {
+                console.error('Failed to save Discord artwork image', err);
+            }
+        }
+        return added;
+    }
+
+    async function loadArtworkHistory() {
+        const target = await resolveNamedTextChannel(isArtworkChannelName);
+        if (!target) {
+            console.log(`Discord artwork channel: no #${artworkChannelName()} channel found`);
+            return;
+        }
+        console.log(`Discord artwork channel: #${target.name}`);
+        if (!onArtworkImage) {
+            return;
+        }
+
+        const messages = [];
+        let before;
+        try {
+            for (let page = 0; page < 20; page++) {
+                const batch = await target.messages.fetch(before ? { limit: 100, before } : { limit: 100 });
+                if (!batch.size) {
+                    break;
+                }
+                messages.push(...batch.values());
+                before = batch.last()?.id;
+                if (batch.size < 100) {
+                    break;
+                }
+            }
+        } catch (err) {
+            console.error(`Failed to read #${target.name} history`, err);
+            return;
+        }
+
+        messages.reverse();
+        const seen = new Set();
+        const urls = [];
+        for (const message of messages) {
+            for (const url of imageUrlsFromMessage(message)) {
+                if (seen.has(url)) {
+                    continue;
+                }
+                seen.add(url);
+                urls.push(url);
+            }
+        }
+
+        const added = await ingestArtworkUrls(urls, { silent: true });
+        try {
+            await onArtworkReady?.();
+        } catch (err) {
+            console.error('Failed to apply Discord artwork', err);
+        }
+        console.log(`Discord artwork: loaded ${added} image${added === 1 ? '' : 's'} from #${target.name}`);
     }
 
     async function relayChat({ displayName, text } = {}) {
@@ -283,6 +387,7 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage } = {}) {
                 console.log(`Discord Twitch chat bridge: no #${bridgeChannelName()} channel found`);
             }
             console.log(`Discord dance queue channel: #${danceChannelName()}`);
+            await loadArtworkHistory();
 
             if (!clientId) {
                 console.log('DISCORD_CLIENT_ID missing; skipping slash command registration');
@@ -374,6 +479,12 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage } = {}) {
                         console.error('Failed to reply in #stream-dance', err);
                     }
                 }
+                return;
+            }
+
+            if (isArtworkChannelName(message.channel?.name)) {
+                const urls = imageUrlsFromMessage(message);
+                await ingestArtworkUrls(urls);
                 return;
             }
 

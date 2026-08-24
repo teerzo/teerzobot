@@ -47,7 +47,7 @@ DISCORD_GUILD_ID=
 In the [Discord Developer Portal](https://discord.com/developers/applications) → **Installation** → **Install Link**, choose **Custom URL** and paste the Discord authorize URL (replace `YOUR_APP_ID` with `DISCORD_CLIENT_ID`):
 
 ```
-https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=3072&integration_type=0&scope=bot+applications.commands
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=68608&integration_type=0&scope=bot+applications.commands
 ```
 
 Or paste your public install redirect (Railway):
@@ -56,7 +56,7 @@ Or paste your public install redirect (Railway):
 https://<your-app>.up.railway.app/discord/install
 ```
 
-Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands`, guild install (`integration_type=0`), and asks for View Channel + Send Messages so it can post in `#general` and `#twitch-chat`. Enable **Message Content Intent** on the Bot page so the chat bridge can read Discord messages.
+Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands`, guild install (`integration_type=0`), and asks for View Channel, Send Messages, and Read Message History so it can post in `#general` / `#twitch-chat` and load images from `#artwork`. Enable **Message Content Intent** on the Bot page so the chat bridge can read Discord messages.
 
 `GET /api/status` includes `discord.installUrl` with the same authorize URL.
 
@@ -83,6 +83,10 @@ The bot’s own messages are not relayed, so the two sides do not echo each othe
 ### Discord dance queue
 
 Images posted in Discord `#stream-dance` (override with `DISCORD_DANCE_CHANNEL`) are downloaded and added to the same approval queue as `!dance`. Accept or reject them at `/manage/dance`. The bot replies in that channel when a GIF is queued.
+
+### Discord dungeon artwork
+
+Images posted in Discord `#artwork` are downloaded to `data/artwork` and used as random painting textures in the dungeon overlay. On startup the bot reads that channel’s history (needs **Read Message History**). New posts are picked up immediately but only appear on paintings after the next floor is built.
 
 ## Run locally
 

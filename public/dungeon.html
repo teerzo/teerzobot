@@ -239,7 +239,7 @@
             <div id="floor">Floor <strong>0</strong></div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
-        <div id="help">!up !down !left !right</div>
+        <div id="help">!up !down !left !right !fire</div>
         <div id="last"><span>Waiting for chat</span></div>
         <div id="votes">
             <h2 id="vote-title">Democracy</h2>
@@ -290,7 +290,7 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(120, 640 / 480, 0.05, 80);
+        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 80);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         renderer.setSize(640, 480);
@@ -303,6 +303,56 @@
         const torch = new THREE.PointLight(0xffd6a0, 2.4, 8, 1.6);
         camera.add(torch);
         scene.add(camera);
+
+        const staffWoodMat = new THREE.MeshStandardMaterial({
+            color: 0x4a2e18,
+            roughness: 0.92,
+            metalness: 0.04,
+        });
+        const staffIronMat = new THREE.MeshStandardMaterial({
+            color: 0x8a8174,
+            roughness: 0.38,
+            metalness: 0.78,
+        });
+        const staffCrystalMat = new THREE.MeshStandardMaterial({
+            color: 0xff4a14,
+            emissive: 0xff2a00,
+            emissiveIntensity: 1.8,
+            roughness: 0.22,
+            metalness: 0.12,
+            transparent: true,
+            opacity: 0.94,
+        });
+        const staff = new THREE.Group();
+        const staffShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.026, 0.78, 7), staffWoodMat);
+        staffShaft.position.y = 0.16;
+        const staffGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.1, 7), staffIronMat);
+        staffGrip.position.y = -0.16;
+        const staffBand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.04, 8), staffIronMat);
+        staffBand.position.y = 0.48;
+        const staffCrystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.055, 0), staffCrystalMat);
+        staffCrystal.position.y = 0.58;
+        const staffGlow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.07, 10, 8),
+            new THREE.MeshBasicMaterial({
+                color: 0xff6622,
+                transparent: true,
+                opacity: 0.35,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+            }),
+        );
+        staffGlow.position.y = 0.58;
+        const staffLight = new THREE.PointLight(0xff6a22, 0.7, 1.6, 2);
+        staffLight.position.y = 0.58;
+        const staffTip = new THREE.Object3D();
+        staffTip.position.y = 0.62;
+        staff.add(staffShaft, staffGrip, staffBand, staffCrystal, staffGlow, staffLight, staffTip);
+        staff.position.set(0.28, -0.36, -0.46);
+        staff.rotation.set(1.12, 0.22, -0.58);
+        const staffBasePos = staff.position.clone();
+        const staffBaseRot = staff.rotation.clone();
+        camera.add(staff);
 
         const pillarMat = new THREE.MeshStandardMaterial({
             color: 0x9a9084,
@@ -673,6 +723,52 @@
             return canvas;
         }
 
+        const PALETTES = {
+            stone: { fog: 0x090807, dark: 0x12100e, wall: 0xe8ddd0, floor: 0xd8cfc4, torch: 0xff8a3a, flame: 0xff6a14 },
+            moss: { fog: 0x08110c, dark: 0x0c1410, wall: 0xc4d8c0, floor: 0xb0c8a8, torch: 0x8ad85a, flame: 0x3a8a28 },
+            ember: { fog: 0x140a06, dark: 0x1a0e08, wall: 0xffd2a8, floor: 0xe8b078, torch: 0xff9030, flame: 0xff5010 },
+            iron: { fog: 0x080a12, dark: 0x0c1018, wall: 0xc0d0e4, floor: 0xa0b4cc, torch: 0x88bbff, flame: 0x4060c0 },
+            blood: { fog: 0x120606, dark: 0x180808, wall: 0xecc0b4, floor: 0xd08070, torch: 0xff5533, flame: 0xc02010 },
+        };
+        const ROOM_ACCENTS = {
+            cell: 0xa8b0c0,
+            pantry: 0xc8b48a,
+            closet: 0xb8a898,
+            bedroom: 0xe8c8c0,
+            kitchen: 0xe0c878,
+            study: 0xc0b898,
+            dining: 0xd8b070,
+            library: 0xb89878,
+            barracks: 0xb0a090,
+        };
+
+        function paletteOf(id) {
+            return PALETTES[id] || PALETTES.stone;
+        }
+
+        function applyPalette(id) {
+            const palette = paletteOf(id);
+            scene.background.setHex(palette.fog);
+            scene.fog.color.setHex(palette.fog);
+            floorBaseMat.color.setHex(palette.dark);
+            ceilMat.color.setHex(palette.dark);
+            wallMat.color.setHex(palette.wall);
+            vineWallMat.color.setHex(palette.wall);
+            crackedWallMat.color.setHex(palette.wall);
+            torchFlameMat.color.setHex(palette.torch);
+            torchFlameMat.emissive.setHex(palette.flame);
+            torchHot.setHex(palette.torch).lerp(torchWhite, 0.42);
+            torchCool.setHex(palette.flame);
+            torch.color.setHex(palette.torch);
+            ambient.color.setHex(palette.dark);
+            return palette;
+        }
+
+        function roomContaining(rooms, x, z) {
+            return (rooms || []).find((room) =>
+                x >= room.x && x < room.x + room.w && z >= room.y && z < room.y + room.h);
+        }
+
         const FLOOR_KINDS = ['flag', 'worn', 'moss', 'dark', 'gravel'];
         const floorMats = FLOOR_KINDS.map((kind) => new THREE.MeshStandardMaterial({
             map: canvasToTexture(makeFloorCanvas(kind), 1, 1),
@@ -709,6 +805,151 @@
         const torchBowlGeo = new THREE.BoxGeometry(0.11, 0.045, 0.09);
         const torchFlameGeo = new THREE.BoxGeometry(0.055, 0.11, 0.055);
         const torchTipGeo = new THREE.BoxGeometry(0.03, 0.08, 0.03);
+        const torchHot = new THREE.Color(0xffe8a8);
+        const torchCool = new THREE.Color(0xff6a14);
+        const torchWhite = new THREE.Color(0xfff6d8);
+
+        function makeEmberTexture() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const glow = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            glow.addColorStop(0, 'rgba(255,255,240,1)');
+            glow.addColorStop(0.22, 'rgba(255,210,120,0.95)');
+            glow.addColorStop(0.5, 'rgba(255,90,20,0.4)');
+            glow.addColorStop(1, 'rgba(20,0,0,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, size, size);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        const TORCH_EMBER_COUNT = 168;
+        const emberPositions = new Float32Array(TORCH_EMBER_COUNT * 3);
+        const emberColors = new Float32Array(TORCH_EMBER_COUNT * 3);
+        const emberSizes = new Float32Array(TORCH_EMBER_COUNT);
+        const emberAlphas = new Float32Array(TORCH_EMBER_COUNT);
+        const emberGeo = new THREE.BufferGeometry();
+        emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPositions, 3));
+        emberGeo.setAttribute('color', new THREE.BufferAttribute(emberColors, 3));
+        emberGeo.setAttribute('aSize', new THREE.BufferAttribute(emberSizes, 1));
+        emberGeo.setAttribute('aAlpha', new THREE.BufferAttribute(emberAlphas, 1));
+        const emberMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uMap: { value: makeEmberTexture() },
+                uSize: { value: 42 },
+                uPixelRatio: { value: Math.min(devicePixelRatio, 2) },
+            },
+            vertexShader: `
+                attribute float aSize;
+                attribute float aAlpha;
+                attribute vec3 color;
+                varying vec3 vColor;
+                varying float vAlpha;
+                uniform float uSize;
+                uniform float uPixelRatio;
+                void main() {
+                    vColor = color;
+                    vAlpha = aAlpha;
+                    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = aSize * uSize * uPixelRatio / max(0.55, -mv.z);
+                    gl_Position = projectionMatrix * mv;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uMap;
+                varying vec3 vColor;
+                varying float vAlpha;
+                void main() {
+                    vec4 t = texture2D(uMap, gl_PointCoord);
+                    gl_FragColor = vec4(vColor * t.a * vAlpha, t.a * vAlpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            depthTest: true,
+        });
+        const emberPoints = new THREE.Points(emberGeo, emberMat);
+        emberPoints.frustumCulled = false;
+        emberPoints.renderOrder = 3;
+        scene.add(emberPoints);
+        const emberState = Array.from({ length: TORCH_EMBER_COUNT }, (_, i) => ({
+            age: 1,
+            life: 0.4 + (i % 7) * 0.08,
+            x: 0,
+            y: -20,
+            z: 0,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            size: 1,
+            seed: i * 1.37,
+        }));
+
+        function makeSporeTexture() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const glow = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            glow.addColorStop(0, 'rgba(240,255,250,0.95)');
+            glow.addColorStop(0.28, 'rgba(160,255,220,0.55)');
+            glow.addColorStop(0.62, 'rgba(80,200,255,0.18)');
+            glow.addColorStop(1, 'rgba(0,40,60,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, size, size);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        const MUSHROOM_SPORE_COUNT = 120;
+        const sporePositions = new Float32Array(MUSHROOM_SPORE_COUNT * 3);
+        const sporeColors = new Float32Array(MUSHROOM_SPORE_COUNT * 3);
+        const sporeSizes = new Float32Array(MUSHROOM_SPORE_COUNT);
+        const sporeAlphas = new Float32Array(MUSHROOM_SPORE_COUNT);
+        const sporeGeo = new THREE.BufferGeometry();
+        sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePositions, 3));
+        sporeGeo.setAttribute('color', new THREE.BufferAttribute(sporeColors, 3));
+        sporeGeo.setAttribute('aSize', new THREE.BufferAttribute(sporeSizes, 1));
+        sporeGeo.setAttribute('aAlpha', new THREE.BufferAttribute(sporeAlphas, 1));
+        const sporeMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uMap: { value: makeSporeTexture() },
+                uSize: { value: 58 },
+                uPixelRatio: { value: Math.min(devicePixelRatio, 2) },
+            },
+            vertexShader: emberMat.vertexShader,
+            fragmentShader: emberMat.fragmentShader,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            depthTest: true,
+        });
+        const sporePoints = new THREE.Points(sporeGeo, sporeMat);
+        sporePoints.frustumCulled = false;
+        sporePoints.renderOrder = 3;
+        scene.add(sporePoints);
+        const sporeState = Array.from({ length: MUSHROOM_SPORE_COUNT }, (_, i) => ({
+            age: 1,
+            life: 1.2 + (i % 9) * 0.12,
+            x: 0,
+            y: -20,
+            z: 0,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            size: 1,
+            seed: i * 2.17,
+            mix: (i % 10) / 9,
+        }));
+        const sporeGreen = new THREE.Color(0x7cff9a);
+        const sporeBlue = new THREE.Color(0x7ad8ff);
 
         const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.86, metalness: 0.04 });
         const frameMats = [0xc4a24a, 0x8a3a28, 0x3a4a6b, 0x2e6b48, 0x6b2d5a].map((color) =>
@@ -722,6 +963,22 @@
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
         const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
         const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
+        const mushStemMat = new THREE.MeshStandardMaterial({ color: 0xc8c2a8, roughness: 0.88, metalness: 0.02 });
+        const mushCapMats = [
+            new THREE.MeshStandardMaterial({ color: 0x5ee87a, emissive: 0x1f8a38, emissiveIntensity: 1.05, roughness: 0.48, metalness: 0.04 }),
+            new THREE.MeshStandardMaterial({ color: 0x4ee0c4, emissive: 0x168a78, emissiveIntensity: 1.15, roughness: 0.42, metalness: 0.06 }),
+            new THREE.MeshStandardMaterial({ color: 0x62d8ff, emissive: 0x1a6a9a, emissiveIntensity: 1.2, roughness: 0.4, metalness: 0.08 }),
+        ];
+        const mushGlowMat = new THREE.MeshBasicMaterial({
+            color: 0x88ffe0,
+            transparent: true,
+            opacity: 0.32,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const mushStemGeo = new THREE.CylinderGeometry(0.02, 0.03, 1, 6);
+        const mushCapGeo = new THREE.SphereGeometry(1, 8, 6);
+        const mushGlowGeo = new THREE.SphereGeometry(1, 8, 6);
         const voidMat = new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1, metalness: 0, emissive: 0x000000 });
         const paintMats = [0x6b2d2d, 0x2d4a6b, 0x4a6b2d, 0x6b5a2d, 0x4a2d6b].map((color) =>
             new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.02 }),
@@ -758,6 +1015,10 @@
         let extraWallRoot = null;
         let torchRoot = null;
         let torchLights = [];
+        let torchMeshes = [];
+        const torchEmitters = [];
+        let mushroomLights = [];
+        const mushroomEmitters = [];
         let propRoot = null;
         let mazeKey = '';
         let shownFloor = null;
@@ -772,12 +1033,200 @@
         let targetYaw = 0;
         let bump = 0;
         let lastAt = '';
+        let lastShotId = 0;
+        let staffKick = 0;
         let voteEndsAt = 0;
         let overlayOn = true;
         let rafId = 0;
         let canvasW = 0;
         let canvasH = 0;
         const clock = new THREE.Clock();
+        const fxItems = [];
+        const boltGeo = new THREE.SphereGeometry(0.05, 10, 8);
+        const boltGlowGeo = new THREE.SphereGeometry(0.09, 10, 8);
+        const streakGeo = new THREE.ConeGeometry(0.032, 0.22, 6);
+        const sparkGeo = new THREE.SphereGeometry(0.028, 6, 6);
+        const boomGeo = new THREE.SphereGeometry(0.08, 12, 10);
+
+        function fireAlong(dir) {
+            const yaw = YAWS[dir] ?? 0;
+            return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        }
+
+        function makeFireMat(color, opacity, additive = true) {
+            return new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                depthWrite: false,
+                blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+            });
+        }
+
+        function disposeObject(root) {
+            if (!root) {
+                return;
+            }
+            scene.remove(root);
+            root.traverse((obj) => {
+                if (obj.material && obj.material.userData?.fx) {
+                    obj.material.dispose();
+                }
+            });
+        }
+
+        function clearFx() {
+            for (const fx of fxItems) {
+                disposeObject(fx.group);
+            }
+            fxItems.length = 0;
+        }
+
+        function spawnExplosion(pos) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+            scene.add(group);
+
+            const coreMat = makeFireMat(0xffeeaa, 0.95);
+            coreMat.userData.fx = true;
+            const core = new THREE.Mesh(boomGeo, coreMat);
+            group.add(core);
+
+            const glowMat = makeFireMat(0xff5511, 0.7);
+            glowMat.userData.fx = true;
+            const glow = new THREE.Mesh(boltGlowGeo, glowMat);
+            glow.scale.setScalar(1.6);
+            group.add(glow);
+
+            const light = new THREE.PointLight(0xff6622, 12, 5, 2);
+            group.add(light);
+
+            const sparks = [];
+            for (let i = 0; i < 14; i += 1) {
+                const sparkMat = makeFireMat(i % 2 ? 0xffaa44 : 0xff3300, 1);
+                sparkMat.userData.fx = true;
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.set((Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08);
+                group.add(spark);
+                sparks.push({
+                    mesh: spark,
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 2.4,
+                        0.4 + Math.random() * 1.8,
+                        (Math.random() - 0.5) * 2.4,
+                    ),
+                });
+            }
+
+            fxItems.push({
+                kind: 'boom',
+                group,
+                core,
+                glow,
+                light,
+                sparks,
+                t: 0,
+                duration: 0.42,
+            });
+        }
+
+        function spawnFireBolt(shot) {
+            const along = fireAlong(shot.dir);
+            const impact = new THREE.Vector3(shot.hit.x * CELL, 0.52, shot.hit.y * CELL);
+            impact.addScaledVector(along, -0.52);
+
+            const origin = new THREE.Vector3(shot.from.x * CELL, EYE - 0.04, shot.from.y * CELL);
+            const start = new THREE.Vector3();
+            camera.updateMatrixWorld(true);
+            staffTip.getWorldPosition(start);
+            const toHit = impact.clone().sub(origin);
+            const rayLen = toHit.length();
+            if (rayLen > 0.02) {
+                const dirN = toHit.multiplyScalar(1 / rayLen);
+                const alongStaff = Number.isFinite(start.x) ? start.clone().sub(origin).dot(dirN) : 0.28;
+                const t = Math.min(rayLen - 0.02, Math.max(0.16, alongStaff));
+                start.copy(origin).addScaledVector(dirN, t);
+            } else {
+                start.copy(origin);
+            }
+
+            const dist = Math.max(0.12, start.distanceTo(impact));
+            const duration = Math.min(0.55, Math.max(0.09, dist * 0.09));
+
+            const group = new THREE.Group();
+            group.position.copy(start);
+            scene.add(group);
+
+            const coreMat = makeFireMat(0xfff2c4, 1);
+            coreMat.userData.fx = true;
+            const core = new THREE.Mesh(boltGeo, coreMat);
+            group.add(core);
+
+            const glowMat = makeFireMat(0xff4a10, 0.65);
+            glowMat.userData.fx = true;
+            const glow = new THREE.Mesh(boltGlowGeo, glowMat);
+            group.add(glow);
+
+            const streakMat = makeFireMat(0xff7722, 0.8);
+            streakMat.userData.fx = true;
+            const streak = new THREE.Mesh(streakGeo, streakMat);
+            streak.rotation.x = Math.PI / 2;
+            streak.position.z = 0.12;
+            group.add(streak);
+
+            const light = new THREE.PointLight(0xff5511, 3.4, 3.2, 2);
+            group.add(light);
+            group.lookAt(impact);
+
+            fxItems.push({
+                kind: 'bolt',
+                group,
+                start: start.clone(),
+                end: impact,
+                t: 0,
+                duration,
+                light,
+            });
+            staffKick = 1;
+        }
+
+        function updateFx(dt) {
+            for (let i = fxItems.length - 1; i >= 0; i -= 1) {
+                const fx = fxItems[i];
+                if (fx.kind === 'bolt') {
+                    fx.t += dt / fx.duration;
+                    if (fx.t >= 1) {
+                        const pos = fx.end.clone();
+                        disposeObject(fx.group);
+                        fxItems.splice(i, 1);
+                        spawnExplosion(pos);
+                    } else {
+                        fx.group.position.lerpVectors(fx.start, fx.end, fx.t);
+                        fx.group.lookAt(fx.end);
+                        fx.light.intensity = 3.2 + Math.sin(clock.elapsedTime * 40) * 0.5;
+                    }
+                    continue;
+                }
+
+                fx.t += dt;
+                const u = Math.min(1, fx.t / fx.duration);
+                fx.core.scale.setScalar(1 + u * 5.5);
+                fx.glow.scale.setScalar(1.6 + u * 6);
+                fx.core.material.opacity = 0.95 * (1 - u);
+                fx.glow.material.opacity = 0.7 * (1 - u);
+                fx.light.intensity = 12 * (1 - u) * (1 - u);
+                for (const spark of fx.sparks) {
+                    spark.vel.y -= 4.2 * dt;
+                    spark.mesh.position.addScaledVector(spark.vel, dt);
+                    spark.mesh.material.opacity = 1 - u;
+                    spark.mesh.scale.setScalar(1 - u * 0.6);
+                }
+                if (u >= 1) {
+                    disposeObject(fx.group);
+                    fxItems.splice(i, 1);
+                }
+            }
+        }
 
         function lerpAngle(a, b, t) {
             let diff = b - a;
@@ -803,6 +1252,167 @@
                 scene.remove(light);
             }
             torchLights = [];
+            torchMeshes = [];
+            torchEmitters.length = 0;
+            resetTorchEmbers();
+        }
+
+        function resetTorchEmbers() {
+            for (const ember of emberState) {
+                ember.age = ember.life;
+                ember.y = -20;
+            }
+            emberAlphas.fill(0);
+            emberGeo.attributes.aAlpha.needsUpdate = true;
+        }
+
+        function spawnTorchEmber(ember, origin) {
+            const spark = Math.random() < 0.22;
+            ember.age = 0;
+            ember.life = spark ? 0.28 + Math.random() * 0.28 : 0.48 + Math.random() * 0.7;
+            ember.x = origin.x + (Math.random() - 0.5) * 0.05;
+            ember.y = origin.y + Math.random() * 0.04;
+            ember.z = origin.z + (Math.random() - 0.5) * 0.05;
+            ember.vx = (Math.random() - 0.5) * (spark ? 0.14 : 0.05);
+            ember.vy = spark ? 0.32 + Math.random() * 0.38 : 0.12 + Math.random() * 0.2;
+            ember.vz = (Math.random() - 0.5) * (spark ? 0.14 : 0.05);
+            ember.size = spark ? 0.38 + Math.random() * 0.28 : 0.7 + Math.random() * 0.55;
+        }
+
+        function updateTorchEmbers(dt) {
+            const n = torchEmitters.length;
+            if (!n) {
+                if (emberAlphas[0] !== 0) {
+                    resetTorchEmbers();
+                }
+                return;
+            }
+
+            const t = clock.elapsedTime;
+            const active = Math.min(TORCH_EMBER_COUNT, n * 14);
+            for (let i = 0; i < torchMeshes.length; i += 1) {
+                const torch = torchMeshes[i];
+                const flicker = 1 + Math.sin(t * 17 + i * 2.3) * 0.14 + Math.sin(t * 29 + i * 1.1) * 0.08;
+                torch.userData.flame.scale.set(0.85 + flicker * 0.2, flicker, 0.85 + flicker * 0.2);
+                torch.userData.tip.scale.set(0.8 + flicker * 0.15, 0.75 + flicker * 0.45, 0.8 + flicker * 0.15);
+            }
+
+            for (let i = 0; i < TORCH_EMBER_COUNT; i += 1) {
+                const ember = emberState[i];
+                if (i >= active) {
+                    emberAlphas[i] = 0;
+                    continue;
+                }
+                ember.age += dt;
+                if (ember.age >= ember.life) {
+                    spawnTorchEmber(ember, torchEmitters[i % n]);
+                }
+                const swirl = Math.sin(t * 6 + ember.seed) * 0.03;
+                ember.vx += swirl * dt;
+                ember.vy += 0.08 * dt;
+                ember.x += ember.vx * dt;
+                ember.y += ember.vy * dt;
+                ember.z += ember.vz * dt;
+
+                const u = Math.min(1, ember.age / ember.life);
+                const fade = u < 0.12 ? u / 0.12 : 1 - (u - 0.12) / 0.88;
+                const heat = 1 - u;
+                const r = torchCool.r + (torchHot.r - torchCool.r) * heat;
+                const g = torchCool.g + (torchHot.g - torchCool.g) * heat;
+                const b = torchCool.b + (torchHot.b - torchCool.b) * heat;
+                emberPositions[i * 3] = ember.x;
+                emberPositions[i * 3 + 1] = ember.y;
+                emberPositions[i * 3 + 2] = ember.z;
+                emberColors[i * 3] = r + heat * 0.35;
+                emberColors[i * 3 + 1] = g + heat * 0.22;
+                emberColors[i * 3 + 2] = b;
+                emberSizes[i] = ember.size * (0.65 + heat * 0.7);
+                emberAlphas[i] = Math.max(0, fade) * (0.45 + heat * 0.55);
+            }
+            emberGeo.attributes.position.needsUpdate = true;
+            emberGeo.attributes.color.needsUpdate = true;
+            emberGeo.attributes.aSize.needsUpdate = true;
+            emberGeo.attributes.aAlpha.needsUpdate = true;
+        }
+
+        function resetMushroomSpores() {
+            for (const spore of sporeState) {
+                spore.age = spore.life;
+                spore.y = -20;
+            }
+            sporeAlphas.fill(0);
+            sporeGeo.attributes.aAlpha.needsUpdate = true;
+        }
+
+        function spawnMushroomSpore(spore, origin) {
+            spore.age = 0;
+            spore.life = 1.35 + Math.random() * 1.4;
+            spore.x = origin.x + (Math.random() - 0.5) * 0.12;
+            spore.y = origin.y + Math.random() * 0.05;
+            spore.z = origin.z + (Math.random() - 0.5) * 0.12;
+            spore.vx = (Math.random() - 0.5) * 0.045;
+            spore.vy = 0.035 + Math.random() * 0.07;
+            spore.vz = (Math.random() - 0.5) * 0.045;
+            spore.size = 0.9 + Math.random() * 0.9;
+            spore.mix = Math.random();
+        }
+
+        function updateMushroomSpores(dt) {
+            const n = mushroomEmitters.length;
+            if (!n) {
+                if (sporeAlphas[0] !== 0) {
+                    resetMushroomSpores();
+                }
+                return;
+            }
+
+            const t = clock.elapsedTime;
+            const pulse = 0.95 + Math.sin(t * 2.1) * 0.22;
+            mushCapMats[0].emissiveIntensity = 0.9 + Math.sin(t * 1.7) * 0.2;
+            mushCapMats[1].emissiveIntensity = 1.05 + Math.sin(t * 2.0 + 0.8) * 0.22;
+            mushCapMats[2].emissiveIntensity = 1.1 + Math.sin(t * 1.85 + 1.4) * 0.24;
+            mushGlowMat.opacity = 0.22 + Math.sin(t * 2.4) * 0.08;
+            for (let i = 0; i < mushroomLights.length; i += 1) {
+                const light = mushroomLights[i];
+                light.intensity = light.userData.base * (0.82 + Math.sin(t * 1.8 + i * 1.3) * 0.18);
+            }
+
+            const active = Math.min(MUSHROOM_SPORE_COUNT, n * 10);
+            for (let i = 0; i < MUSHROOM_SPORE_COUNT; i += 1) {
+                const spore = sporeState[i];
+                if (i >= active) {
+                    sporeAlphas[i] = 0;
+                    continue;
+                }
+                spore.age += dt;
+                if (spore.age >= spore.life) {
+                    spawnMushroomSpore(spore, mushroomEmitters[i % n]);
+                }
+                const drift = Math.sin(t * 1.4 + spore.seed) * 0.02;
+                spore.vx += drift * dt;
+                spore.x += spore.vx * dt;
+                spore.y += spore.vy * dt;
+                spore.z += spore.vz * dt;
+
+                const u = Math.min(1, spore.age / spore.life);
+                const fade = u < 0.18 ? u / 0.18 : 1 - (u - 0.18) / 0.82;
+                const heat = 1 - u * 0.65;
+                const g = sporeGreen.g + (sporeBlue.g - sporeGreen.g) * spore.mix;
+                const r = sporeGreen.r + (sporeBlue.r - sporeGreen.r) * spore.mix + heat * 0.18;
+                const b = sporeGreen.b + (sporeBlue.b - sporeGreen.b) * spore.mix + heat * 0.12;
+                sporePositions[i * 3] = spore.x;
+                sporePositions[i * 3 + 1] = spore.y;
+                sporePositions[i * 3 + 2] = spore.z;
+                sporeColors[i * 3] = r + heat * 0.12;
+                sporeColors[i * 3 + 1] = g + heat * 0.08;
+                sporeColors[i * 3 + 2] = b;
+                sporeSizes[i] = spore.size * (0.85 + heat * 0.5) * pulse;
+                sporeAlphas[i] = Math.max(0, fade) * 0.42;
+            }
+            sporeGeo.attributes.position.needsUpdate = true;
+            sporeGeo.attributes.color.needsUpdate = true;
+            sporeGeo.attributes.aSize.needsUpdate = true;
+            sporeGeo.attributes.aAlpha.needsUpdate = true;
         }
 
         function clearProps() {
@@ -810,6 +1420,9 @@
                 scene.remove(propRoot);
                 propRoot = null;
             }
+            mushroomLights = [];
+            mushroomEmitters.length = 0;
+            resetMushroomSpores();
             clearArtworkClips();
         }
 
@@ -1116,7 +1729,12 @@
             flame.position.set(0, 0.2, 0.06);
             const tip = new THREE.Mesh(torchTipGeo, torchFlameMat);
             tip.position.set(0.008, 0.28, 0.06);
-            group.add(bracket, bowl, flame, tip);
+            const origin = new THREE.Object3D();
+            origin.position.set(0, 0.26, 0.06);
+            group.add(bracket, bowl, flame, tip, origin);
+            group.userData.flame = flame;
+            group.userData.tip = tip;
+            group.userData.origin = origin;
             return group;
         }
 
@@ -1185,6 +1803,104 @@
             leaf3.position.set(-0.03, 0.15, -0.02);
             group.add(pot, leaf1, leaf2, leaf3);
             return group;
+        }
+
+        function mushroomBudget(paletteId) {
+            if (paletteId === 'moss') {
+                return { max: 11, step: 4 };
+            }
+            if (paletteId === 'iron') {
+                return { max: 8, step: 7 };
+            }
+            if (paletteId === 'stone') {
+                return { max: 4, step: 11 };
+            }
+            return null;
+        }
+
+        function makeMushroom(hash, blueBias) {
+            const group = new THREE.Group();
+            const count = 1 + (hash % 4);
+            let maxY = 0;
+            for (let i = 0; i < count; i += 1) {
+                const stemH = 0.07 + ((hash + i * 9) % 6) * 0.018;
+                const capR = 0.042 + ((hash + i * 5) % 7) * 0.007;
+                const x = ((i % 2) * 2 - 1) * (0.03 + (i % 3) * 0.018);
+                const z = (i < 2 ? -0.5 : 0.5) * (0.04 + (i % 2) * 0.02);
+                const stem = new THREE.Mesh(mushStemGeo, mushStemMat);
+                stem.scale.set(0.85 + (i % 3) * 0.12, stemH, 0.85 + (i % 3) * 0.12);
+                stem.position.set(x, stemH / 2, z);
+                const cap = new THREE.Mesh(mushCapGeo, mushCapMats[(hash + i + blueBias) % mushCapMats.length]);
+                cap.scale.set(capR, capR * 0.4, capR);
+                cap.position.set(x, stemH + capR * 0.12, z);
+                const glow = new THREE.Mesh(mushGlowGeo, mushGlowMat);
+                glow.scale.setScalar(capR * 1.35);
+                glow.position.copy(cap.position);
+                group.add(stem, cap, glow);
+                maxY = Math.max(maxY, cap.position.y);
+            }
+            const origin = new THREE.Object3D();
+            origin.position.set(0, maxY + 0.03, 0);
+            const light = new THREE.PointLight(blueBias ? 0x66d8ff : 0x66ffc4, 1.15, 2.4, 2);
+            light.position.set(0, maxY + 0.02, 0);
+            light.userData.base = 0.85 + (hash % 5) * 0.12;
+            light.intensity = light.userData.base;
+            group.add(origin, light);
+            group.userData.origin = origin;
+            group.userData.light = light;
+            return group;
+        }
+
+        function placeMushrooms(grid, floorCells, taken, paletteId) {
+            const budget = mushroomBudget(paletteId);
+            if (!budget) {
+                return;
+            }
+            const blueBias = paletteId === 'iron' ? 1 : 0;
+            let candidates = floorCells.filter((cell) =>
+                !taken.has(`${cell.x},${cell.z}`) && cell.hash % budget.step === 2);
+            if (paletteId !== 'moss') {
+                const nearWall = candidates.filter((cell) =>
+                    WALL_DIRS.some((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx])));
+                if (nearWall.length) {
+                    candidates = nearWall;
+                }
+            }
+            candidates.sort((a, b) => a.hash - b.hash);
+            for (const cell of candidates.slice(0, budget.max)) {
+                const walls = WALL_DIRS.filter((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx]));
+                const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 0 };
+                const ox = dir.dx * 0.3 + ((cell.hash % 5) - 2) * 0.03;
+                const oz = dir.dz * 0.3 + ((cell.hash % 3) - 1) * 0.03;
+                const cluster = makeMushroom(cell.hash, blueBias);
+                cluster.position.set(cell.x + ox, 0, cell.z + oz);
+                cluster.rotation.y = (cell.hash % 6) * 0.7;
+                propRoot.add(cluster);
+                if (mushroomLights.length < 8) {
+                    mushroomLights.push(cluster.userData.light);
+                } else {
+                    cluster.remove(cluster.userData.light);
+                }
+                mushroomEmitters.push(new THREE.Vector3(
+                    cluster.position.x,
+                    cluster.userData.origin.position.y,
+                    cluster.position.z,
+                ));
+                taken.add(`${cell.x},${cell.z}`);
+            }
+            for (let i = 0; i < MUSHROOM_SPORE_COUNT; i += 1) {
+                const spore = sporeState[i];
+                if (!mushroomEmitters.length || i >= mushroomEmitters.length * 10) {
+                    spore.age = spore.life;
+                    sporeAlphas[i] = 0;
+                    continue;
+                }
+                spawnMushroomSpore(spore, mushroomEmitters[i % mushroomEmitters.length]);
+                spore.age = spore.life * Math.random() * 0.9;
+                spore.x += spore.vx * spore.age;
+                spore.y += spore.vy * spore.age;
+                spore.z += spore.vz * spore.age;
+            }
         }
 
         function makeBarrel() {
@@ -1422,14 +2138,39 @@
             return 0;
         }
 
-        function placeLargeFurniture(grid, width, height) {
+        function placeLargeFurniture(grid, width, height, rooms) {
             for (const group of furnitureGroups(grid, width, height)) {
                 const n = group.cells.length;
                 const cx = (group.minx + group.maxx) / 2;
                 const cz = (group.minz + group.maxz) / 2;
                 const alongX = group.maxx - group.minx >= group.maxz - group.minz;
+                const room = roomContaining(rooms, Math.round(cx), Math.round(cz));
+                const kind = room?.kind;
                 let prop;
-                if (n >= 4) {
+                if (kind === 'bedroom') {
+                    prop = n >= 2 ? makeBed() : makeCabinet();
+                } else if (kind === 'kitchen') {
+                    prop = makeTable(n >= 2 ? 1.55 : 0.72, 0.7);
+                    if (n >= 2) {
+                        const c1 = makeChair();
+                        c1.position.set(0, 0, -0.48);
+                        const c2 = makeChair();
+                        c2.position.set(0, 0, 0.48);
+                        c2.rotation.y = Math.PI;
+                        prop.add(c1, c2);
+                    }
+                } else if (kind === 'study' || kind === 'library') {
+                    prop = n >= 2 ? makeBookshelf() : makeCabinet();
+                } else if (kind === 'dining' || kind === 'barracks') {
+                    prop = n >= 4 ? makeDiningTable() : makeTable(1.55, 0.7);
+                } else if (kind === 'cell' || kind === 'pantry' || kind === 'closet') {
+                    if (kind === 'closet') {
+                        prop = makeCabinet();
+                    } else {
+                        prop = makeCrate();
+                        prop.scale.set(1.7, 1.7, 1.7);
+                    }
+                } else if (n >= 4) {
                     prop = group.hash % 3 === 0 ? makeBed() : makeDiningTable();
                 } else if (n >= 2) {
                     if (group.hash % 2 === 0) {
@@ -1452,7 +2193,7 @@
                     prop.scale.set(1.7, 1.7, 1.7);
                 }
                 prop.position.set(cx, 0, cz);
-                if (n === 1 || (n === 2 && group.hash % 2 !== 0)) {
+                if (kind === 'study' || kind === 'library' || kind === 'closet' || n === 1) {
                     prop.rotation.y = facingFromWalls(grid, group.cells);
                 } else {
                     prop.rotation.y = alongX ? 0 : Math.PI / 2;
@@ -1480,6 +2221,7 @@
                 torch.position.set(px, py, pz);
                 torch.rotation.y = Math.atan2(-spot.dx, -spot.dz);
                 torchRoot.add(torch);
+                torchMeshes.push(torch);
 
                 const light = new THREE.RectAreaLight(0xff8a3a, 9, 0.16, 0.28);
                 light.position.set(px - spot.dx * 0.06, py + 0.18, pz - spot.dz * 0.06);
@@ -1489,10 +2231,32 @@
                 torchLights.push(light);
             }
             scene.add(torchRoot);
+            if (!torchMeshes.length) {
+                return used;
+            }
+            torchRoot.updateMatrixWorld(true);
+            for (const torch of torchMeshes) {
+                const origin = new THREE.Vector3();
+                torch.userData.origin.getWorldPosition(origin);
+                torchEmitters.push(origin);
+            }
+            for (let i = 0; i < TORCH_EMBER_COUNT; i += 1) {
+                const ember = emberState[i];
+                if (i >= torchEmitters.length * 14) {
+                    ember.age = ember.life;
+                    emberAlphas[i] = 0;
+                    continue;
+                }
+                spawnTorchEmber(ember, torchEmitters[i % torchEmitters.length]);
+                ember.age = ember.life * Math.random() * 0.9;
+                ember.x += ember.vx * ember.age;
+                ember.y += ember.vy * ember.age;
+                ember.z += ember.vz * ember.age;
+            }
             return used;
         }
 
-        function placeProps(grid, width, height, player, exit, torchFaces) {
+        function placeProps(grid, width, height, player, exit, torchFaces, rooms, paletteId) {
             clearProps();
             propRoot = new THREE.Group();
             const faces = collectFaces(grid, width, height);
@@ -1565,6 +2329,7 @@
             const details = floorCells
                 .filter((cell) => !furnitureCells.has(`${cell.x},${cell.z}`) && cell.hash % 11 === 0)
                 .slice(0, 8);
+            const detailCells = new Set(details.map((cell) => `${cell.x},${cell.z}`));
             for (const cell of details) {
                 const maker = DETAIL_PROP_MAKERS[cell.hash % DETAIL_PROP_MAKERS.length];
                 const prop = maker(cell.hash);
@@ -1575,11 +2340,15 @@
                 propRoot.add(prop);
             }
 
-            placeLargeFurniture(grid, width, height);
+            const taken = new Set([...furnitureCells, ...detailCells]);
+            placeMushrooms(grid, floorCells, taken, paletteId);
+
+            placeLargeFurniture(grid, width, height, rooms);
             scene.add(propRoot);
         }
 
         function rebuildMaze(state) {
+            clearFx();
             disposeMesh(floorBase);
             for (const mesh of floorMeshes) {
                 disposeMesh(mesh);
@@ -1594,6 +2363,11 @@
             clearExtraWalls();
             clearTorches();
             clearProps();
+
+            const palette = applyPalette(state.palette);
+            for (const mat of floorMats) {
+                mat.color.setHex(palette.floor);
+            }
 
             const w = state.width;
             const h = state.height;
@@ -1713,7 +2487,11 @@
                     dummy.updateMatrix();
                     mesh.setMatrixAt(index, dummy.matrix);
                     const shade = 0.9 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;
+                    const room = roomContaining(state.rooms, positions[i], positions[i + 1]);
                     color.setRGB(shade, shade, shade);
+                    if (room && ROOM_ACCENTS[room.kind]) {
+                        color.lerp(new THREE.Color(ROOM_ACCENTS[room.kind]), 0.28);
+                    }
                     mesh.setColorAt(index, color);
                 }
                 mesh.instanceMatrix.needsUpdate = true;
@@ -1726,7 +2504,10 @@
             tileGeo.dispose();
 
             const torchFaces = placeTorches(state.grid, w, h);
-            placeProps(state.grid, w, h, state.player, state.exit, torchFaces);
+            for (const light of torchLights) {
+                light.color.setHex(palette.torch);
+            }
+            placeProps(state.grid, w, h, state.player, state.exit, torchFaces, state.rooms, state.palette);
         }
 
         function applyState(state, snap) {
@@ -1876,16 +2657,31 @@
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
             modeEl.classList.toggle('autoplay', autoplaying);
             hudEl.classList.toggle('autoplay', autoplaying);
-            helpEl.textContent = autoplaying ? 'Autoplay · !up to take over' : '!up !down !left !right';
+            helpEl.textContent = autoplaying ? 'Autoplay · !up to take over' : '!up !down !left !right !fire';
 
             const action = state.lastAction;
             if (autoplaying && action?.user === 'autoplay') {
                 lastEl.innerHTML = `Autoplay <span>walking</span>`;
             } else if (action?.displayName) {
-                const extra = action.vote ? ' · voting' : action.bumped ? ' · wall' : '';
+                const extra = action.vote
+                    ? ' · voting'
+                    : action.command === 'fire'
+                      ? ' · fire staff'
+                      : action.bumped
+                        ? ' · wall'
+                        : '';
                 lastEl.innerHTML = `${escapeHtml(action.displayName)} <span>!${escapeHtml(action.command)}${extra}</span>`;
             } else {
                 lastEl.innerHTML = '<span>Waiting for chat</span>';
+            }
+
+            if (action?.command === 'fire' && action.shot && action.shotId) {
+                if (snap) {
+                    lastShotId = action.shotId;
+                } else if (action.shotId !== lastShotId) {
+                    lastShotId = action.shotId;
+                    spawnFireBolt(action.shot);
+                }
             }
 
             const voting = state.mode === 'democracy' && state.votes;
@@ -1929,8 +2725,18 @@
                 camPos.z + lookZ * bump,
             );
             camera.rotation.y = camYaw;
+            staffKick *= Math.exp(-dt * 11);
+            staff.position.y = staffBasePos.y + bob * 0.35;
+            staff.rotation.x = staffBaseRot.x - staffKick * 0.42;
+            staff.rotation.z = staffBaseRot.z - staffKick * 0.14;
+            staffCrystalMat.emissiveIntensity = 1.55 + staffKick * 2.4 + Math.sin(clock.elapsedTime * 9) * 0.28;
+            staffLight.intensity = 0.55 + staffKick * 1.8 + Math.sin(clock.elapsedTime * 13) * 0.12;
+            staffGlow.scale.setScalar(1 + staffKick * 0.35 + Math.sin(clock.elapsedTime * 11) * 0.08);
+            updateFx(dt);
             torch.intensity = 1.6 + Math.sin(clock.elapsedTime * 11) * 0.12;
             torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
+            updateTorchEmbers(dt);
+            updateMushroomSpores(dt);
             for (let i = 0; i < torchLights.length; i++) {
                 const light = torchLights[i];
                 const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 1.1 + Math.sin(clock.elapsedTime * 23 + i) * 0.6;

@@ -17,7 +17,10 @@ const DIRS = [
 ];
 
 const MOVES = new Set(['up', 'down', 'left', 'right']);
+const ACTIONS = new Set(['fire']);
+const COMMANDS = new Set([...MOVES, ...ACTIONS]);
 const ANARCHY_LOCK_MS = 350;
+const FIRE_LOCK_MS = 500;
 const DEMOCRACY_MS = 8_000;
 const IDLE_MS = 60_000;
 const AUTOPLAY_MS = 800;
@@ -50,6 +53,11 @@ const ANCHORS = {
     br: 'bottom-right',
 };
 
+const PALETTE_IDS = ['stone', 'moss', 'ember', 'iron', 'blood'];
+const SMALL_KINDS = ['cell', 'pantry', 'closet'];
+const MEDIUM_KINDS = ['bedroom', 'kitchen', 'study'];
+const LARGE_KINDS = ['dining', 'library', 'barracks'];
+
 export const DUNGEON_ALIASES = {
     u: 'up',
     f: 'up',
@@ -59,6 +67,10 @@ export const DUNGEON_ALIASES = {
     back: 'down',
     l: 'left',
     r: 'right',
+    shoot: 'fire',
+    blast: 'fire',
+    bolt: 'fire',
+    cast: 'fire',
 };
 
 export function normalizeDungeonCommand(value) {
@@ -67,11 +79,39 @@ export function normalizeDungeonCommand(value) {
         .toLowerCase()
         .replace(/^!/, '');
     const command = DUNGEON_ALIASES[key] ?? key;
-    return MOVES.has(command) ? command : null;
+    return COMMANDS.has(command) ? command : null;
 }
 
 function isOpen(cell) {
     return cell === FLOOR || cell === EXIT;
+}
+
+function castFire(maze) {
+    const { x, y, dir } = maze.player;
+    const { dx, dy } = DIRS[dir];
+    let cx = x;
+    let cy = y;
+    let hitX = x + dx;
+    let hitY = y + dy;
+    const limit = maze.width + maze.height;
+    for (let i = 0; i < limit; i += 1) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (!isOpen(maze.grid[ny]?.[nx])) {
+            hitX = nx;
+            hitY = ny;
+            break;
+        }
+        cx = nx;
+        cy = ny;
+        hitX = nx + dx;
+        hitY = ny + dy;
+    }
+    return {
+        from: { x, y },
+        dir,
+        hit: { x: hitX, y: hitY },
+    };
 }
 
 function shuffle(items) {
@@ -143,6 +183,44 @@ function pickExit(grid, startX, startY, minDist) {
         }
     }
     return best || fallback;
+}
+
+function paletteForFloor(floor) {
+    const n = PALETTE_IDS.length;
+    return PALETTE_IDS[((Number(floor) % n) + n) % n];
+}
+
+function assignRoomKinds(rooms) {
+    const small = shuffle(SMALL_KINDS.slice());
+    const medium = shuffle(MEDIUM_KINDS.slice());
+    const large = shuffle(LARGE_KINDS.slice());
+    let si = 0;
+    let mi = 0;
+    let li = 0;
+    for (const room of rooms) {
+        const area = room.w * room.h;
+        if (area <= 15) {
+            room.kind = small[si % small.length];
+            si += 1;
+        } else if (area <= 30) {
+            room.kind = medium[mi % medium.length];
+            mi += 1;
+        } else {
+            room.kind = large[li % large.length];
+            li += 1;
+        }
+    }
+    return rooms;
+}
+
+function snapshotRooms(rooms) {
+    return (rooms || []).map((room) => ({
+        x: room.x,
+        y: room.y,
+        w: room.w,
+        h: room.h,
+        kind: room.kind || 'closet',
+    }));
 }
 
 function roomsOverlap(a, b, gap) {
@@ -222,10 +300,17 @@ function generateRooms(size) {
     return { grid, startX: start.x, startY: start.y, rooms };
 }
 
+function touchesOneRoom(x, y, room) {
+    return x >= room.x - 1 && x < room.x + room.w + 1 && y >= room.y - 1 && y < room.y + room.h + 1
+        && !(x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h);
+}
+
 function touchesRoom(x, y, rooms) {
-    return rooms.some((room) =>
-        x >= room.x - 1 && x < room.x + room.w + 1 && y >= room.y - 1 && y < room.y + room.h + 1
-        && !(x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h));
+    return rooms.some((room) => touchesOneRoom(x, y, room));
+}
+
+function cellRoomAt(x, y, rooms) {
+    return rooms.find((room) => room.kind === 'cell' && touchesOneRoom(x, y, room));
 }
 
 function styleInteriorWalls(grid, rooms) {
@@ -234,6 +319,11 @@ function styleInteriorWalls(grid, rooms) {
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
             if (grid[y][x] !== WALL || !touchesRoom(x, y, rooms)) {
+                continue;
+            }
+            if (cellRoomAt(x, y, rooms)) {
+                const roll = Math.abs(x * 7 + y * 13) % 5;
+                grid[y][x] = roll === 0 ? HOLE : FENCE;
                 continue;
             }
             const kind = Math.abs(x * 7 + y * 13) % 7;
@@ -294,6 +384,22 @@ function wallSideCells(room, grid) {
     return shuffle(spots);
 }
 
+function centerBlock(room) {
+    const cx = room.x + Math.floor(room.w / 2) - 1;
+    const cy = room.y + Math.floor(room.h / 2) - 1;
+    return [
+        [cx, cy],
+        [cx + 1, cy],
+        [cx, cy + 1],
+        [cx + 1, cy + 1],
+    ];
+}
+
+function wallPair(origin, hash) {
+    const [x, y] = origin;
+    return hash % 2 === 0 ? [[x, y], [x + 1, y]] : [[x, y], [x, y + 1]];
+}
+
 function placeRoomFurniture(grid, rooms, startX, startY, exitX, exitY) {
     for (const room of rooms) {
         const area = room.w * room.h;
@@ -302,38 +408,17 @@ function placeRoomFurniture(grid, rooms, startX, startY, exitX, exitY) {
         }
         const hash = Math.abs(room.x * 31 + room.y * 47);
         const spots = wallSideCells(room, grid);
-        if (area <= 15) {
-            const cell = spots[0];
-            if (cell) {
-                stampFurniture(grid, [cell], startX, startY, exitX, exitY);
-            }
-            continue;
+        const one = spots[0] ? [spots[0]] : [];
+        const pair = spots[0] ? wallPair(spots[0], hash) : [];
+        const kind = room.kind || 'closet';
+        let stamped = false;
+        if (kind === 'dining' || kind === 'barracks' || (kind === 'bedroom' && area >= 31)) {
+            stamped = stampFurniture(grid, centerBlock(room), startX, startY, exitX, exitY);
+        } else if (kind === 'bedroom' || kind === 'kitchen' || kind === 'study' || kind === 'library') {
+            stamped = pair.length ? stampFurniture(grid, pair, startX, startY, exitX, exitY) : false;
         }
-        if (area <= 30) {
-            const origin = spots[0];
-            if (!origin) {
-                continue;
-            }
-            const [x, y] = origin;
-            const pair = hash % 2 === 0 ? [[x, y], [x + 1, y]] : [[x, y], [x, y + 1]];
-            if (!stampFurniture(grid, pair, startX, startY, exitX, exitY) && spots[1]) {
-                stampFurniture(grid, [spots[1]], startX, startY, exitX, exitY);
-            }
-            continue;
-        }
-        const cx = room.x + Math.floor(room.w / 2) - 1;
-        const cy = room.y + Math.floor(room.h / 2) - 1;
-        const block = [
-            [cx, cy],
-            [cx + 1, cy],
-            [cx, cy + 1],
-            [cx + 1, cy + 1],
-        ];
-        if (!stampFurniture(grid, block, startX, startY, exitX, exitY)) {
-            const cell = spots[0];
-            if (cell) {
-                stampFurniture(grid, [cell], startX, startY, exitX, exitY);
-            }
+        if (!stamped && one.length) {
+            stampFurniture(grid, one, startX, startY, exitX, exitY);
         }
     }
 }
@@ -411,6 +496,20 @@ function generateCorridor() {
         grid,
         player: { x: startX, y: startY, dir: 1 },
         exit,
+        palette: paletteForFloor(0),
+        rooms: [],
+    };
+}
+
+function mazePayload(size, grid, startX, startY, exit, rooms, floor) {
+    return {
+        width: size,
+        height: size,
+        grid,
+        player: { x: startX, y: startY, dir: openDir(grid, startX, startY) },
+        exit,
+        palette: paletteForFloor(floor),
+        rooms: snapshotRooms(rooms),
     };
 }
 
@@ -423,6 +522,7 @@ function buildFloor(floor) {
     let last = null;
     for (let attempt = 0; attempt < 14; attempt++) {
         const { grid, startX, startY, rooms } = generateRooms(size);
+        assignRoomKinds(rooms);
         const exit = pickExit(grid, startX, startY, targetPath);
         if (!exit) {
             if (size < MAX_SIZE) {
@@ -433,13 +533,7 @@ function buildFloor(floor) {
         grid[exit.y][exit.x] = EXIT;
         styleInteriorWalls(grid, rooms);
         placeRoomFurniture(grid, rooms, startX, startY, exit.x, exit.y);
-        last = {
-            width: size,
-            height: size,
-            grid,
-            player: { x: startX, y: startY, dir: openDir(grid, startX, startY) },
-            exit,
-        };
+        last = mazePayload(size, grid, startX, startY, exit, rooms, floor);
         const dist = distFrom(grid, startX, startY)[exit.y][exit.x];
         if (dist >= targetPath) {
             return last;
@@ -457,6 +551,7 @@ export function createDungeon() {
     let mode = 'anarchy';
     let maze = buildFloor(floor);
     let lastAction = null;
+    let shotSeq = 0;
     let lockedUntil = 0;
     let ballots = new Map();
     let voteEndsAt = null;
@@ -482,6 +577,8 @@ export function createDungeon() {
             canvasHeight,
             anchor,
             artwork: [...artwork],
+            palette: maze.palette || 'stone',
+            rooms: snapshotRooms(maze.rooms),
             width: maze.width,
             height: maze.height,
             grid: cloneGrid(maze.grid),
@@ -518,6 +615,20 @@ export function createDungeon() {
         const player = maze.player;
         const from = { x: player.x, y: player.y, dir: player.dir };
         let bumped = false;
+
+        if (command === 'fire') {
+            lastAction = {
+                command,
+                user: actor.user,
+                displayName: actor.displayName || actor.user,
+                bumped: false,
+                from,
+                to: { ...from },
+                shot: castFire(maze),
+                shotId: (shotSeq += 1),
+            };
+            return { floorCleared: false, previousFloor: floor, bumped: false };
+        }
 
         if (command === 'left') {
             player.dir = (player.dir + 3) % 4;
@@ -699,7 +810,7 @@ export function createDungeon() {
     function input({ command: raw, user, displayName } = {}) {
         const command = normalizeDungeonCommand(raw);
         if (!command) {
-            const err = new Error('Usage: !up !down !left !right');
+            const err = new Error('Usage: !up !down !left !right !fire');
             err.code = 'USAGE';
             throw err;
         }
@@ -736,7 +847,7 @@ export function createDungeon() {
             }
         }
 
-        if (mode === 'democracy') {
+        if (mode === 'democracy' && command !== 'fire') {
             const isFirst = ballots.size === 0 && !voteTimer;
             ballots.set(actor.user, command);
             if (isFirst) {
@@ -771,7 +882,7 @@ export function createDungeon() {
         }
 
         const moved = applyCommand(command, actor);
-        lockedUntil = Date.now() + ANARCHY_LOCK_MS;
+        lockedUntil = Date.now() + (command === 'fire' ? FIRE_LOCK_MS : ANARCHY_LOCK_MS);
         emit();
         return {
             ...snapshot(),

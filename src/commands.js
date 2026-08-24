@@ -42,6 +42,7 @@ const RESERVED = new Set([
     'down',
     'left',
     'right',
+    'fire',
     ...Object.keys(DUNGEON_ALIASES),
 ]);
 
@@ -66,7 +67,7 @@ function formatDungeonLayout(state) {
 const HELP_TOPICS = {
     dc: {
         aliases: ['dungeon'],
-        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !anarchy !democracy !autoplay (mods) · !clear hides',
+        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !anarchy !democracy !autoplay (mods) · !clear hides',
     },
     ttt: {
         aliases: ['tictactoe'],
@@ -470,7 +471,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 if (!state.changed) {
                     return say(channel, 'Already in democracy mode.');
                 }
-                return say(channel, 'Democracy mode. Vote with !up !down !left !right.');
+                return say(channel, 'Democracy mode. Vote with !up !down !left !right. !fire shoots anytime.');
             },
         },
         {
@@ -533,6 +534,13 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             builtin: true,
             skipCooldown: true,
             execute: moveDungeon('right'),
+        },
+        {
+            name: 'fire',
+            response: 'Dungeon: shoot the fire staff',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('fire'),
         },
         {
             name: 'ttt',

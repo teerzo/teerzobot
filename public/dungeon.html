@@ -17,12 +17,13 @@
         html.paused body {
             background: transparent;
         }
-        html.paused canvas,
-        html.paused #hud {
-            display: none;
-        }
         canvas {
             display: block;
+            opacity: 1;
+        }
+        html.paused canvas,
+        html.paused #hud {
+            opacity: 0;
         }
         #hud {
             position: absolute;
@@ -1199,6 +1200,7 @@
         function setOverlayVisible(on) {
             overlayOn = on;
             document.documentElement.classList.toggle('paused', !on);
+            renderer.domElement.style.opacity = on ? '1' : '0';
             if (on) {
                 startLoop();
             } else {

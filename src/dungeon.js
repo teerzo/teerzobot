@@ -567,6 +567,7 @@ export function createDungeon() {
     let canvasHeight = DEFAULT_CANVAS.height;
     let anchor = 'top-left';
     let artwork = [];
+    let worldId = 0;
 
     function snapshot() {
         return {
@@ -576,6 +577,7 @@ export function createDungeon() {
             canvasWidth,
             canvasHeight,
             anchor,
+            worldId,
             artwork: [...artwork],
             palette: maze.palette || 'stone',
             rooms: snapshotRooms(maze.rooms),
@@ -915,6 +917,7 @@ export function createDungeon() {
         const wasHidden = !visible;
         visible = true;
         clearVotes();
+        worldId += 1;
         floor = 0;
         maze = buildFloor(floor);
         lastAction = null;
@@ -928,7 +931,6 @@ export function createDungeon() {
             scheduleIdle();
         }
         emit();
-        hub.emit({ type: 'reload' });
         return { ...snapshot(), changed: wasHidden };
     }
 

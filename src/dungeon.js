@@ -259,11 +259,13 @@ export function createDungeon() {
     let idleTimer = null;
     let autoplayTimer = null;
     let nextAutoCommand = 'up';
+    let visible = true;
 
     function snapshot() {
         return {
             floor,
             mode,
+            visible,
             width: maze.width,
             height: maze.height,
             grid: cloneGrid(maze.grid),
@@ -366,7 +368,7 @@ export function createDungeon() {
 
     function scheduleIdle() {
         clearIdle();
-        if (mode === 'autoplay') {
+        if (!visible || mode === 'autoplay') {
             return;
         }
         idleTimer = setTimeout(() => {
@@ -404,7 +406,7 @@ export function createDungeon() {
     }
 
     function autoplayStep() {
-        if (mode !== 'autoplay' || Date.now() < lockedUntil) {
+        if (!visible || mode !== 'autoplay' || Date.now() < lockedUntil) {
             return;
         }
         const moved = applyCommand(nextAutoCommand, { user: 'autoplay', displayName: 'Autoplay' });
@@ -422,14 +424,14 @@ export function createDungeon() {
         clearIdle();
         mode = 'autoplay';
         lockedUntil = 0;
-        if (!autoplayTimer) {
+        if (visible && !autoplayTimer) {
             nextAutoCommand = 'up';
             autoplayTimer = setInterval(autoplayStep, AUTOPLAY_MS);
             autoplayStep();
         } else {
             emit();
         }
-        if (idle && !already) {
+        if (idle && !already && visible) {
             try {
                 onAutoplay?.();
             } catch (err) {
@@ -487,6 +489,16 @@ export function createDungeon() {
         }
 
         const actor = { user: user || 'anon', displayName: displayName || user || 'anon' };
+        if (!visible) {
+            return {
+                ...snapshot(),
+                applied: false,
+                ignored: true,
+                bumped: false,
+                floorCleared: false,
+                voted: false,
+            };
+        }
         const synthetic = isSyntheticUser(actor.user);
 
         if (synthetic && mode === 'autoplay') {
@@ -554,7 +566,18 @@ export function createDungeon() {
         };
     }
 
+    function hide() {
+        stopAutoplayLoop();
+        clearIdle();
+        clearVotes();
+        visible = false;
+        emit();
+        return snapshot();
+    }
+
     function reset() {
+        const wasHidden = !visible;
+        visible = true;
         clearVotes();
         floor = 0;
         maze = buildFloor(floor);
@@ -564,11 +587,12 @@ export function createDungeon() {
         if (mode === 'autoplay') {
             stopAutoplayLoop();
             autoplayTimer = setInterval(autoplayStep, AUTOPLAY_MS);
+            autoplayStep();
         } else {
             scheduleIdle();
         }
         emit();
-        return snapshot();
+        return { ...snapshot(), changed: wasHidden };
     }
 
     function setMode(next) {
@@ -599,6 +623,8 @@ export function createDungeon() {
         get: () => snapshot(),
         input,
         reset,
+        hide,
+        clear: hide,
         setMode,
         setOnFloorClear(fn) {
             onFloorClear = typeof fn === 'function' ? fn : null;
@@ -610,6 +636,7 @@ export function createDungeon() {
             listeners: hub.listenerCount,
             floor,
             mode,
+            visible,
         }),
     };
 }

@@ -58,8 +58,8 @@
                 name: 'Dungeon',
                 path: '/dungeon',
                 commands: ['!up', '!down', '!left', '!right', '!dungeon', '!anarchy', '!democracy', '!autoplay'],
-                note: 'Chat walks a shared first-person maze. Idle autoplay after 1 minute. Preview walk: /dungeon?preview=1',
-                clearPath: '/api/dungeon/reset',
+                note: 'Chat walks a shared first-person maze. Idle autoplay after 1 minute. !clear hides it; !dungeon shows it again. Preview walk: /dungeon?preview=1',
+                clearPath: '/api/dungeon/clear',
                 previewClass: 'ratio-16x9',
                 sizes: [
                     { label: '480×270', width: 480, height: 270 },
@@ -173,7 +173,7 @@
                     fetch('/api/dance/clear', { method: 'POST' }),
                     fetch('/api/dvd/clear', { method: 'POST' }),
                     fetch('/api/ttt/clear', { method: 'POST' }),
-                    fetch('/api/dungeon/reset', { method: 'POST' }),
+                    fetch('/api/dungeon/clear', { method: 'POST' }),
                 ]);
             } finally {
                 clearAll.disabled = false;

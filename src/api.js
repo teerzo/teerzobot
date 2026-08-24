@@ -109,7 +109,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
             ttt: status.ttt ?? { listeners: 0 },
-            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy' },
+            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -194,7 +194,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     });
 
     app.get('/api/dungeon', (_req, res) => {
-        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', grid: [] });
+        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, grid: [] });
     });
 
     app.post('/api/dungeon/reset', (_req, res) => {
@@ -203,6 +203,14 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             return;
         }
         res.json(dungeon.reset());
+    });
+
+    app.post('/api/dungeon/clear', (_req, res) => {
+        if (!dungeon) {
+            res.status(503).json({ error: 'Dungeon overlay is not available' });
+            return;
+        }
+        res.json(dungeon.clear());
     });
 
     app.post('/api/dungeon/input', (req, res) => {

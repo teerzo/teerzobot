@@ -13,6 +13,14 @@
             color: #fff;
             font: clamp(13px, 2.4vw, 16px)/1.3 "Trebuchet MS", "Segoe UI", sans-serif;
         }
+        html.paused,
+        html.paused body {
+            background: transparent;
+        }
+        html.paused canvas,
+        html.paused #hud {
+            display: none;
+        }
         canvas {
             display: block;
         }
@@ -732,6 +740,8 @@
         let bump = 0;
         let lastAt = '';
         let voteEndsAt = 0;
+        let overlayOn = true;
+        let rafId = 0;
         const clock = new THREE.Clock();
 
         function lerpAngle(a, b, t) {
@@ -1160,7 +1170,16 @@
         }
 
         function applyState(state, snap) {
-            if (!state?.grid?.length) {
+            if (!state) {
+                return;
+            }
+            const showing = state.visible !== false;
+            const resume = showing && document.documentElement.classList.contains('paused');
+            setOverlayVisible(showing);
+            if (!showing) {
+                return;
+            }
+            if (!state.grid?.length) {
                 return;
             }
             if (transitioning) {
@@ -1169,12 +1188,38 @@
             }
             const nextFloor = Number(state.floor);
             const isNewFloor = shownFloor !== null && nextFloor !== shownFloor;
-            if (isNewFloor && !snap) {
+            if (isNewFloor && !snap && !resume) {
                 startLevelTransition(state);
                 return;
             }
-            commitWorld(state, snap || shownFloor === null);
+            commitWorld(state, snap || resume || shownFloor === null);
             shownFloor = nextFloor;
+        }
+
+        function setOverlayVisible(on) {
+            overlayOn = on;
+            document.documentElement.classList.toggle('paused', !on);
+            if (on) {
+                startLoop();
+            } else {
+                stopLoop();
+            }
+        }
+
+        function startLoop() {
+            if (rafId) {
+                return;
+            }
+            clock.getDelta();
+            rafId = requestAnimationFrame(tick);
+        }
+
+        function stopLoop() {
+            if (!rafId) {
+                return;
+            }
+            cancelAnimationFrame(rafId);
+            rafId = 0;
         }
 
         function startLevelTransition(state) {
@@ -1273,6 +1318,11 @@
         }
 
         function tick() {
+            if (!overlayOn) {
+                rafId = 0;
+                return;
+            }
+            rafId = requestAnimationFrame(tick);
             const dt = clock.getDelta();
             const t = 1 - Math.exp(-dt * 9);
             camPos.lerp(targetPos, t);
@@ -1308,7 +1358,6 @@
             }
 
             renderer.render(scene, camera);
-            requestAnimationFrame(tick);
         }
 
         addEventListener('resize', () => {
@@ -1335,6 +1384,9 @@
         if (preview) {
             let next = 'up';
             const send = async () => {
+                if (!overlayOn) {
+                    return;
+                }
                 try {
                     const res = await fetch('/api/dungeon/input', {
                         method: 'POST',
@@ -1359,7 +1411,7 @@
             setInterval(send, 800);
         }
 
-        tick();
+        startLoop();
     </script>
 </body>
 </html>

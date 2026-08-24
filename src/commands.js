@@ -337,14 +337,14 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'dungeon',
-            response: 'Resets the dungeon crawler overlay to floor 0',
+            response: 'Shows and resets the dungeon crawler overlay to floor 0',
             builtin: true,
             execute({ say, channel }) {
                 if (!dungeon) {
                     return say(channel, 'Dungeon overlay is not available.');
                 }
                 dungeon.reset();
-                return say(channel, 'Dungeon reset to floor 0. Move with !up !down !left !right.');
+                return say(channel, 'Dungeon overlay is on. Reset to floor 0. Move with !up !down !left !right.');
             },
         },
         {
@@ -458,13 +458,14 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'clear',
-            response: 'Clears dance GIFs, DVD logos, and tic-tac-toe from the overlays',
+            response: 'Clears dance GIFs, DVD logos, tic-tac-toe, and hides the dungeon overlay',
             builtin: true,
             execute({ say, channel }) {
                 dance?.clear();
                 dvd?.clear();
                 ttt?.clear();
-                return say(channel, 'Cleared dance, DVD, and tic-tac-toe overlays.');
+                dungeon?.clear();
+                return say(channel, 'Cleared dance, DVD, tic-tac-toe, and dungeon overlays.');
             },
         },
         ...sceneBuiltins(),

@@ -893,6 +893,177 @@
             return canvas;
         }
 
+        function makeVaultCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1612';
+            ctx.fillRect(0, 0, size, size);
+            const ribs = ['#3a3228', '#4a4034', '#2a241c'];
+            for (let i = 0; i < size; i++) {
+                ctx.fillStyle = ribs[i % 3];
+                ctx.fillRect(i, i, 2, 1);
+                ctx.fillRect(i, size - 1 - i, 2, 1);
+                ctx.fillRect(i, 15, 1, 2);
+                ctx.fillRect(15, i, 2, 1);
+            }
+            ctx.fillStyle = '#c4a24a';
+            ctx.fillRect(14, 14, 4, 4);
+            ctx.fillStyle = '#8a7038';
+            ctx.fillRect(15, 15, 2, 2);
+            return canvas;
+        }
+
+        function makeRockCeilCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const pal = ['#2a241c', '#3a3228', '#4a4034', '#1a1610', '#5a4e40'];
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    ctx.fillStyle = pal[(x * 7 + y * 13) % pal.length];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            for (let i = 0; i < 8; i++) {
+                const cx = (i * 11 + 3) % 28;
+                const cy = (i * 17 + 5) % 28;
+                ctx.fillStyle = pal[i % pal.length];
+                ctx.fillRect(cx, cy, 6 + (i % 4), 5 + (i % 3));
+                ctx.fillStyle = '#0e0c0a';
+                ctx.fillRect(cx, cy, 6 + (i % 4), 1);
+            }
+            return canvas;
+        }
+
+        function makeGrateCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a2014';
+            ctx.fillRect(0, 0, size, size);
+            for (let y = 0; y < size; y += 8) {
+                for (let x = 0; x < size; x += 16) {
+                    const ox = (y / 8) % 2 === 0 ? 0 : 8;
+                    ctx.fillStyle = ((x + y) / 8) % 2 === 0 ? '#3a4a28' : '#2a3820';
+                    ctx.fillRect(x + ox + 1, y + 1, 14, 6);
+                    ctx.fillStyle = '#0c1008';
+                    ctx.fillRect(x + ox, y, 16, 1);
+                    ctx.fillRect(x + ox, y, 1, 8);
+                }
+            }
+            ctx.fillStyle = '#2a3028';
+            for (let x = 4; x < size; x += 6) {
+                ctx.fillRect(x, 0, 1, size);
+            }
+            for (let y = 4; y < size; y += 6) {
+                ctx.fillRect(0, y, size, 1);
+            }
+            ctx.fillStyle = '#4a6a28';
+            ctx.fillRect(10, 18, 3, 2);
+            ctx.fillRect(20, 8, 2, 3);
+            return canvas;
+        }
+
+        function makeSootCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#161210';
+            ctx.fillRect(0, 0, size, size);
+            for (let i = 0; i < 40; i++) {
+                const x = (i * 13) % size;
+                const y = (i * 17) % size;
+                ctx.fillStyle = i % 3 === 0 ? '#2a2018' : '#0c0a08';
+                ctx.fillRect(x, y, 3 + (i % 4), 2 + (i % 3));
+            }
+            ctx.fillStyle = '#3a2218';
+            ctx.fillRect(0, 10, size, 1);
+            ctx.fillRect(0, 22, size, 1);
+            return canvas;
+        }
+
+        function makeGiltCeilCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a2010';
+            ctx.fillRect(0, 0, size, size);
+            for (let y = 0; y < size; y += 16) {
+                for (let x = 0; x < size; x += 16) {
+                    ctx.fillStyle = '#5a4828';
+                    ctx.fillRect(x + 1, y + 1, 14, 14);
+                    ctx.fillStyle = '#c4a24a';
+                    ctx.fillRect(x + 2, y + 2, 12, 1);
+                    ctx.fillRect(x + 2, y + 13, 12, 1);
+                    ctx.fillRect(x + 2, y + 2, 1, 12);
+                    ctx.fillRect(x + 13, y + 2, 1, 12);
+                    ctx.fillStyle = '#e8d090';
+                    ctx.fillRect(x + 7, y + 7, 2, 2);
+                }
+            }
+            return canvas;
+        }
+
+        function makeBrickCeilCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1410';
+            ctx.fillRect(0, 0, size, size);
+            const bricks = ['#4a382c', '#3a2c22', '#5a4434', '#2e241c'];
+            for (let y = 0; y < size; y += 4) {
+                const shift = (y / 4) % 2 === 0 ? 0 : 4;
+                for (let x = -4; x < size; x += 8) {
+                    ctx.fillStyle = bricks[((x + y) / 4) % bricks.length];
+                    ctx.fillRect(x + shift + 1, y + 1, 6, 2);
+                    ctx.fillStyle = '#0e0a08';
+                    ctx.fillRect(x + shift, y, 8, 1);
+                    ctx.fillRect(x + shift, y, 1, 4);
+                }
+            }
+            return canvas;
+        }
+
+        function makePlasterCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3a2e2a';
+            ctx.fillRect(0, 0, size, size);
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if ((x * 11 + y * 19) % 7 === 0) {
+                        ctx.fillStyle = '#4a3a34';
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            ctx.fillStyle = '#5a2018';
+            for (let i = 0; i < 6; i++) {
+                ctx.fillRect((i * 9 + 2) % 28, (i * 13 + 4) % 28, 4 + (i % 3), 3);
+            }
+            ctx.fillStyle = '#1a1210';
+            ctx.fillRect(6, 4, 1, 18);
+            ctx.fillRect(6, 12, 14, 1);
+            ctx.fillRect(18, 8, 1, 12);
+            return canvas;
+        }
+
         function makeNightSkyCanvas() {
             const size = 64;
             const canvas = document.createElement('canvas');
@@ -1266,9 +1437,42 @@
                 woodWallMat.color.lerp(new THREE.Color(0x8a7a68), 0.18);
             }
             metalWallMat.color.setHex(palette.wall);
-            for (const mat of ceilMats) {
+            for (let i = 0; i < ceilMats.length; i++) {
+                const kind = CEIL_KINDS[i];
+                const mat = ceilMats[i];
                 mat.color.setHex(palette.dark);
-                mat.color.lerp(new THREE.Color(palette.wall), 0.4);
+                if (kind === 'gilt') {
+                    mat.color.lerp(new THREE.Color(0xe8c878), 0.55);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.12);
+                } else if (kind === 'vine') {
+                    mat.color.lerp(new THREE.Color(0x6a9a58), 0.4);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.15);
+                } else if (kind === 'soot') {
+                    mat.color.lerp(new THREE.Color(0x1a1210), 0.55);
+                } else if (kind === 'rock') {
+                    mat.color.lerp(new THREE.Color(0xb8a890), 0.35);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.2);
+                } else if (kind === 'grate') {
+                    mat.color.lerp(new THREE.Color(0x6a7a50), 0.28);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.2);
+                } else if (kind === 'vault') {
+                    mat.color.lerp(new THREE.Color(0xd8c8a0), 0.32);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.18);
+                } else if (kind === 'brick') {
+                    mat.color.lerp(new THREE.Color(0x8a7060), 0.3);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.18);
+                } else if (kind === 'plaster') {
+                    mat.color.lerp(new THREE.Color(0xc07068), 0.28);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.2);
+                } else if (kind === 'metal') {
+                    mat.color.lerp(new THREE.Color(0x8898a8), 0.35);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.2);
+                } else if (kind === 'wood') {
+                    mat.color.lerp(new THREE.Color(0x8a6a48), 0.3);
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.18);
+                } else {
+                    mat.color.lerp(new THREE.Color(palette.wall), 0.28);
+                }
             }
             nightSkyMat.color.setHex(
                 id === 'ember' ? 0xffd8b0
@@ -1380,9 +1584,96 @@
             return FLOOR_KINDS[hash % 5];
         }
 
-        function pickCeilKind(x, z, rooms) {
+        const PALETTE_CEIL = {
+            stone: 'stone',
+            moss: 'vine',
+            ember: 'soot',
+            iron: 'metal',
+            blood: 'plaster',
+            crypt: 'brick',
+            sewer: 'grate',
+            gilt: 'gilt',
+            cave: 'rock',
+        };
+        const ROOM_CEIL = {
+            chapel: 'vault',
+            shrine: 'vault',
+            cave: 'rock',
+            sewer: 'grate',
+            well: 'grate',
+            forge: 'soot',
+            kitchen: 'soot',
+            garden: 'vine',
+            armory: 'metal',
+            barracks: 'metal',
+            crypt: 'brick',
+            cell: 'brick',
+            bedroom: 'wood',
+            study: 'wood',
+            library: 'wood',
+            dining: 'wood',
+            pantry: 'wood',
+            closet: 'wood',
+        };
+        const ROOM_CEIL_H = {
+            cell: 1.22,
+            closet: 1.28,
+            pantry: 1.32,
+            well: 1.38,
+            sewer: 1.42,
+            kitchen: 1.48,
+            bedroom: 1.52,
+            study: 1.58,
+            armory: 1.62,
+            barracks: 1.64,
+            forge: 1.72,
+            crypt: 1.78,
+            garden: 1.88,
+            cave: 1.9,
+            library: 2.02,
+            dining: 2.08,
+            shrine: 2.14,
+            chapel: 2.24,
+        };
+
+        function pickCeilKind(x, z, rooms, paletteId) {
             const room = roomContaining(rooms, x, z);
-            return ROOM_THEMES[room?.kind]?.ceil || 'dark';
+            if (room?.kind && ROOM_CEIL[room.kind]) {
+                return ROOM_CEIL[room.kind];
+            }
+            return PALETTE_CEIL[paletteId] || 'dark';
+        }
+
+        function pickCeilHeight(x, z, rooms) {
+            const room = roomContaining(rooms, x, z);
+            if (!room) {
+                return WALL_H;
+            }
+            if (room.kind === 'cave') {
+                return 1.62 + cellHash01(x, z, 41) * 0.52;
+            }
+            return ROOM_CEIL_H[room.kind] || WALL_H;
+        }
+
+        function wallHeightAt(x, z, rooms, grid) {
+            let h = WALL_H;
+            for (const { dx, dz } of WALL_DIRS) {
+                const nx = x + dx;
+                const nz = z + dz;
+                if (!isCeilTile(grid?.[nz]?.[nx])) {
+                    continue;
+                }
+                h = Math.max(h, pickCeilHeight(nx, nz, rooms));
+            }
+            return h;
+        }
+
+        function maxRoomCeil(rooms) {
+            let h = WALL_H;
+            for (const room of rooms || []) {
+                h = Math.max(h, room.kind === 'cave' ? 2.16 : (ROOM_CEIL_H[room.kind] || WALL_H));
+            }
+            return h;
         }
 
         function floorFamily(kind) {
@@ -1514,7 +1805,7 @@
             roughness: 0.38,
             metalness: 0.78,
         });
-        const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine'];
+        const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine', 'vault', 'rock', 'grate', 'soot', 'gilt', 'brick', 'plaster'];
         const ceilMats = [
             new THREE.MeshStandardMaterial({
                 map: canvasToTexture(makeStoneCanvas()),
@@ -1539,6 +1830,41 @@
             }),
             new THREE.MeshStandardMaterial({
                 map: canvasToTexture(makeVineCanvas()),
+                roughness: 0.96,
+                metalness: 0.02,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeVaultCanvas()),
+                roughness: 0.88,
+                metalness: 0.08,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeRockCeilCanvas()),
+                roughness: 0.98,
+                metalness: 0.02,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeGrateCanvas()),
+                roughness: 0.7,
+                metalness: 0.18,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeSootCanvas()),
+                roughness: 0.98,
+                metalness: 0,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeGiltCeilCanvas()),
+                roughness: 0.55,
+                metalness: 0.28,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makeBrickCeilCanvas()),
+                roughness: 0.94,
+                metalness: 0.03,
+            }),
+            new THREE.MeshStandardMaterial({
+                map: canvasToTexture(makePlasterCanvas()),
                 roughness: 0.96,
                 metalness: 0.02,
             }),
@@ -1857,6 +2183,8 @@
         const WATER_TILE = 10;
         const SPIKE_TILE = 11;
         const DOOR_TILE = 12;
+        const ANGLE_WALL = 13;
+        const CURVE_WALL = 14;
         const HALF_H = WALL_H * 0.36;
         const BROKEN_H = WALL_H * 0.32;
 
@@ -1896,6 +2224,8 @@
         const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
         const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
         const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+        const curveQuarterGeo = new THREE.CylinderGeometry(0.98, 0.98, 1, 16, 1, false, 0, Math.PI / 2);
+        const curveHalfGeo = new THREE.CylinderGeometry(0.7, 0.7, 1, 14, 1, false, 0, Math.PI);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1981,7 +2311,7 @@
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
             goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo, bloodStainGeo,
-            hangCurtainGeo, cobwebHangGeo, caveBlockGeo,
+            hangCurtainGeo, cobwebHangGeo, caveBlockGeo, curveQuarterGeo, curveHalfGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -2849,7 +3179,8 @@
         }
 
         function isCeilTile(cell) {
-            return isFloorTile(cell) || cell === WATER_TILE || cell === SPIKE_TILE;
+            return isFloorTile(cell) || cell === WATER_TILE || cell === SPIKE_TILE
+                || cell === ANGLE_WALL || cell === CURVE_WALL;
         }
 
         function isFullWall(cell) {
@@ -2858,7 +3189,8 @@
 
         function isWallLike(cell) {
             return cell === FULL_WALL || cell === HALF_WALL || cell === BROKEN_WALL
-                || cell === HOLE_WALL || cell === FENCE_WALL || cell === WINDOW_WALL || cell === BREACH_WALL;
+                || cell === HOLE_WALL || cell === FENCE_WALL || cell === WINDOW_WALL || cell === BREACH_WALL
+                || cell === ANGLE_WALL || cell === CURVE_WALL;
         }
 
         function faceKey(wx, wz, dx, dz) {
@@ -3338,6 +3670,72 @@
                 return doorIronMat;
             }
             return doorWoodMat;
+        }
+
+        function makeAnglePartition(x, z, grid, rooms) {
+            const n = isWallLike(grid[z - 1]?.[x]);
+            const s = isWallLike(grid[z + 1]?.[x]);
+            const e = isWallLike(grid[z]?.[x + 1]);
+            const w = isWallLike(grid[z]?.[x - 1]);
+            let yaw = Math.PI / 4;
+            if ((n && e) || (s && w)) {
+                yaw = -Math.PI / 4;
+            } else if ((n && w) || (s && e)) {
+                yaw = Math.PI / 4;
+            } else if (e || w) {
+                yaw = Math.PI / 2 + ((x + z) % 2 === 0 ? 0.4 : -0.4);
+            } else {
+                yaw = (x + z) % 2 === 0 ? 0.4 : -0.4;
+            }
+            const h = pickCeilHeight(x, z, rooms);
+            const mesh = new THREE.Mesh(caveBlockGeo, doorFrameMat(roomContaining(rooms, x, z)?.kind));
+            mesh.position.set(x, h / 2, z);
+            mesh.scale.set(1.38, h, 0.2);
+            mesh.rotation.y = yaw;
+            mesh.castShadow = true;
+            return mesh;
+        }
+
+        function makeCurvePartition(x, z, grid, rooms) {
+            const n = isWallLike(grid[z - 1]?.[x]);
+            const s = isWallLike(grid[z + 1]?.[x]);
+            const e = isWallLike(grid[z]?.[x + 1]);
+            const w = isWallLike(grid[z]?.[x - 1]);
+            const h = pickCeilHeight(x, z, rooms);
+            const mat = doorFrameMat(roomContaining(rooms, x, z)?.kind);
+            const mesh = new THREE.Mesh(
+                (n && e) || (n && w) || (s && e) || (s && w) ? curveQuarterGeo : curveHalfGeo,
+                mat,
+            );
+            let ox = 0;
+            let oz = 0;
+            let yaw = 0;
+            if (n && w) {
+                ox = -0.5;
+                oz = -0.5;
+                yaw = 0;
+            } else if (n && e) {
+                ox = 0.5;
+                oz = -0.5;
+                yaw = Math.PI / 2;
+            } else if (s && e) {
+                ox = 0.5;
+                oz = 0.5;
+                yaw = Math.PI;
+            } else if (s && w) {
+                ox = -0.5;
+                oz = 0.5;
+                yaw = -Math.PI / 2;
+            } else {
+                ox = e ? 0.28 : w ? -0.28 : 0;
+                oz = s ? 0.28 : n ? -0.28 : 0;
+                yaw = n ? 0 : s ? Math.PI : e ? Math.PI / 2 : -Math.PI / 2;
+            }
+            mesh.position.set(x + ox, h / 2, z + oz);
+            mesh.scale.set(1, h, 1);
+            mesh.rotation.y = yaw;
+            mesh.castShadow = true;
+            return mesh;
         }
 
         const DOOR_CLOSED = 0;
@@ -4128,7 +4526,7 @@
             const ceilGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
             ceilGeo.rotateX(Math.PI / 2);
             ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
-            ceilMesh.position.set((w - 1) / 2, WALL_H, (h - 1) / 2);
+            ceilMesh.position.set((w - 1) / 2, maxRoomCeil(state.rooms), (h - 1) / 2);
             scene.add(ceilMesh);
 
             const stoneWalls = [];
@@ -4145,6 +4543,8 @@
             const waterTiles = [];
             const spikeTiles = [];
             const doorTiles = [];
+            const angleTiles = [];
+            const curveTiles = [];
             const paletteId = state.palette || 'stone';
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
@@ -4182,6 +4582,10 @@
                         spikeTiles.push(x, y);
                     } else if (cell === DOOR_TILE) {
                         doorTiles.push(x, y);
+                    } else if (cell === ANGLE_WALL) {
+                        angleTiles.push(x, y);
+                    } else if (cell === CURVE_WALL) {
+                        curveTiles.push(x, y);
                     }
                 }
             }
@@ -4207,14 +4611,16 @@
                 const chunkColors = [];
                 const dummy = new THREE.Object3D();
                 const color = new THREE.Color();
+                const vary = maxH === WALL_H;
                 for (let i = 0; i < positions.length; i += 2) {
                     const x = positions[i];
                     const z = positions[i + 1];
+                    const tileH = vary ? wallHeightAt(x, z, state.rooms, state.grid) : maxH;
                     const room = roomBeside(state.rooms, x, z);
                     let y = 0;
                     const layers = 3 + (Math.abs(x + z * 3) % 2);
-                    for (let layer = 0; layer < layers && y < maxH - 0.06; layer++) {
-                        const h = Math.min(maxH - y, 0.24 + cellHash01(x, z, layer) * 0.36);
+                    for (let layer = 0; layer < layers && y < tileH - 0.06; layer++) {
+                        const h = Math.min(tileH - y, 0.24 + cellHash01(x, z, layer) * 0.36);
                         const w = 0.74 + cellHash01(x, z, layer + 3) * 0.32;
                         const d = 0.74 + cellHash01(x, z, layer + 6) * 0.32;
                         chunks.push(
@@ -4234,7 +4640,7 @@
                         const h = 0.16 + cellHash01(x, z, 22) * 0.24;
                         chunks.push(
                             x + (cellHash01(x, z, 23) - 0.5) * 0.24,
-                            0.18 + cellHash01(x, z, 24) * Math.max(0.2, maxH - 0.4),
+                            0.18 + cellHash01(x, z, 24) * Math.max(0.2, tileH - 0.4),
                             z + (cellHash01(x, z, 25) - 0.5) * 0.24,
                             0.32 + cellHash01(x, z, 26) * 0.3,
                             h,
@@ -4274,7 +4680,11 @@
                 const color = new THREE.Color();
                 for (let i = 0; i < positions.length; i += 2) {
                     const index = i / 2;
-                    dummy.position.set(positions[i], height / 2, positions[i + 1]);
+                    const x = positions[i];
+                    const z = positions[i + 1];
+                    const h = height === WALL_H ? wallHeightAt(x, z, state.rooms, state.grid) : height;
+                    dummy.position.set(x, h / 2, z);
+                    dummy.scale.set(1, h / height, 1);
                     dummy.updateMatrix();
                     mesh.setMatrixAt(index, dummy.matrix);
                     const shade = 0.88 + ((positions[i] * 13 + positions[i + 1] * 7) % 9) * 0.015;
@@ -4314,6 +4724,16 @@
             buildBlockyWalls(caveBroken, crackedWallMat, BROKEN_H);
 
             extraWallRoot = new THREE.Group();
+            function addRoofCap(x, z, baseH = WALL_H) {
+                const top = wallHeightAt(x, z, state.rooms, state.grid);
+                if (top <= baseH + 0.05) {
+                    return;
+                }
+                const cap = new THREE.Mesh(caveBlockGeo, wallMat);
+                cap.position.set(x, (baseH + top) / 2, z);
+                cap.scale.set(1.02, top - baseH, 1.02);
+                extraWallRoot.add(cap);
+            }
             const windowTiles = [];
             for (let i = 0; i < holeWalls.length; i += 2) {
                 windowTiles.push(holeWalls[i], holeWalls[i + 1]);
@@ -4332,6 +4752,7 @@
                 win.position.set(wx, 0, wz);
                 win.rotation.y = facingOpen(state.grid, wx, wz);
                 extraWallRoot.add(win);
+                addRoofCap(wx, wz);
                 if (win.userData.light && windowLights.length < 3) {
                     windowLights.push(win.userData.light);
                 } else if (win.userData.light) {
@@ -4349,6 +4770,7 @@
                 const breach = makeBreachWall();
                 breach.position.set(breachWalls[i], 0, breachWalls[i + 1]);
                 extraWallRoot.add(breach);
+                addRoofCap(breachWalls[i], breachWalls[i + 1]);
             }
             for (let i = 0; i < doorTiles.length; i += 2) {
                 const dx = doorTiles[i];
@@ -4359,6 +4781,7 @@
                 door.rotation.y = yaw;
                 door.position.set(dx + Math.sin(yaw) * 0.5, 0, dz + Math.cos(yaw) * 0.5);
                 extraWallRoot.add(door);
+                addRoofCap(dx, dz);
                 if (door.userData.hinge) {
                     doorHinges.push({
                         hinge: door.userData.hinge,
@@ -4366,6 +4789,12 @@
                         z: dz,
                     });
                 }
+            }
+            for (let i = 0; i < angleTiles.length; i += 2) {
+                extraWallRoot.add(makeAnglePartition(angleTiles[i], angleTiles[i + 1], state.grid, state.rooms));
+            }
+            for (let i = 0; i < curveTiles.length; i += 2) {
+                extraWallRoot.add(makeCurvePartition(curveTiles[i], curveTiles[i + 1], state.grid, state.rooms));
             }
             scene.add(extraWallRoot);
 
@@ -4516,7 +4945,7 @@
                     if (!isCeilTile(state.grid[y][x])) {
                         continue;
                     }
-                    const kindName = pickCeilKind(x, y, state.rooms);
+                    const kindName = pickCeilKind(x, y, state.rooms, paletteId);
                     const kind = Math.max(0, CEIL_KINDS.indexOf(kindName));
                     ceilBuckets[kind].push(x, y);
                 }
@@ -4531,8 +4960,9 @@
                 const mesh = new THREE.InstancedMesh(ceilTileGeo.clone(), ceilMats[k], positions.length / 2);
                 for (let i = 0; i < positions.length; i += 2) {
                     const index = i / 2;
-                    dummy.position.set(positions[i], WALL_H - 0.002, positions[i + 1]);
-                    dummy.rotation.y = ((positions[i] + positions[i + 1]) % 4) * (Math.PI / 2);
+                    dummy.scale.set(1, 1, 1);
+                    dummy.position.set(positions[i], pickCeilHeight(positions[i], positions[i + 1], state.rooms) - 0.002, positions[i + 1]);
+                    dummy.rotation.set(0, ((positions[i] + positions[i + 1]) % 4) * (Math.PI / 2), 0);
                     dummy.updateMatrix();
                     mesh.setMatrixAt(index, dummy.matrix);
                     const shade = 0.82 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;

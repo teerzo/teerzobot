@@ -15,6 +15,8 @@ const BREACH = 9;
 const WATER = 10;
 const SPIKES = 11;
 const DOOR = 12;
+const ANGLE = 13;
+const CURVE = 14;
 
 const DIRS = [
     { dx: 0, dy: -1 },
@@ -615,7 +617,8 @@ function wallStyleForKind(kind, roll) {
 }
 
 function isWallish(cell) {
-    return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE || cell === FENCE;
+    return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE || cell === FENCE
+        || cell === ANGLE || cell === CURVE;
 }
 
 function styleInteriorWalls(grid, rooms) {
@@ -760,7 +763,7 @@ function wallSideCells(room, grid) {
             const against = DIRS.some(({ dx, dy }) => {
                 const cell = grid[y + dy]?.[x + dx];
                 return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE
-                    || cell === FENCE || cell === WINDOW || cell === BREACH;
+                    || cell === FENCE || cell === WINDOW || cell === BREACH || cell === ANGLE || cell === CURVE;
             });
             if (against) {
                 spots.push([x, y]);
@@ -858,6 +861,46 @@ function interiorFloorCells(room, grid, startX, startY, exitX, exitY) {
         }
     }
     return shuffle(cells);
+}
+
+function roomCornerCells(room) {
+    return [
+        [room.x, room.y],
+        [room.x + room.w - 1, room.y],
+        [room.x, room.y + room.h - 1],
+        [room.x + room.w - 1, room.y + room.h - 1],
+    ];
+}
+
+function placeRoomPartitions(grid, rooms, startX, startY, exitX, exitY) {
+    const skip = new Set(['cell', 'closet', 'pantry', 'well']);
+    for (const room of rooms) {
+        const area = room.w * room.h;
+        if (area < 15 || skip.has(room.kind)) {
+            continue;
+        }
+        const hash = Math.abs(room.x * 19 + room.y * 29 + (room.kind || '').length * 11);
+        const corners = shuffle(roomCornerCells(room).filter(([x, y]) =>
+            grid[y]?.[x] === FLOOR && !isDoorwayCell(room, x, y, grid)));
+        if (!corners.length) {
+            continue;
+        }
+        const preferCurve = room.kind === 'cave' || room.kind === 'sewer' || room.kind === 'crypt'
+            || room.kind === 'garden' || room.kind === 'chapel';
+        const firstKind = preferCurve && hash % 3 !== 0 ? CURVE : (hash % 2 === 0 ? ANGLE : CURVE);
+        stampCells(grid, [corners[0]], firstKind, startX, startY, exitX, exitY);
+        if (area >= 28 && corners[1]) {
+            const secondKind = firstKind === CURVE ? ANGLE : CURVE;
+            stampCells(grid, [corners[1]], secondKind, startX, startY, exitX, exitY);
+        }
+        if (area >= 36 && hash % 3 === 0) {
+            const juts = wallSideCells(room, grid).filter(([x, y]) =>
+                !corners.some((c) => c[0] === x && c[1] === y));
+            if (juts[0]) {
+                stampCells(grid, [juts[0]], hash % 2 === 0 ? ANGLE : CURVE, startX, startY, exitX, exitY);
+            }
+        }
+    }
 }
 
 function twoByTwo(origin) {
@@ -1019,6 +1062,7 @@ function buildFloor(floor) {
         styleInteriorWalls(grid, rooms);
         placeDoorways(grid, rooms, startX, startY, exit.x, exit.y);
         placeRoomFurniture(grid, rooms, startX, startY, exit.x, exit.y);
+        placeRoomPartitions(grid, rooms, startX, startY, exit.x, exit.y);
         placeHazards(grid, rooms, startX, startY, exit.x, exit.y);
         last = mazePayload(size, grid, startX, startY, exit, rooms, floor);
         const dist = distFrom(grid, startX, startY)[exit.y][exit.x];

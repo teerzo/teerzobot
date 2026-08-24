@@ -67,7 +67,7 @@
             align-items: flex-start;
             gap: 0.35em;
         }
-        #floor, #mode, #last, #votes, #fps {
+        #floor, #mode, #last, #votes, #fps, #hp {
             background: rgba(0, 0, 0, 0.62);
             border-radius: 0.5em;
         }
@@ -78,6 +78,35 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
             font-variant-numeric: tabular-nums;
+        }
+        #hp {
+            margin-top: 0.35em;
+            padding: 0.3em 0.55em 0.4em;
+            display: grid;
+            grid-template-columns: 1.8em 1fr;
+            gap: 0.4em;
+            align-items: center;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            width: 7.4em;
+        }
+        #hp .bar {
+            margin: 0;
+        }
+        #hp .bar i {
+            width: 100%;
+            background: #6ee08a;
+        }
+        #hp.mid .bar i {
+            background: #e0d06e;
+        }
+        #hp.low .bar i {
+            background: #e06a5a;
+        }
+        #vignette.hurt {
+            background: radial-gradient(ellipse at center, transparent 28%, rgba(140, 12, 8, 0.62) 100%);
         }
         #floor {
             display: flex;
@@ -253,6 +282,7 @@
             <div id="top-left">
                 <div id="floor">Floor <strong>0</strong></div>
                 <div id="fps">-- fps</div>
+                <div id="hp"><span>HP</span><div class="bar"><i id="hp-fill"></i></div></div>
             </div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
@@ -292,6 +322,9 @@
 
         const floorEl = document.querySelector('#floor strong');
         const fpsEl = document.getElementById('fps');
+        const hpEl = document.getElementById('hp');
+        const hpFillEl = document.getElementById('hp-fill');
+        const vignetteEl = document.getElementById('vignette');
         const hudEl = document.getElementById('hud');
         const stageEl = document.getElementById('stage');
         const modeEl = document.getElementById('mode');
@@ -1019,6 +1052,7 @@
             crypt: { fog: 0x0c0c12, dark: 0x12141a, wall: 0xd8d4cc, floor: 0xc4c0b8, torch: 0xc8d8ff, flame: 0x6070a0 },
             sewer: { fog: 0x0c1008, dark: 0x10140c, wall: 0xb8c4a0, floor: 0x8a9a70, torch: 0x9ad060, flame: 0x4a7028 },
             gilt: { fog: 0x120e08, dark: 0x1a140c, wall: 0xf0e0b8, floor: 0xe8d090, torch: 0xffd060, flame: 0xc08020 },
+            cave: { fog: 0x0a0908, dark: 0x12100e, wall: 0xd2c4b0, floor: 0xb4a48c, torch: 0xffa050, flame: 0xe06020 },
         };
         const ROOM_ACCENTS = {
             cell: 0xa8b0c0,
@@ -1038,12 +1072,13 @@
             sewer: 0x8a9a70,
             chapel: 0xe8d8b0,
             garden: 0x78a868,
+            cave: 0xb8a890,
         };
         const CARPET_ROOMS = new Set(['bedroom', 'chapel', 'dining', 'library', 'shrine']);
         const CARPET_SOMETIMES = new Set(['study', 'closet']);
-        const MUSHROOM_PALETTES = new Set(['moss', 'iron', 'sewer', 'stone']);
+        const MUSHROOM_PALETTES = new Set(['moss', 'iron', 'sewer', 'stone', 'cave']);
         const BLOOD_ROOMS = new Set(['crypt', 'cell', 'barracks', 'armory']);
-        const SLIME_ROOMS = new Set(['sewer', 'garden', 'well']);
+        const SLIME_ROOMS = new Set(['sewer', 'garden', 'well', 'cave']);
         const CLEAN_ROOMS = new Set(['chapel', 'bedroom']);
         const STAINED_WINDOW_ROOMS = new Set(['chapel', 'shrine', 'library']);
         const NIGHT_WINDOW_ROOMS = new Set(['bedroom', 'garden']);
@@ -1066,6 +1101,7 @@
             barracks: { wall: 'stone', floor: 'worn', ceil: 'stone' },
             chapel: { wall: 'stone', floor: 'flag', ceil: 'dark' },
             garden: { wall: 'vine', floor: 'dirt', ceil: 'vine' },
+            cave: { wall: 'cracked', floor: 'gravel', ceil: 'stone' },
         };
 
         function paletteOf(id) {
@@ -1090,6 +1126,8 @@
                 woodWallMat.color.lerp(new THREE.Color(0x88aa70), 0.22);
             } else if (id === 'gilt') {
                 woodWallMat.color.lerp(new THREE.Color(0xe8c878), 0.28);
+            } else if (id === 'cave') {
+                woodWallMat.color.lerp(new THREE.Color(0x8a7a68), 0.18);
             }
             metalWallMat.color.setHex(palette.wall);
             for (const mat of ceilMats) {
@@ -1101,6 +1139,7 @@
                     : id === 'crypt' ? 0xc0d0ff
                     : id === 'blood' ? 0xffc8c0
                     : id === 'gilt' ? 0xffe8c8
+                    : id === 'cave' ? 0xe8dcc8
                     : 0xffffff,
             );
             torch.color.setHex(palette.torch);
@@ -1119,6 +1158,9 @@
         }
 
         function pickHallWall(paletteId, roll) {
+            if (paletteId === 'cave') {
+                return roll === 1 ? 'stone' : 'cracked';
+            }
             if ((paletteId === 'iron' || paletteId === 'gilt') && (roll === 0 || roll === 2)) {
                 return 'metal';
             }
@@ -1161,6 +1203,9 @@
             if (kind === 'chapel' || kind === 'shrine') {
                 return roll === 1 ? 'cracked' : 'stone';
             }
+            if (kind === 'cave') {
+                return roll === 0 ? 'stone' : 'cracked';
+            }
             return theme.wall;
         }
 
@@ -1168,6 +1213,9 @@
             const room = roomContaining(rooms, x, z);
             const hash = Math.abs(x * 11 + z * 29);
             const theme = ROOM_THEMES[room?.kind];
+            if (room?.kind === 'cave') {
+                return ['gravel', 'gravel', 'dirt', 'dark', 'moss'][hash % 5];
+            }
             if (theme) {
                 if (theme.floor !== 'dirt' && MUSHROOM_PALETTES.has(paletteId) && hash % 11 === 2) {
                     return 'dirt';
@@ -1579,6 +1627,16 @@
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
         const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
         const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
+        const goblinMat = new THREE.MeshStandardMaterial({ color: 0x3a8a28, roughness: 0.72, metalness: 0.04 });
+        const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
+        const ghostMat = new THREE.MeshBasicMaterial({
+            color: 0xd8e8ff,
+            transparent: true,
+            opacity: 0.52,
+            depthWrite: false,
+            fog: false,
+            blending: THREE.AdditiveBlending,
+        });
         const mushStemMat = new THREE.MeshStandardMaterial({ color: 0xc8c2a8, roughness: 0.88, metalness: 0.02 });
         const mushCapMats = [
             new THREE.MeshStandardMaterial({ color: 0x5ee87a, emissive: 0x1f8a38, emissiveIntensity: 1.05, roughness: 0.48, metalness: 0.04 }),
@@ -1641,14 +1699,20 @@
             }
             return geo;
         }
-        const fencePostGeo = new THREE.BoxGeometry(0.08, 0.72, 0.08);
-        const fenceRailGeo = new THREE.BoxGeometry(0.94, 0.045, 0.045);
+        const fencePostGeo = new THREE.BoxGeometry(0.04, 0.72, 0.04);
+        const fenceRailGeo = new THREE.BoxGeometry(0.98, 0.03, 0.03);
         const windowPaneGeo = new THREE.PlaneGeometry(0.56, 0.78);
         const windowMullionVGeo = new THREE.BoxGeometry(0.035, 0.78, 0.045);
         const windowMullionHGeo = new THREE.BoxGeometry(0.56, 0.035, 0.045);
         const doorJambGeo = new THREE.BoxGeometry(0.12, WALL_H, 0.16);
         const doorLintelGeo = new THREE.BoxGeometry(1.02, 0.16, 0.18);
         const doorLeafGeo = new THREE.BoxGeometry(0.72, WALL_H * 0.78, 0.05);
+        const goblinBodyGeo = new THREE.CylinderGeometry(0.11, 0.15, 0.32, 6);
+        const goblinHeadGeo = new THREE.SphereGeometry(0.1, 8, 6);
+        const goblinEarGeo = new THREE.ConeGeometry(0.035, 0.12, 5);
+        const goblinEyeGeo = new THREE.BoxGeometry(0.025, 0.025, 0.02);
+        const ghostBodyGeo = new THREE.ConeGeometry(0.16, 0.72, 8);
+        const ghostHeadGeo = new THREE.SphereGeometry(0.13, 8, 6);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1662,7 +1726,11 @@
         let woodWallMesh = null;
         let metalWallMesh = null;
         let extraWallRoot = null;
+        let doorHinges = [];
         let hazardRoot = null;
+        let enemyRoot = null;
+        const enemyActors = new Map();
+        let lastHurtKey = '';
         let waterMeshes = [];
         let windowLights = [];
         let torchRoot = null;
@@ -1727,13 +1795,14 @@
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
+            goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
             doorWoodMat, doorIronMat,
             nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
-            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, mushStemMat, mushGlowMat, voidMat,
+            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinEyeMat, ghostMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat,
             ...floorMats, ...ceilMats, ...frameMats, ...mushCapMats, ...paintMats, ...clothMats,
             ...stainedGlassMats,
@@ -2347,12 +2416,133 @@
             disposeObject(extraWallRoot);
             extraWallRoot = null;
             windowLights = [];
+            doorHinges = [];
         }
 
         function clearHazards() {
             disposeObject(hazardRoot);
             hazardRoot = null;
             waterMeshes = [];
+        }
+
+        function clearEnemies() {
+            disposeObject(enemyRoot);
+            enemyRoot = null;
+            enemyActors.clear();
+        }
+
+        function makeGoblin() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(goblinBodyGeo, goblinMat);
+            body.position.y = 0.2;
+            const head = new THREE.Mesh(goblinHeadGeo, goblinMat);
+            head.position.y = 0.4;
+            const earL = new THREE.Mesh(goblinEarGeo, goblinMat);
+            earL.position.set(-0.07, 0.48, 0);
+            earL.rotation.z = 0.55;
+            const earR = new THREE.Mesh(goblinEarGeo, goblinMat);
+            earR.position.set(0.07, 0.48, 0);
+            earR.rotation.z = -0.55;
+            const eyeL = new THREE.Mesh(goblinEyeGeo, goblinEyeMat);
+            eyeL.position.set(-0.03, 0.42, 0.08);
+            const eyeR = new THREE.Mesh(goblinEyeGeo, goblinEyeMat);
+            eyeR.position.set(0.03, 0.42, 0.08);
+            group.add(body, head, earL, earR, eyeL, eyeR);
+            group.rotation.y = Math.PI;
+            return group;
+        }
+
+        function makeGhost() {
+            const group = new THREE.Group();
+            const sheet = new THREE.Mesh(ghostBodyGeo, ghostMat);
+            sheet.position.y = 0.4;
+            const head = new THREE.Mesh(ghostHeadGeo, ghostMat);
+            head.position.y = 0.72;
+            group.add(sheet, head);
+            group.userData.bob = Math.random() * Math.PI * 2;
+            return group;
+        }
+
+        function updateHpBar(state) {
+            const maxHp = Math.max(1, Number(state.maxHp) || 3);
+            const hp = Math.max(0, Math.min(maxHp, Number(state.hp ?? maxHp)));
+            hpFillEl.style.width = `${(hp / maxHp) * 100}%`;
+            hpEl.classList.toggle('mid', hp === 2);
+            hpEl.classList.toggle('low', hp <= 1);
+        }
+
+        function flashHurt(state) {
+            if (!state.lastAction?.hurt || !vignetteEl) {
+                return;
+            }
+            const key = `${state.worldId}:${state.hp}:${state.lastAction.command}:${state.lastAction.user}`;
+            if (key === lastHurtKey) {
+                return;
+            }
+            lastHurtKey = key;
+            vignetteEl.classList.add('hurt');
+            window.setTimeout(() => vignetteEl.classList.remove('hurt'), 320);
+        }
+
+        function syncEnemies(state, snap) {
+            if (!enemyRoot) {
+                enemyRoot = new THREE.Group();
+                scene.add(enemyRoot);
+            }
+            const live = new Set();
+            for (const enemy of state.enemies || []) {
+                live.add(enemy.id);
+                let actor = enemyActors.get(enemy.id);
+                if (!actor) {
+                    const group = enemy.kind === 'ghost' ? makeGhost() : makeGoblin();
+                    group.position.set(enemy.x * CELL, PROP_LIFT, enemy.y * CELL);
+                    enemyRoot.add(group);
+                    actor = {
+                        group,
+                        kind: enemy.kind,
+                        tx: enemy.x * CELL,
+                        tz: enemy.y * CELL,
+                        dying: false,
+                        dieAt: 0,
+                    };
+                    enemyActors.set(enemy.id, actor);
+                }
+                actor.tx = enemy.x * CELL;
+                actor.tz = enemy.y * CELL;
+                if (snap) {
+                    actor.group.position.x = actor.tx;
+                    actor.group.position.z = actor.tz;
+                }
+            }
+            for (const [id, actor] of enemyActors) {
+                if (!live.has(id) && !actor.dying) {
+                    actor.dying = true;
+                    actor.dieAt = clock.elapsedTime;
+                }
+            }
+        }
+
+        function updateEnemies(dt, t) {
+            const now = clock.elapsedTime;
+            for (const [id, actor] of [...enemyActors]) {
+                actor.group.position.x += (actor.tx - actor.group.position.x) * t;
+                actor.group.position.z += (actor.tz - actor.group.position.z) * t;
+                if (actor.kind === 'ghost') {
+                    actor.group.position.y = PROP_LIFT + 0.08 + Math.sin(now * 2.4 + (actor.group.userData.bob || 0)) * 0.05;
+                } else {
+                    actor.group.lookAt(targetPos.x, actor.group.position.y, targetPos.z);
+                    actor.group.rotateY(Math.PI);
+                }
+                if (actor.dying) {
+                    const fade = Math.max(0, 1 - (now - actor.dieAt) / 0.22);
+                    actor.group.scale.setScalar(Math.max(0.05, fade));
+                    if (fade <= 0) {
+                        enemyRoot.remove(actor.group);
+                        disposeObject(actor.group);
+                        enemyActors.delete(id);
+                    }
+                }
+            }
         }
 
         function isWalkable(cell) {
@@ -2493,6 +2683,30 @@
             return group;
         }
 
+        function makeStalagmite(hash = 0) {
+            const group = new THREE.Group();
+            const h = 0.32 + (hash % 5) * 0.09;
+            const r = 0.08 + (hash % 4) * 0.018;
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), crackedWallMat);
+            spike.position.y = h / 2;
+            const base = new THREE.Mesh(new THREE.SphereGeometry(r * 0.85, 6, 4), wallMat);
+            base.position.y = r * 0.45;
+            group.add(base, spike);
+            return group;
+        }
+
+        function makeBoulder(hash = 0) {
+            const group = new THREE.Group();
+            const big = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.26), crackedWallMat);
+            big.position.y = 0.11;
+            big.rotation.y = 0.22 + (hash % 5) * 0.08;
+            const small = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.18), wallMat);
+            small.position.set(0.1, 0.07, 0.05);
+            small.rotation.y = -0.3;
+            group.add(big, small);
+            return group;
+        }
+
         function makePlant() {
             const group = new THREE.Group();
             const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.12, 8), potMat);
@@ -2508,6 +2722,9 @@
         }
 
         function mushroomBudget(paletteId) {
+            if (paletteId === 'cave') {
+                return { max: 8, step: 3 };
+            }
             if (paletteId === 'moss') {
                 return { max: 7, step: 4 };
             }
@@ -2751,23 +2968,16 @@
 
         function makeFenceWall() {
             const group = new THREE.Group();
-            const posts = [
-                [-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38],
-                [0, -0.38], [0, 0.38], [-0.38, 0], [0.38, 0],
-            ];
-            for (const [lx, lz] of posts) {
+            for (const x of [-0.46, 0, 0.46]) {
                 const post = new THREE.Mesh(fencePostGeo, woodMat);
-                post.position.set(lx, 0.36, lz);
+                post.position.set(x, 0.36, 0);
                 post.castShadow = true;
                 group.add(post);
             }
-            for (const y of [0.26, 0.5]) {
-                for (const rot of [0, Math.PI / 2]) {
-                    const rail = new THREE.Mesh(fenceRailGeo, woodMat);
-                    rail.position.y = y;
-                    rail.rotation.y = rot;
-                    group.add(rail);
-                }
+            for (const y of [0.2, 0.38, 0.56]) {
+                const rail = new THREE.Mesh(fenceRailGeo, woodMat);
+                rail.position.y = y;
+                group.add(rail);
             }
             return group;
         }
@@ -2835,6 +3045,9 @@
             return doorWoodMat;
         }
 
+        const DOOR_CLOSED = 0;
+        const DOOR_OPEN = 1.45;
+
         function makeDoorway(kind) {
             const group = new THREE.Group();
             const frameMat = doorFrameMat(kind);
@@ -2849,18 +3062,22 @@
 
             const hinge = new THREE.Group();
             hinge.position.set(-0.38, 0, 0);
-            hinge.rotation.y = -0.48;
+            hinge.rotation.y = DOOR_CLOSED;
             const door = new THREE.Mesh(doorLeafGeo, doorLeafMat(kind));
             door.position.set(0.36, WALL_H * 0.42, 0);
             hinge.add(door);
 
-            group.add(frame, hinge);
+            group.add(frame);
+            if (kind !== 'cave') {
+                group.add(hinge);
+                group.userData.door = door;
+                group.userData.hinge = hinge;
+                door.castShadow = true;
+            }
             group.userData.frame = frame;
-            group.userData.door = door;
             for (const part of frame.children) {
                 part.castShadow = true;
             }
-            door.castShadow = true;
             return group;
         }
 
@@ -3164,6 +3381,14 @@
                     prop = makePlanter();
                 } else if (kind === 'well') {
                     prop = makeWell();
+                } else if (kind === 'cave') {
+                    prop = n >= 2 ? makeBoulder(group.hash) : makeStalagmite(group.hash);
+                    if (n >= 2) {
+                        const extra = makeStalagmite(group.hash + 3);
+                        extra.position.set(0.26, 0, 0.1);
+                        extra.scale.set(0.72, 0.72, 0.72);
+                        prop.add(extra);
+                    }
                 } else if (kind === 'cell' || kind === 'pantry' || kind === 'closet') {
                     if (kind === 'closet') {
                         prop = makeCabinet();
@@ -3356,6 +3581,7 @@
 
             const paintingSpots = openFaces
                 .filter((face) => face.propHash % 2 === 0)
+                .filter((face) => roomContaining(rooms, face.x, face.z)?.kind !== 'cave')
                 .sort((a, b) => a.propHash - b.propHash)
                 .slice(0, 12);
             const paintingFaces = new Set(paintingSpots.map((face) => faceKey(face.wx, face.wz, face.dx, face.dz)));
@@ -3378,6 +3604,9 @@
                 .slice(0, 10);
             for (const spot of wallSpots) {
                 const room = roomContaining(rooms, spot.x, spot.z);
+                if (room?.kind === 'cave') {
+                    continue;
+                }
                 let maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
                 if (room?.kind === 'armory' || room?.kind === 'barracks') {
                     maker = makeWeapons;
@@ -3421,6 +3650,8 @@
                     maker = makePlant;
                 } else if (room?.kind === 'kitchen') {
                     maker = makeBarrel;
+                } else if (room?.kind === 'cave') {
+                    maker = cell.hash % 2 === 0 ? makeStalagmite : makeBoulder;
                 }
                 const prop = maker(cell.hash);
                 prop.position.set(cell.x + dir.dx * 0.32, PROP_LIFT, cell.z + dir.dz * 0.32);
@@ -3438,7 +3669,10 @@
                 if (maker === makePit && ['cell', 'crypt', 'armory', 'barracks'].includes(room?.kind)) {
                     continue;
                 }
-                const prop = maker(cell.hash);
+                if (room?.kind === 'cave' && maker === makeRug) {
+                    continue;
+                }
+                const prop = room?.kind === 'cave' ? makeBoulder(cell.hash) : maker(cell.hash);
                 const ox = ((cell.hash % 5) - 2) * 0.06;
                 const oz = ((cell.hash % 3) - 1) * 0.06;
                 prop.position.set(cell.x + ox, PROP_LIFT, cell.z + oz);
@@ -3476,6 +3710,7 @@
             disposeMesh(metalWallMesh);
             clearExtraWalls();
             clearHazards();
+            clearEnemies();
             clearTorches();
             clearProps();
 
@@ -3598,6 +3833,7 @@
             for (let i = 0; i < fenceWalls.length; i += 2) {
                 const fence = makeFenceWall();
                 fence.position.set(fenceWalls[i], 0, fenceWalls[i + 1]);
+                fence.rotation.y = facingOpen(state.grid, fenceWalls[i], fenceWalls[i + 1]);
                 extraWallRoot.add(fence);
             }
             for (let i = 0; i < windowWalls.length; i += 2) {
@@ -3631,6 +3867,13 @@
                 door.rotation.y = yaw;
                 door.position.set(dx + Math.sin(yaw) * 0.5, 0, dz + Math.cos(yaw) * 0.5);
                 extraWallRoot.add(door);
+                if (door.userData.hinge) {
+                    doorHinges.push({
+                        hinge: door.userData.hinge,
+                        x: dx,
+                        z: dz,
+                    });
+                }
             }
             scene.add(extraWallRoot);
 
@@ -3788,7 +4031,16 @@
             const resume = showing && document.documentElement.classList.contains('paused');
             const worldId = Number(state.worldId) || 0;
             const worldChanged = shownWorldId !== null && worldId !== shownWorldId;
-            if (worldChanged) {
+            const died = Boolean(state.lastAction?.died);
+            if (died && !snap && shownWorldId !== null && worldChanged) {
+                if (transitioning) {
+                    pendingState = state;
+                    return;
+                }
+                startLevelTransition(state, true);
+                return;
+            }
+            if (worldChanged && !died) {
                 transitioning = false;
                 pendingState = null;
                 transitionEl.classList.remove('out', 'title');
@@ -3870,10 +4122,10 @@
             rafId = 0;
         }
 
-        function startLevelTransition(state) {
+        function startLevelTransition(state, died = false) {
             transitioning = true;
             pendingState = state;
-            transitionMsgEl.textContent = `Entering Level ${state.floor}`;
+            transitionMsgEl.textContent = died ? 'You died' : `Entering Level ${state.floor}`;
             transitionEl.classList.remove('title');
             transitionEl.classList.add('out');
 
@@ -3928,6 +4180,9 @@
             lastAt = state.at || lastAt;
 
             floorEl.textContent = String(state.floor ?? 0);
+            updateHpBar(state);
+            flashHurt(state);
+            syncEnemies(state, snap);
             const autoplaying = state.mode === 'autoplay';
             modeNameEl.textContent = state.mode === 'democracy' ? 'Democracy' : autoplaying ? 'Autoplay' : 'Anarchy';
             modeHintEl.textContent = autoplaying ? 'Chat !up to take over' : '';
@@ -4001,6 +4256,12 @@
             camPos.lerp(targetPos, t);
             camYaw = lerpAngle(camYaw, targetYaw, t);
             bump *= Math.exp(-dt * 9);
+            updateEnemies(dt, t);
+            for (const door of doorHinges) {
+                const nearby = Math.max(Math.abs(door.x - targetPos.x), Math.abs(door.z - targetPos.z)) <= 1.01;
+                const want = nearby ? DOOR_OPEN : DOOR_CLOSED;
+                door.hinge.rotation.y += (want - door.hinge.rotation.y) * t;
+            }
 
             const bob = Math.sin(clock.elapsedTime * 2.1) * 0.018;
             const lookX = -Math.sin(camYaw);

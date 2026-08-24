@@ -86,7 +86,7 @@ Images posted in Discord `#stream-dance` (override with `DISCORD_DANCE_CHANNEL`)
 
 ### Discord dungeon artwork
 
-Images posted in Discord `#artwork` are downloaded to `data/artwork` and used as random painting textures in the dungeon overlay. On startup the bot reads that channel’s history (needs **Read Message History**). New posts are picked up immediately but only appear on paintings after the next floor is built.
+Images posted in Discord `#artwork` (override with `DISCORD_ARTWORK_CHANNEL`) are downloaded to `data/artwork` and used as random painting textures in the dungeon overlay. On startup the bot reads that channel’s history (needs **Read Message History**). New posts are picked up immediately but only appear on paintings after the next floor is built. Canvas size and corner from `!dc bigger` / `!dc topright` are saved to `data/dungeon.json` so they survive bot restarts and OBS cache refresh.
 
 ## Run locally
 
@@ -107,6 +107,8 @@ Attach a volume (for example at `/data`) and set:
 TOKEN_PATH=/data/token.536204553.json
 COMMANDS_PATH=/data/commands.json
 DANCE_PATH=/data/gifs
+ARTWORK_PATH=/data/artwork
+DUNGEON_PATH=/data/dungeon.json
 ```
 
 The first boot writes the env token onto the volume. After that, Twitch refreshes persist across deploys. Without a volume, a refresh can invalidate the env token on the next restart.

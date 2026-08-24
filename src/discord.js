@@ -104,7 +104,7 @@ function isDanceChannelName(name) {
 }
 
 function artworkChannelName() {
-    return 'artwork';
+    return normalizeChannelName(process.env.DISCORD_ARTWORK_CHANNEL || 'artwork');
 }
 
 function isArtworkChannelName(name) {

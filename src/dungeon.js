@@ -1,3 +1,5 @@
+import { promises as fs } from 'fs';
+import path from 'path';
 import { createSseHub } from './sse.js';
 
 const FLOOR = 0;
@@ -33,6 +35,7 @@ const BASE_PATH = 4;
 const MIN_SIZE = 15;
 const MAX_SIZE = 31;
 const DEFAULT_CANVAS = { width: 640, height: 480 };
+const DEFAULT_ANCHOR = 'top-left';
 const CANVAS_STEPS = [
     { width: 480, height: 270 },
     { width: 640, height: 360 },
@@ -58,13 +61,13 @@ const ANCHORS = {
     br: 'bottom-right',
 };
 
-const PALETTE_IDS = ['stone', 'moss', 'ember', 'iron', 'blood', 'crypt', 'sewer', 'gilt'];
+const PALETTE_IDS = ['stone', 'moss', 'ember', 'iron', 'blood', 'crypt', 'sewer', 'gilt', 'cave'];
 const SMALL_KINDS = ['cell', 'pantry', 'closet', 'shrine', 'well'];
-const MEDIUM_KINDS = ['bedroom', 'kitchen', 'study', 'armory', 'forge', 'crypt', 'sewer'];
-const LARGE_KINDS = ['dining', 'library', 'barracks', 'chapel', 'garden'];
+const MEDIUM_KINDS = ['bedroom', 'kitchen', 'study', 'armory', 'forge', 'crypt', 'sewer', 'cave'];
+const LARGE_KINDS = ['dining', 'library', 'barracks', 'chapel', 'garden', 'cave'];
 const WINDOW_KINDS = new Set(['chapel', 'bedroom', 'garden', 'library', 'shrine']);
-const BREACH_KINDS = new Set(['forge', 'armory', 'crypt', 'barracks', 'sewer']);
-const WATER_KINDS = new Set(['garden', 'well', 'sewer']);
+const BREACH_KINDS = new Set(['forge', 'armory', 'crypt', 'barracks', 'sewer', 'cave']);
+const WATER_KINDS = new Set(['garden', 'well', 'sewer', 'cave']);
 const SPIKE_KINDS = new Set(['cell', 'crypt', 'armory', 'barracks']);
 const RARE_BREACH_KINDS = new Set(['chapel', 'bedroom']);
 
@@ -96,32 +99,219 @@ function isOpen(cell) {
     return cell === FLOOR || cell === EXIT || cell === DOOR;
 }
 
+const PLAYER_MAX_HP = 3;
+const GOBLIN_HP = 1;
+const GHOST_HP = 2;
+const GHOST_ROOMS = new Set(['crypt', 'chapel', 'shrine']);
+const GOBLIN_ROOMS = new Set(['armory', 'barracks']);
+
+function snapshotEnemies(enemies) {
+    return (enemies || []).map((enemy) => ({
+        id: enemy.id,
+        kind: enemy.kind,
+        x: enemy.x,
+        y: enemy.y,
+        hp: enemy.hp,
+    }));
+}
+
+function enemyAt(enemies, x, y, skipId) {
+    return (enemies || []).find((enemy) => enemy.x === x && enemy.y === y && enemy.id !== skipId) || null;
+}
+
+function roomKindAt(rooms, x, y) {
+    const room = (rooms || []).find((item) =>
+        x >= item.x && x < item.x + item.w && y >= item.y && y < item.y + item.h);
+    return room?.kind || 'hall';
+}
+
+function canEnemyStand(maze, x, y, skipId) {
+    const cell = maze.grid[y]?.[x];
+    if (cell !== FLOOR && cell !== DOOR) {
+        return false;
+    }
+    if (x === maze.player.x && y === maze.player.y) {
+        return false;
+    }
+    if (x === maze.exit.x && y === maze.exit.y) {
+        return false;
+    }
+    return !enemyAt(maze.enemies, x, y, skipId);
+}
+
+function manhattan(ax, ay, bx, by) {
+    return Math.abs(ax - bx) + Math.abs(ay - by);
+}
+
+function spawnCandidates(maze) {
+    const dist = distFrom(maze.grid, maze.player.x, maze.player.y);
+    const spots = [];
+    for (let y = 0; y < maze.height; y++) {
+        for (let x = 0; x < maze.width; x++) {
+            if (maze.grid[y][x] !== FLOOR) {
+                continue;
+            }
+            if ((x === maze.player.x && y === maze.player.y) || (x === maze.exit.x && y === maze.exit.y)) {
+                continue;
+            }
+            if ((dist[y]?.[x] ?? -1) < 4) {
+                continue;
+            }
+            spots.push({ x, y, kind: roomKindAt(maze.rooms, x, y) });
+        }
+    }
+    return shuffle(spots);
+}
+
+function takeSpots(spots, count, prefer) {
+    const preferred = spots.filter(prefer);
+    const other = spots.filter((spot) => !prefer(spot));
+    const taken = [...preferred, ...other].slice(0, count);
+    const used = new Set(taken.map((spot) => `${spot.x},${spot.y}`));
+    return {
+        taken,
+        rest: spots.filter((spot) => !used.has(`${spot.x},${spot.y}`)),
+    };
+}
+
+function spawnEnemies(maze, floor) {
+    maze.enemies = [];
+    if (floor <= 0) {
+        return maze;
+    }
+    const goblinCount = Math.min(3, 1 + Math.floor((floor - 1) / 3));
+    const ghostCount = floor < 2 ? 0 : Math.min(2, 1 + Math.floor((floor - 2) / 4));
+    let spots = spawnCandidates(maze);
+    let nextId = 1;
+    const ghosts = takeSpots(spots, ghostCount, (spot) => GHOST_ROOMS.has(spot.kind));
+    spots = ghosts.rest;
+    for (const spot of ghosts.taken) {
+        maze.enemies.push({ id: nextId, kind: 'ghost', x: spot.x, y: spot.y, hp: GHOST_HP });
+        nextId += 1;
+    }
+    const goblins = takeSpots(spots, goblinCount, (spot) => GOBLIN_ROOMS.has(spot.kind) || spot.kind === 'hall');
+    for (const spot of goblins.taken) {
+        maze.enemies.push({ id: nextId, kind: 'goblin', x: spot.x, y: spot.y, hp: GOBLIN_HP });
+        nextId += 1;
+    }
+    return maze;
+}
+
 function castFire(maze) {
     const { x, y, dir } = maze.player;
     const { dx, dy } = DIRS[dir];
+    const limit = maze.width + maze.height;
     let cx = x;
     let cy = y;
-    let hitX = x + dx;
-    let hitY = y + dy;
-    const limit = maze.width + maze.height;
     for (let i = 0; i < limit; i += 1) {
         const nx = cx + dx;
         const ny = cy + dy;
+        const foe = enemyAt(maze.enemies, nx, ny);
+        if (foe) {
+            return {
+                from: { x, y },
+                dir,
+                hit: { x: nx, y: ny },
+                hitKind: 'enemy',
+                enemyId: foe.id,
+            };
+        }
         if (!isOpen(maze.grid[ny]?.[nx])) {
-            hitX = nx;
-            hitY = ny;
-            break;
+            return {
+                from: { x, y },
+                dir,
+                hit: { x: nx, y: ny },
+                hitKind: 'wall',
+            };
         }
         cx = nx;
         cy = ny;
-        hitX = nx + dx;
-        hitY = ny + dy;
     }
     return {
         from: { x, y },
         dir,
-        hit: { x: hitX, y: hitY },
+        hit: { x: cx + dx, y: cy + dy },
+        hitKind: 'wall',
     };
+}
+
+function applyFireHit(maze, shot) {
+    const hits = [];
+    const killed = [];
+    if (shot?.hitKind !== 'enemy') {
+        return { hits, killed };
+    }
+    const enemy = (maze.enemies || []).find((item) => item.id === shot.enemyId);
+    if (!enemy) {
+        return { hits, killed };
+    }
+    enemy.hp -= 1;
+    hits.push({ id: enemy.id, kind: enemy.kind, x: enemy.x, y: enemy.y, hp: enemy.hp });
+    if (enemy.hp <= 0) {
+        killed.push({ id: enemy.id, kind: enemy.kind, x: enemy.x, y: enemy.y });
+        maze.enemies = maze.enemies.filter((item) => item.id !== enemy.id);
+    }
+    return { hits, killed };
+}
+
+function stepTowardOpen(maze, enemy) {
+    const dir = bestDirToward(maze.grid, enemy.x, enemy.y, maze.player.x, maze.player.y, 0);
+    if (dir == null) {
+        return;
+    }
+    const nx = enemy.x + DIRS[dir].dx;
+    const ny = enemy.y + DIRS[dir].dy;
+    if (canEnemyStand(maze, nx, ny, enemy.id)) {
+        enemy.x = nx;
+        enemy.y = ny;
+    }
+}
+
+function stepGhost(maze, enemy) {
+    let best = null;
+    let bestDist = manhattan(enemy.x, enemy.y, maze.player.x, maze.player.y);
+    for (const { dx, dy } of DIRS) {
+        const mx = enemy.x + dx;
+        const my = enemy.y + dy;
+        const nx = enemy.x + dx * 2;
+        const ny = enemy.y + dy * 2;
+        if (!isWallish(maze.grid[my]?.[mx])) {
+            continue;
+        }
+        if (!canEnemyStand(maze, nx, ny, enemy.id)) {
+            continue;
+        }
+        const dist = manhattan(nx, ny, maze.player.x, maze.player.y);
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = { x: nx, y: ny };
+        }
+    }
+    if (best) {
+        enemy.x = best.x;
+        enemy.y = best.y;
+        return;
+    }
+    stepTowardOpen(maze, enemy);
+}
+
+function stepEnemies(maze) {
+    for (const enemy of maze.enemies || []) {
+        if (enemy.kind === 'ghost') {
+            stepGhost(maze, enemy);
+        } else {
+            stepTowardOpen(maze, enemy);
+        }
+    }
+}
+
+function enemyMelee(maze) {
+    return (maze.enemies || []).some((enemy) =>
+        manhattan(enemy.x, enemy.y, maze.player.x, maze.player.y) === 1);
+}
+
+function enemyInFront(maze) {
+    return castFire(maze).hitKind === 'enemy';
 }
 
 function shuffle(items) {
@@ -388,6 +578,18 @@ function wallStyleForKind(kind, roll) {
         }
         return WALL;
     }
+    if (kind === 'cave') {
+        if (roll % 3 === 0) {
+            return BROKEN;
+        }
+        if (roll % 3 === 1) {
+            return HALF;
+        }
+        if (roll % 5 === 0) {
+            return HOLE;
+        }
+        return WALL;
+    }
     if (kind === 'crypt' || kind === 'sewer') {
         if (roll % 3 === 0) {
             return HOLE;
@@ -613,18 +815,22 @@ function placeRoomFurniture(grid, rooms, startX, startY, exitX, exitY) {
         } else if (kind === 'well') {
             const c = roomCenter(room);
             stamped = stampFurniture(grid, [[c.x, c.y]], startX, startY, exitX, exitY);
+        } else if (kind === 'cave') {
+            stamped = true;
         }
-        if (!stamped && one.length) {
-            stampFurniture(grid, one, startX, startY, exitX, exitY);
-        }
-        if (area > 30 && spots[2]) {
-            stampFurniture(grid, [spots[2]], startX, startY, exitX, exitY);
-        }
-        if (area > 30 && hash % 5 === 0) {
-            const c = roomCenter(room);
-            const px = c.x + (hash % 2);
-            const py = c.y + ((hash >> 1) % 2);
-            stampFurniture(grid, [[px, py]], startX, startY, exitX, exitY);
+        if (kind !== 'cave') {
+            if (!stamped && one.length) {
+                stampFurniture(grid, one, startX, startY, exitX, exitY);
+            }
+            if (area > 30 && spots[2]) {
+                stampFurniture(grid, [spots[2]], startX, startY, exitX, exitY);
+            }
+            if (area > 30 && hash % 5 === 0) {
+                const c = roomCenter(room);
+                const px = c.x + (hash % 2);
+                const py = c.y + ((hash >> 1) % 2);
+                stampFurniture(grid, [[px, py]], startX, startY, exitX, exitY);
+            }
         }
     }
 }
@@ -773,11 +979,12 @@ function generateCorridor() {
         exit,
         palette: paletteForFloor(0),
         rooms: [],
+        enemies: [],
     };
 }
 
 function mazePayload(size, grid, startX, startY, exit, rooms, floor) {
-    return {
+    const maze = {
         width: size,
         height: size,
         grid,
@@ -785,7 +992,10 @@ function mazePayload(size, grid, startX, startY, exit, rooms, floor) {
         exit,
         palette: paletteForFloor(floor),
         rooms: snapshotRooms(rooms),
+        enemies: [],
     };
+    spawnEnemies(maze, floor);
+    return maze;
 }
 
 function buildFloor(floor) {
@@ -822,6 +1032,22 @@ function buildFloor(floor) {
     return last || generateCorridor();
 }
 
+function layoutFilePath() {
+    return process.env.DUNGEON_PATH || './data/dungeon.json';
+}
+
+function clampCanvas(rawWidth, rawHeight) {
+    const nextWidth = Math.round(Number(rawWidth));
+    const nextHeight = Math.round(Number(rawHeight));
+    if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth < 1 || nextHeight < 1) {
+        return null;
+    }
+    return {
+        width: Math.min(1920, Math.max(160, nextWidth)),
+        height: Math.min(1080, Math.max(90, nextHeight)),
+    };
+}
+
 export function createDungeon() {
     const hub = createSseHub({ defaultType: 'dungeon' });
     let floor = 0;
@@ -842,9 +1068,10 @@ export function createDungeon() {
     let visible = true;
     let canvasWidth = DEFAULT_CANVAS.width;
     let canvasHeight = DEFAULT_CANVAS.height;
-    let anchor = 'top-left';
+    let anchor = DEFAULT_ANCHOR;
     let artwork = [];
     let worldId = 0;
+    let hp = PLAYER_MAX_HP;
 
     function snapshot() {
         return {
@@ -863,6 +1090,9 @@ export function createDungeon() {
             grid: cloneGrid(maze.grid),
             player: { ...maze.player },
             exit: { ...maze.exit },
+            enemies: snapshotEnemies(maze.enemies),
+            hp,
+            maxHp: PLAYER_MAX_HP,
             lastAction: lastAction ? { ...lastAction } : null,
             votes: mode === 'democracy' && voteEndsAt ? tally() : null,
             voteEndsAt: voteEndsAt ? new Date(voteEndsAt).toISOString() : null,
@@ -896,6 +1126,8 @@ export function createDungeon() {
         let bumped = false;
 
         if (command === 'fire') {
+            const shot = castFire(maze);
+            const { hits, killed } = applyFireHit(maze, shot);
             lastAction = {
                 command,
                 user: actor.user,
@@ -903,10 +1135,12 @@ export function createDungeon() {
                 bumped: false,
                 from,
                 to: { ...from },
-                shot: castFire(maze),
+                shot,
                 shotId: (shotSeq += 1),
+                hits,
+                killed,
             };
-            return { floorCleared: false, previousFloor: floor, bumped: false };
+            return { floorCleared: false, previousFloor: floor, bumped: false, died: false, hurt: false };
         }
 
         if (command === 'left') {
@@ -918,12 +1152,60 @@ export function createDungeon() {
             const nx = player.x + DIRS[facing].dx;
             const ny = player.y + DIRS[facing].dy;
             const cell = maze.grid[ny]?.[nx];
-            if (isOpen(cell)) {
+            if (isOpen(cell) && !enemyAt(maze.enemies, nx, ny)) {
                 player.x = nx;
                 player.y = ny;
             } else {
                 bumped = true;
             }
+        }
+
+        const onExit = maze.grid[player.y][player.x] === EXIT;
+        let floorCleared = false;
+        const previousFloor = floor;
+        let hurt = false;
+        let died = false;
+        if (onExit) {
+            floorCleared = true;
+            floor += 1;
+            maze = buildFloor(floor);
+            lastAction = {
+                command,
+                user: actor.user,
+                displayName: actor.displayName || actor.user,
+                bumped,
+                from,
+                to: { ...maze.player },
+            };
+            try {
+                onFloorClear?.({ previousFloor, floor });
+            } catch (err) {
+                console.error('Dungeon floor-clear announce failed', err);
+            }
+            return { floorCleared, previousFloor, bumped, died: false, hurt: false };
+        }
+
+        stepEnemies(maze);
+        if (enemyMelee(maze)) {
+            hp = Math.max(0, hp - 1);
+            hurt = true;
+        }
+        if (hp <= 0) {
+            died = true;
+            hp = PLAYER_MAX_HP;
+            worldId += 1;
+            maze = buildFloor(floor);
+            lastAction = {
+                command,
+                user: actor.user,
+                displayName: actor.displayName || actor.user,
+                bumped,
+                from,
+                to: { ...maze.player },
+                hurt: true,
+                died: true,
+            };
+            return { floorCleared: false, previousFloor: floor, bumped, died: true, hurt: true };
         }
 
         lastAction = {
@@ -933,24 +1215,11 @@ export function createDungeon() {
             bumped,
             from,
             to: { x: player.x, y: player.y, dir: player.dir },
+            hurt,
+            died: false,
         };
 
-        const onExit = maze.grid[player.y][player.x] === EXIT;
-        let floorCleared = false;
-        const previousFloor = floor;
-        if (onExit) {
-            floorCleared = true;
-            floor += 1;
-            maze = buildFloor(floor);
-            lastAction.to = { ...maze.player };
-            try {
-                onFloorClear?.({ previousFloor, floor });
-            } catch (err) {
-                console.error('Dungeon floor-clear announce failed', err);
-            }
-        }
-
-        return { floorCleared, previousFloor, bumped };
+        return { floorCleared, previousFloor, bumped, died, hurt };
     }
 
     function isSyntheticUser(user) {
@@ -995,9 +1264,13 @@ export function createDungeon() {
             return next === 'up' ? randomTurn() : next;
         };
 
+        if (enemyInFront(maze)) {
+            return 'fire';
+        }
+
         if (command === 'fire') {
             const { dx, dy } = DIRS[player.dir];
-            if (!isOpen(grid[player.y + dy]?.[player.x + dx])) {
+            if (!isOpen(grid[player.y + dy]?.[player.x + dx]) || enemyAt(maze.enemies, player.x + dx, player.y + dy)) {
                 return seekTurn(0.85);
             }
             return 'up';
@@ -1196,6 +1469,7 @@ export function createDungeon() {
         clearVotes();
         worldId += 1;
         floor = 0;
+        hp = PLAYER_MAX_HP;
         maze = buildFloor(floor);
         lastAction = null;
         lockedUntil = 0;
@@ -1231,22 +1505,54 @@ export function createDungeon() {
         return { ...snapshot(), changed };
     }
 
+    function persistLayout() {
+        const filePath = layoutFilePath();
+        const body = `${JSON.stringify({ canvasWidth, canvasHeight, anchor }, null, 2)}\n`;
+        fs.mkdir(path.dirname(path.resolve(filePath)), { recursive: true })
+            .then(() => fs.writeFile(filePath, body))
+            .catch((err) => {
+                console.error('Failed to save dungeon layout', err);
+            });
+    }
+
+    async function loadLayout() {
+        try {
+            const raw = await fs.readFile(layoutFilePath(), 'utf-8');
+            const data = JSON.parse(raw);
+            const size = clampCanvas(data?.canvasWidth, data?.canvasHeight);
+            if (size) {
+                canvasWidth = size.width;
+                canvasHeight = size.height;
+            }
+            const nextAnchor = ANCHORS[String(data?.anchor ?? '')
+                .trim()
+                .toLowerCase()
+                .replace(/[\s_]+/g, '')];
+            if (nextAnchor) {
+                anchor = nextAnchor;
+            }
+            emit();
+        } catch (err) {
+            if (err.code !== 'ENOENT') {
+                console.error('Failed to load dungeon layout', err);
+            }
+        }
+    }
+
     function setSize(rawWidth, rawHeight) {
-        const nextWidth = Math.round(Number(rawWidth));
-        const nextHeight = Math.round(Number(rawHeight));
-        if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth < 1 || nextHeight < 1) {
+        const size = clampCanvas(rawWidth, rawHeight);
+        if (!size) {
             const err = new Error('Usage: !dc size bigger|smaller|full');
             err.code = 'USAGE';
             throw err;
         }
-        const width = Math.min(1920, Math.max(160, nextWidth));
-        const height = Math.min(1080, Math.max(90, nextHeight));
-        if (canvasWidth === width && canvasHeight === height) {
+        if (canvasWidth === size.width && canvasHeight === size.height) {
             return { ...snapshot(), changed: false, action: 'size' };
         }
-        canvasWidth = width;
-        canvasHeight = height;
+        canvasWidth = size.width;
+        canvasHeight = size.height;
         emit();
+        persistLayout();
         return { ...snapshot(), changed: true, action: 'size' };
     }
 
@@ -1296,6 +1602,7 @@ export function createDungeon() {
         }
         anchor = next;
         emit();
+        persistLayout();
         return { ...snapshot(), changed: true, action: 'anchor' };
     }
 
@@ -1378,6 +1685,9 @@ export function createDungeon() {
     }
 
     scheduleIdle();
+    loadLayout().catch((err) => {
+        console.error('Failed to load dungeon layout', err);
+    });
 
     return {
         subscribe: hub.subscribe,

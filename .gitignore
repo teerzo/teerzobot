@@ -16,6 +16,9 @@ data/gifs/
 # Discord artwork used as dungeon paintings
 data/artwork/
 
+# Dungeon overlay canvas size and corner
+data/dungeon.json
+
 # Logs
 *.log
 npm-debug.log*

@@ -66,13 +66,17 @@
             border-radius: 0.5em;
         }
         #floor {
+            display: flex;
+            align-items: baseline;
+            gap: 0.35em;
+            white-space: nowrap;
             padding: 0.35em 0.6em;
             font-size: 0.9em;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
         #floor strong {
-            display: block;
+            display: inline;
             font-size: clamp(1.1em, 3.8cqw, 1.5em);
             letter-spacing: 0.02em;
             font-weight: 700;
@@ -232,7 +236,7 @@
     <div id="hud">
         <div id="vignette"></div>
         <div id="top">
-            <div id="floor">Floor<br><strong>0</strong></div>
+            <div id="floor">Floor <strong>0</strong></div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
         <div id="help">!up !down !left !right</div>
@@ -722,6 +726,16 @@
             { dx: 0, dz: 1 },
             { dx: -1, dz: 0 },
         ];
+        const FULL_WALL = 1;
+        const HALF_WALL = 3;
+        const BROKEN_WALL = 4;
+        const HOLE_WALL = 5;
+        const FENCE_WALL = 6;
+        const FURNITURE = 7;
+        const HALF_H = WALL_H * 0.5;
+        const BROKEN_H = WALL_H * 0.32;
+        const fencePostGeo = new THREE.BoxGeometry(0.08, 0.72, 0.08);
+        const fenceRailGeo = new THREE.BoxGeometry(0.94, 0.045, 0.045);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -729,6 +743,9 @@
         let wallMesh = null;
         let vineWallMesh = null;
         let crackedWallMesh = null;
+        let halfWallMesh = null;
+        let brokenWallMesh = null;
+        let extraWallRoot = null;
         let torchRoot = null;
         let torchLights = [];
         let propRoot = null;
@@ -783,6 +800,30 @@
             }
         }
 
+        function clearExtraWalls() {
+            if (extraWallRoot) {
+                scene.remove(extraWallRoot);
+                extraWallRoot = null;
+            }
+        }
+
+        function isWalkable(cell) {
+            return cell === 0 || cell === 2;
+        }
+
+        function isFloorTile(cell) {
+            return cell === 0 || cell === 2 || cell === FURNITURE;
+        }
+
+        function isFullWall(cell) {
+            return cell === FULL_WALL;
+        }
+
+        function isWallLike(cell) {
+            return cell === FULL_WALL || cell === HALF_WALL || cell === BROKEN_WALL
+                || cell === HOLE_WALL || cell === FENCE_WALL;
+        }
+
         function faceKey(wx, wz, dx, dz) {
             return `${wx},${wz},${dx},${dz}`;
         }
@@ -792,14 +833,14 @@
             for (let z = 0; z < height; z++) {
                 for (let x = 0; x < width; x++) {
                     const cell = grid[z][x];
-                    if (cell !== 0 && cell !== 2) {
+                    if (!isWalkable(cell)) {
                         continue;
                     }
                     for (let d = 0; d < 4; d++) {
                         const { dx, dz } = WALL_DIRS[d];
                         const wx = x + dx;
                         const wz = z + dz;
-                        if (grid[wz]?.[wx] !== 1) {
+                        if (!isFullWall(grid[wz]?.[wx])) {
                             continue;
                         }
                         faces.push({
@@ -956,6 +997,227 @@
             return group;
         }
 
+        function makeTable(width = 0.72, depth = 0.72) {
+            const group = new THREE.Group();
+            const top = new THREE.Mesh(new THREE.BoxGeometry(width, 0.05, depth), woodMat);
+            top.position.y = 0.42;
+            top.castShadow = true;
+            const legGeo = new THREE.BoxGeometry(0.05, 0.4, 0.05);
+            const ox = width / 2 - 0.08;
+            const oz = depth / 2 - 0.08;
+            for (const [lx, lz] of [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]]) {
+                const leg = new THREE.Mesh(legGeo, woodMat);
+                leg.position.set(lx, 0.2, lz);
+                group.add(leg);
+            }
+            group.add(top);
+            return group;
+        }
+
+        function makeDiningTable() {
+            const group = makeTable(1.55, 1.55);
+            const cloth = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.02, 1.32), clothMats[0]);
+            cloth.position.y = 0.45;
+            group.add(cloth);
+            const seats = [
+                [0, -0.82, 0],
+                [0, 0.82, Math.PI],
+                [-0.82, 0, Math.PI / 2],
+                [0.82, 0, -Math.PI / 2],
+            ];
+            for (const [dx, dz, rot] of seats) {
+                const chair = makeChair();
+                chair.position.set(dx, 0, dz);
+                chair.rotation.y = rot;
+                group.add(chair);
+            }
+            return group;
+        }
+
+        function makeBed() {
+            const group = new THREE.Group();
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.18, 1.15), woodMat);
+            frame.position.y = 0.16;
+            const mattress = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.12, 0.98), clothMats[1]);
+            mattress.position.y = 0.28;
+            const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.08, 0.72), clothMats[2]);
+            pillow.position.set(-0.52, 0.36, 0);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 1.18), woodMat);
+            head.position.set(-0.82, 0.35, 0);
+            group.add(frame, mattress, pillow, head);
+            return group;
+        }
+
+        function makeBookshelf() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.18, 0.3), woodMat);
+            body.position.y = 0.59;
+            body.castShadow = true;
+            group.add(body);
+            for (const y of [0.22, 0.52, 0.82, 1.12]) {
+                const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.03, 0.28), woodMat);
+                shelf.position.y = y;
+                group.add(shelf);
+            }
+            for (let i = 0; i < 8; i++) {
+                const book = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.18, 0.2),
+                    paintMats[i % paintMats.length],
+                );
+                book.position.set(-0.32 + (i % 4) * 0.2, 0.34 + Math.floor(i / 4) * 0.32, 0);
+                group.add(book);
+            }
+            return group;
+        }
+
+        function makeCabinet() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.74, 0.34), woodMat);
+            body.position.y = 0.37;
+            body.castShadow = true;
+            const door = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.04), woodMat);
+            door.position.set(-0.1, 0.4, 0.17);
+            const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), ironMat);
+            knob.position.set(-0.02, 0.4, 0.2);
+            group.add(body, door, knob);
+            return group;
+        }
+
+        function makeFenceWall() {
+            const group = new THREE.Group();
+            const posts = [
+                [-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38],
+                [0, -0.38], [0, 0.38], [-0.38, 0], [0.38, 0],
+            ];
+            for (const [lx, lz] of posts) {
+                const post = new THREE.Mesh(fencePostGeo, woodMat);
+                post.position.set(lx, 0.36, lz);
+                post.castShadow = true;
+                group.add(post);
+            }
+            for (const y of [0.26, 0.5]) {
+                for (const rot of [0, Math.PI / 2]) {
+                    const rail = new THREE.Mesh(fenceRailGeo, woodMat);
+                    rail.position.y = y;
+                    rail.rotation.y = rot;
+                    group.add(rail);
+                }
+            }
+            return group;
+        }
+
+        function makeHoleWall() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.02, WALL_H, 1.02), wallMat);
+            body.position.y = WALL_H / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            const holeZ = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 1.12), voidMat);
+            holeZ.position.y = 0.88;
+            const holeX = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.5, 0.42), voidMat);
+            holeX.position.y = 0.88;
+            group.add(body, holeZ, holeX);
+            return group;
+        }
+
+        function furnitureGroups(grid, width, height) {
+            const seen = new Set();
+            const groups = [];
+            for (let z = 0; z < height; z++) {
+                for (let x = 0; x < width; x++) {
+                    if (grid[z][x] !== FURNITURE || seen.has(`${x},${z}`)) {
+                        continue;
+                    }
+                    const cells = [];
+                    const queue = [[x, z]];
+                    seen.add(`${x},${z}`);
+                    for (let i = 0; i < queue.length; i++) {
+                        const [cx, cz] = queue[i];
+                        cells.push({ x: cx, z: cz });
+                        for (const dir of WALL_DIRS) {
+                            const nx = cx + dir.dx;
+                            const nz = cz + dir.dz;
+                            const key = `${nx},${nz}`;
+                            if (grid[nz]?.[nx] !== FURNITURE || seen.has(key)) {
+                                continue;
+                            }
+                            seen.add(key);
+                            queue.push([nx, nz]);
+                        }
+                    }
+                    let minx = cells[0].x;
+                    let maxx = cells[0].x;
+                    let minz = cells[0].z;
+                    let maxz = cells[0].z;
+                    for (const cell of cells) {
+                        minx = Math.min(minx, cell.x);
+                        maxx = Math.max(maxx, cell.x);
+                        minz = Math.min(minz, cell.z);
+                        maxz = Math.max(maxz, cell.z);
+                    }
+                    groups.push({
+                        cells,
+                        minx,
+                        maxx,
+                        minz,
+                        maxz,
+                        hash: Math.abs(minx * 31 + minz * 47 + cells.length * 13),
+                    });
+                }
+            }
+            return groups;
+        }
+
+        function facingFromWalls(grid, cells) {
+            for (const cell of cells) {
+                for (const dir of WALL_DIRS) {
+                    if (isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx])) {
+                        return Math.atan2(-dir.dx, -dir.dz);
+                    }
+                }
+            }
+            return 0;
+        }
+
+        function placeLargeFurniture(grid, width, height) {
+            for (const group of furnitureGroups(grid, width, height)) {
+                const n = group.cells.length;
+                const cx = (group.minx + group.maxx) / 2;
+                const cz = (group.minz + group.maxz) / 2;
+                const alongX = group.maxx - group.minx >= group.maxz - group.minz;
+                let prop;
+                if (n >= 4) {
+                    prop = group.hash % 3 === 0 ? makeBed() : makeDiningTable();
+                } else if (n >= 2) {
+                    if (group.hash % 2 === 0) {
+                        prop = makeTable(1.55, 0.7);
+                        const c1 = makeChair();
+                        c1.position.set(0, 0, -0.48);
+                        const c2 = makeChair();
+                        c2.position.set(0, 0, 0.48);
+                        c2.rotation.y = Math.PI;
+                        prop.add(c1, c2);
+                    } else {
+                        prop = makeBookshelf();
+                    }
+                } else if (group.hash % 3 === 0) {
+                    prop = makeCabinet();
+                } else if (group.hash % 3 === 1) {
+                    prop = makeTable();
+                } else {
+                    prop = makeCrate();
+                    prop.scale.set(1.7, 1.7, 1.7);
+                }
+                prop.position.set(cx, 0, cz);
+                if (n === 1 || (n === 2 && group.hash % 2 !== 0)) {
+                    prop.rotation.y = facingFromWalls(grid, group.cells);
+                } else {
+                    prop.rotation.y = alongX ? 0 : Math.PI / 2;
+                }
+                propRoot.add(prop);
+            }
+        }
+
         const WALL_PROP_MAKERS = [makeHole, makePainting, makeWeapons, makeBanner];
         const FLOOR_PROP_MAKERS = [makePlant, makeBarrel, makeCrate, makeChair];
         const DETAIL_PROP_MAKERS = [makePit, makeRug];
@@ -1030,7 +1292,7 @@
             const furniture = floorCells.filter((cell) => cell.hash % 7 === 0).slice(0, 12);
             const furnitureCells = new Set(furniture.map((cell) => `${cell.x},${cell.z}`));
             for (const cell of furniture) {
-                const walls = WALL_DIRS.filter((dir) => grid[cell.z + dir.dz]?.[cell.x + dir.dx] === 1);
+                const walls = WALL_DIRS.filter((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx]));
                 const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 1 };
                 const maker = FLOOR_PROP_MAKERS[cell.hash % FLOOR_PROP_MAKERS.length];
                 const prop = maker(cell.hash);
@@ -1052,6 +1314,7 @@
                 propRoot.add(prop);
             }
 
+            placeLargeFurniture(grid, width, height);
             scene.add(propRoot);
         }
 
@@ -1065,6 +1328,9 @@
             disposeMesh(wallMesh);
             disposeMesh(vineWallMesh);
             disposeMesh(crackedWallMesh);
+            disposeMesh(halfWallMesh);
+            disposeMesh(brokenWallMesh);
+            clearExtraWalls();
             clearTorches();
             clearProps();
 
@@ -1086,32 +1352,44 @@
             const stoneWalls = [];
             const vineWalls = [];
             const crackedWalls = [];
+            const halfWalls = [];
+            const brokenWalls = [];
+            const holeWalls = [];
+            const fenceWalls = [];
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
-                    if (state.grid[y][x] !== 1) {
-                        continue;
-                    }
-                    const kind = (x * 7 + y * 13) % 5;
-                    if (kind === 0) {
-                        vineWalls.push(x, y);
-                    } else if (kind === 1) {
-                        crackedWalls.push(x, y);
-                    } else {
-                        stoneWalls.push(x, y);
+                    const cell = state.grid[y][x];
+                    if (cell === FULL_WALL) {
+                        const kind = (x * 7 + y * 13) % 5;
+                        if (kind === 0) {
+                            vineWalls.push(x, y);
+                        } else if (kind === 1) {
+                            crackedWalls.push(x, y);
+                        } else {
+                            stoneWalls.push(x, y);
+                        }
+                    } else if (cell === HALF_WALL) {
+                        halfWalls.push(x, y);
+                    } else if (cell === BROKEN_WALL) {
+                        brokenWalls.push(x, y);
+                    } else if (cell === HOLE_WALL) {
+                        holeWalls.push(x, y);
+                    } else if (cell === FENCE_WALL) {
+                        fenceWalls.push(x, y);
                     }
                 }
             }
 
-            function buildWalls(positions, material) {
+            function buildWalls(positions, material, height, widthX = 1.02, widthZ = 1.02) {
                 const count = positions.length / 2 || 1;
-                const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.02, WALL_H, 1.02), material, count);
+                const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(widthX, height, widthZ), material, count);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 const dummy = new THREE.Object3D();
                 const color = new THREE.Color();
                 for (let i = 0; i < positions.length; i += 2) {
                     const index = i / 2;
-                    dummy.position.set(positions[i], WALL_H / 2, positions[i + 1]);
+                    dummy.position.set(positions[i], height / 2, positions[i + 1]);
                     dummy.updateMatrix();
                     mesh.setMatrixAt(index, dummy.matrix);
                     const shade = 0.88 + ((positions[i] * 13 + positions[i + 1] * 7) % 9) * 0.015;
@@ -1126,14 +1404,29 @@
                 return mesh;
             }
 
-            wallMesh = stoneWalls.length ? buildWalls(stoneWalls, wallMat) : null;
-            vineWallMesh = vineWalls.length ? buildWalls(vineWalls, vineWallMat) : null;
-            crackedWallMesh = crackedWalls.length ? buildWalls(crackedWalls, crackedWallMat) : null;
+            wallMesh = stoneWalls.length ? buildWalls(stoneWalls, wallMat, WALL_H) : null;
+            vineWallMesh = vineWalls.length ? buildWalls(vineWalls, vineWallMat, WALL_H) : null;
+            crackedWallMesh = crackedWalls.length ? buildWalls(crackedWalls, crackedWallMat, WALL_H) : null;
+            halfWallMesh = halfWalls.length ? buildWalls(halfWalls, wallMat, HALF_H) : null;
+            brokenWallMesh = brokenWalls.length ? buildWalls(brokenWalls, crackedWallMat, BROKEN_H, 0.94, 0.88) : null;
+
+            extraWallRoot = new THREE.Group();
+            for (let i = 0; i < holeWalls.length; i += 2) {
+                const hole = makeHoleWall();
+                hole.position.set(holeWalls[i], 0, holeWalls[i + 1]);
+                extraWallRoot.add(hole);
+            }
+            for (let i = 0; i < fenceWalls.length; i += 2) {
+                const fence = makeFenceWall();
+                fence.position.set(fenceWalls[i], 0, fenceWalls[i + 1]);
+                extraWallRoot.add(fence);
+            }
+            scene.add(extraWallRoot);
 
             const floorBuckets = FLOOR_KINDS.map(() => []);
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
-                    if (state.grid[y][x] === 1) {
+                    if (!isFloorTile(state.grid[y][x])) {
                         continue;
                     }
                     const kind = Math.abs(x * 11 + y * 29) % FLOOR_KINDS.length;

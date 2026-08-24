@@ -3,6 +3,11 @@ import { createSseHub } from './sse.js';
 const FLOOR = 0;
 const WALL = 1;
 const EXIT = 2;
+const HALF = 3;
+const BROKEN = 4;
+const HOLE = 5;
+const FENCE = 6;
+const FURNITURE = 7;
 
 const DIRS = [
     { dx: 0, dy: -1 },
@@ -16,8 +21,9 @@ const ANARCHY_LOCK_MS = 350;
 const DEMOCRACY_MS = 8_000;
 const IDLE_MS = 60_000;
 const AUTOPLAY_MS = 800;
-const MIN_SIZE = 11;
-const MAX_SIZE = 21;
+const BASE_PATH = 4;
+const MIN_SIZE = 15;
+const MAX_SIZE = 31;
 const DEFAULT_CANVAS = { width: 640, height: 480 };
 const CANVAS_STEPS = [
     { width: 480, height: 270 },
@@ -62,10 +68,8 @@ export function normalizeDungeonCommand(value) {
     return MOVES.has(command) ? command : null;
 }
 
-function sizeForFloor(floor) {
-    const n = MIN_SIZE + 2 * Math.max(0, floor - 1);
-    const odd = n % 2 === 0 ? n + 1 : n;
-    return Math.min(MAX_SIZE, odd);
+function isOpen(cell) {
+    return cell === FLOOR || cell === EXIT;
 }
 
 function shuffle(items) {
@@ -76,85 +80,10 @@ function shuffle(items) {
     return items;
 }
 
-function generateMaze(size) {
-    const grid = Array.from({ length: size }, () => Array(size).fill(WALL));
-    const startX = 1;
-    const startY = 1;
-    grid[startY][startX] = FLOOR;
-
-    const stack = [[startX, startY]];
-    const steps = [
-        [0, -2],
-        [2, 0],
-        [0, 2],
-        [-2, 0],
-    ];
-
-    while (stack.length) {
-        const [x, y] = stack[stack.length - 1];
-        const neighbors = shuffle(
-            steps
-                .map(([dx, dy]) => [x + dx, y + dy, dx, dy])
-                .filter(([nx, ny]) => nx > 0 && ny > 0 && nx < size - 1 && ny < size - 1 && grid[ny][nx] === WALL),
-        );
-        if (!neighbors.length) {
-            stack.pop();
-            continue;
-        }
-        const [nx, ny, dx, dy] = neighbors[0];
-        grid[y + dy / 2][x + dx / 2] = FLOOR;
-        grid[ny][nx] = FLOOR;
-        stack.push([nx, ny]);
-    }
-
-    return { grid, startX, startY };
-}
-
-function farthestCell(grid, startX, startY) {
-    const height = grid.length;
-    const width = grid[0].length;
-    const dist = Array.from({ length: height }, () => Array(width).fill(-1));
-    const queue = [[startX, startY]];
-    dist[startY][startX] = 0;
-    let best = [startX, startY];
-    let bestDist = 0;
-
-    while (queue.length) {
-        const [x, y] = queue.shift();
-        for (const { dx, dy } of DIRS) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (ny < 0 || nx < 0 || ny >= height || nx >= width) {
-                continue;
-            }
-            if (grid[ny][nx] === WALL || dist[ny][nx] >= 0) {
-                continue;
-            }
-            dist[ny][nx] = dist[y][x] + 1;
-            queue.push([nx, ny]);
-            if (dist[ny][nx] > bestDist) {
-                bestDist = dist[ny][nx];
-                best = [nx, ny];
-            }
-        }
-    }
-
-    return { x: best[0], y: best[1] };
-}
-
-function isOpen(cell) {
-    return cell === FLOOR || cell === EXIT;
-}
-
-function openDir(grid, x, y) {
-    for (let dir = 0; dir < 4; dir++) {
-        const nx = x + DIRS[dir].dx;
-        const ny = y + DIRS[dir].dy;
-        if (isOpen(grid[ny]?.[nx])) {
-            return dir;
-        }
-    }
-    return 0;
+function sizeForFloor(floor) {
+    const n = MIN_SIZE + 2 * Math.max(0, floor - 1);
+    const odd = n % 2 === 0 ? n + 1 : n;
+    return Math.min(MAX_SIZE, odd);
 }
 
 function distFrom(grid, ox, oy) {
@@ -182,6 +111,240 @@ function distFrom(grid, ox, oy) {
         }
     }
     return dist;
+}
+
+function pickExit(grid, startX, startY, minDist) {
+    const dist = distFrom(grid, startX, startY);
+    const height = grid.length;
+    const width = grid[0].length;
+    let best = null;
+    let bestDist = -1;
+    let fallback = null;
+    let fallbackDist = -1;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (!isOpen(grid[y][x]) || (x === startX && y === startY)) {
+                continue;
+            }
+            const d = dist[y][x];
+            if (d < 0) {
+                continue;
+            }
+            if (d > fallbackDist) {
+                fallbackDist = d;
+                fallback = { x, y };
+            }
+            if (d >= minDist && d > bestDist) {
+                bestDist = d;
+                best = { x, y };
+            }
+        }
+    }
+    return best || fallback;
+}
+
+function roomsOverlap(a, b, gap) {
+    return !(a.x + a.w + gap <= b.x || b.x + b.w + gap <= a.x || a.y + a.h + gap <= b.y || b.y + b.h + gap <= a.y);
+}
+
+function roomCenter(room) {
+    return {
+        x: room.x + Math.floor(room.w / 2),
+        y: room.y + Math.floor(room.h / 2),
+    };
+}
+
+function carveRoom(grid, room) {
+    for (let y = room.y; y < room.y + room.h; y++) {
+        for (let x = room.x; x < room.x + room.w; x++) {
+            grid[y][x] = FLOOR;
+        }
+    }
+}
+
+function carveLine(grid, x0, y0, x1, y1) {
+    let x = x0;
+    let y = y0;
+    const sx = Math.sign(x1 - x0);
+    const sy = Math.sign(y1 - y0);
+    grid[y][x] = FLOOR;
+    while (x !== x1) {
+        x += sx;
+        grid[y][x] = FLOOR;
+    }
+    while (y !== y1) {
+        y += sy;
+        grid[y][x] = FLOOR;
+    }
+}
+
+function carveHall(grid, a, b) {
+    if (Math.random() < 0.5) {
+        carveLine(grid, a.x, a.y, b.x, a.y);
+        carveLine(grid, b.x, a.y, b.x, b.y);
+    } else {
+        carveLine(grid, a.x, a.y, a.x, b.y);
+        carveLine(grid, a.x, b.y, b.x, b.y);
+    }
+}
+
+function generateRooms(size) {
+    const grid = Array.from({ length: size }, () => Array(size).fill(WALL));
+    const rooms = [];
+    const want = Math.min(8, 3 + Math.floor(size / 6));
+    for (let t = 0; t < 90 && rooms.length < want; t++) {
+        const w = 3 + Math.floor(Math.random() * 5);
+        const h = 3 + Math.floor(Math.random() * 5);
+        const x = 1 + Math.floor(Math.random() * Math.max(1, size - w - 2));
+        const y = 1 + Math.floor(Math.random() * Math.max(1, size - h - 2));
+        const room = { x, y, w, h };
+        if (x + w >= size - 1 || y + h >= size - 1) {
+            continue;
+        }
+        if (rooms.some((other) => roomsOverlap(room, other, 1))) {
+            continue;
+        }
+        rooms.push(room);
+        carveRoom(grid, room);
+    }
+    if (!rooms.length) {
+        const room = { x: 1, y: 1, w: Math.min(7, size - 4), h: Math.min(5, size - 4) };
+        rooms.push(room);
+        carveRoom(grid, room);
+    }
+    const order = shuffle(rooms.slice());
+    for (let i = 1; i < order.length; i++) {
+        carveHall(grid, roomCenter(order[i - 1]), roomCenter(order[i]));
+    }
+    const start = roomCenter(rooms[0]);
+    return { grid, startX: start.x, startY: start.y, rooms };
+}
+
+function touchesRoom(x, y, rooms) {
+    return rooms.some((room) =>
+        x >= room.x - 1 && x < room.x + room.w + 1 && y >= room.y - 1 && y < room.y + room.h + 1
+        && !(x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h));
+}
+
+function styleInteriorWalls(grid, rooms) {
+    const height = grid.length;
+    const width = grid[0].length;
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            if (grid[y][x] !== WALL || !touchesRoom(x, y, rooms)) {
+                continue;
+            }
+            const kind = Math.abs(x * 7 + y * 13) % 7;
+            if (kind === 0) {
+                grid[y][x] = HALF;
+            } else if (kind === 1) {
+                grid[y][x] = BROKEN;
+            } else if (kind === 2) {
+                grid[y][x] = HOLE;
+            } else if (kind === 3) {
+                grid[y][x] = FENCE;
+            }
+        }
+    }
+}
+
+function pathExists(grid, ax, ay, bx, by) {
+    return (distFrom(grid, ax, ay)[by]?.[bx] ?? -1) >= 0;
+}
+
+function stampFurniture(grid, cells, startX, startY, exitX, exitY) {
+    for (const [x, y] of cells) {
+        if (grid[y]?.[x] !== FLOOR) {
+            return false;
+        }
+        if ((x === startX && y === startY) || (x === exitX && y === exitY)) {
+            return false;
+        }
+    }
+    for (const [x, y] of cells) {
+        grid[y][x] = FURNITURE;
+    }
+    if (!pathExists(grid, startX, startY, exitX, exitY)) {
+        for (const [x, y] of cells) {
+            grid[y][x] = FLOOR;
+        }
+        return false;
+    }
+    return true;
+}
+
+function wallSideCells(room, grid) {
+    const spots = [];
+    for (let x = room.x; x < room.x + room.w; x++) {
+        for (let y = room.y; y < room.y + room.h; y++) {
+            if (grid[y][x] !== FLOOR) {
+                continue;
+            }
+            const against = DIRS.some(({ dx, dy }) => {
+                const cell = grid[y + dy]?.[x + dx];
+                return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE || cell === FENCE;
+            });
+            if (against) {
+                spots.push([x, y]);
+            }
+        }
+    }
+    return shuffle(spots);
+}
+
+function placeRoomFurniture(grid, rooms, startX, startY, exitX, exitY) {
+    for (const room of rooms) {
+        const area = room.w * room.h;
+        if (area < 9) {
+            continue;
+        }
+        const hash = Math.abs(room.x * 31 + room.y * 47);
+        const spots = wallSideCells(room, grid);
+        if (area <= 15) {
+            const cell = spots[0];
+            if (cell) {
+                stampFurniture(grid, [cell], startX, startY, exitX, exitY);
+            }
+            continue;
+        }
+        if (area <= 30) {
+            const origin = spots[0];
+            if (!origin) {
+                continue;
+            }
+            const [x, y] = origin;
+            const pair = hash % 2 === 0 ? [[x, y], [x + 1, y]] : [[x, y], [x, y + 1]];
+            if (!stampFurniture(grid, pair, startX, startY, exitX, exitY) && spots[1]) {
+                stampFurniture(grid, [spots[1]], startX, startY, exitX, exitY);
+            }
+            continue;
+        }
+        const cx = room.x + Math.floor(room.w / 2) - 1;
+        const cy = room.y + Math.floor(room.h / 2) - 1;
+        const block = [
+            [cx, cy],
+            [cx + 1, cy],
+            [cx, cy + 1],
+            [cx + 1, cy + 1],
+        ];
+        if (!stampFurniture(grid, block, startX, startY, exitX, exitY)) {
+            const cell = spots[0];
+            if (cell) {
+                stampFurniture(grid, [cell], startX, startY, exitX, exitY);
+            }
+        }
+    }
+}
+
+function openDir(grid, x, y) {
+    for (let dir = 0; dir < 4; dir++) {
+        const nx = x + DIRS[dir].dx;
+        const ny = y + DIRS[dir].dy;
+        if (isOpen(grid[ny]?.[nx])) {
+            return dir;
+        }
+    }
+    return 0;
 }
 
 function bestDirToward(grid, x, y, tx, ty, facing) {
@@ -253,17 +416,37 @@ function buildFloor(floor) {
     if (floor <= 0) {
         return generateCorridor();
     }
-    const size = sizeForFloor(floor);
-    const { grid, startX, startY } = generateMaze(size);
-    const exit = farthestCell(grid, startX, startY);
-    grid[exit.y][exit.x] = EXIT;
-    return {
-        width: size,
-        height: size,
-        grid,
-        player: { x: startX, y: startY, dir: openDir(grid, startX, startY) },
-        exit,
-    };
+    const targetPath = BASE_PATH + floor;
+    let size = sizeForFloor(floor);
+    let last = null;
+    for (let attempt = 0; attempt < 14; attempt++) {
+        const { grid, startX, startY, rooms } = generateRooms(size);
+        const exit = pickExit(grid, startX, startY, targetPath);
+        if (!exit) {
+            if (size < MAX_SIZE) {
+                size = Math.min(MAX_SIZE, size + 2);
+            }
+            continue;
+        }
+        grid[exit.y][exit.x] = EXIT;
+        styleInteriorWalls(grid, rooms);
+        placeRoomFurniture(grid, rooms, startX, startY, exit.x, exit.y);
+        last = {
+            width: size,
+            height: size,
+            grid,
+            player: { x: startX, y: startY, dir: openDir(grid, startX, startY) },
+            exit,
+        };
+        const dist = distFrom(grid, startX, startY)[exit.y][exit.x];
+        if (dist >= targetPath) {
+            return last;
+        }
+        if (size < MAX_SIZE) {
+            size = Math.min(MAX_SIZE, size + 2);
+        }
+    }
+    return last || generateCorridor();
 }
 
 export function createDungeon() {

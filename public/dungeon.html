@@ -1177,6 +1177,125 @@
             return canvas;
         }
 
+        function makeClutterCanvas(colors, paint) {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    ctx.fillStyle = colors[(x * 13 + y * 17 + x * y) % colors.length];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            paint?.(ctx, size);
+            return canvas;
+        }
+
+        function makeStrawCanvas() {
+            return makeClutterCanvas(['#c4a24a', '#a88838', '#d8b85a', '#8a6a28'], (ctx, size) => {
+                ctx.fillStyle = '#6a5018';
+                for (let i = 0; i < 18; i++) {
+                    ctx.fillRect((i * 7) % size, (i * 11) % size, 1, 6 + (i % 5));
+                }
+            });
+        }
+
+        function makeSackclothCanvas() {
+            return makeClutterCanvas(['#c8b48a', '#b49a72', '#d4c09a', '#9a8058'], (ctx, size) => {
+                ctx.fillStyle = 'rgba(60,40,20,0.35)';
+                for (let y = 0; y < size; y += 4) {
+                    ctx.fillRect(0, y, size, 1);
+                }
+                for (let x = 0; x < size; x += 4) {
+                    ctx.fillRect(x, 0, 1, size);
+                }
+            });
+        }
+
+        function makeLinenCanvas() {
+            return makeClutterCanvas(['#e8e0d4', '#d4ccc0', '#f0ece4', '#c8c0b4'], (ctx, size) => {
+                ctx.fillStyle = '#b0a898';
+                ctx.fillRect(4, 8, 24, 2);
+                ctx.fillRect(8, 18, 18, 2);
+            });
+        }
+
+        function makeBoneCanvas() {
+            return makeClutterCanvas(['#e8dcc4', '#d4c8b0', '#f0e8d4', '#c4b898'], (ctx, size) => {
+                ctx.fillStyle = '#8a7a68';
+                ctx.fillRect(10, 4, 1, 20);
+                ctx.fillRect(6, 14, 18, 1);
+                ctx.fillRect(20, 8, 1, 12);
+            });
+        }
+
+        function makeRustCanvas() {
+            return makeClutterCanvas(['#8a4a28', '#6a3820', '#a85a30', '#4a2818', '#c07038'], (ctx, size) => {
+                ctx.fillStyle = '#2a1810';
+                ctx.fillRect(2, 2, size - 4, 1);
+                ctx.fillRect(2, 2, 1, size - 4);
+            });
+        }
+
+        function makeWaxCanvas() {
+            return makeClutterCanvas(['#f0e8d0', '#e0d4b8', '#fff8e8', '#c8b890'], (ctx, size) => {
+                ctx.fillStyle = '#a89060';
+                for (let i = 0; i < 8; i++) {
+                    ctx.fillRect(4 + i * 3, 6 + (i % 4) * 5, 2, 8);
+                }
+            });
+        }
+
+        function makeCrystalCanvas() {
+            return makeClutterCanvas(['#a8d8f0', '#88c0e0', '#d0f0ff', '#68a0c8'], (ctx, size) => {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(8, 4, 2, 12);
+                ctx.fillRect(14, 10, 10, 2);
+                ctx.fillStyle = '#406888';
+                ctx.fillRect(20, 16, 1, 10);
+            });
+        }
+
+        function makeSlimeClutterCanvas() {
+            return makeClutterCanvas(['#4a6a28', '#3a5a18', '#6a8a30', '#2a4010'], (ctx, size) => {
+                ctx.fillStyle = '#8ab848';
+                ctx.beginPath();
+                ctx.ellipse(16, 18, 8, 6, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function makeGoldTrimCanvas() {
+            return makeClutterCanvas(['#e8c878', '#c4a24a', '#f0d890', '#8a7030'], (ctx, size) => {
+                ctx.fillStyle = '#fff4c0';
+                ctx.fillRect(2, 2, 28, 2);
+                ctx.fillRect(2, 28, 28, 2);
+                ctx.fillRect(2, 2, 2, 28);
+                ctx.fillRect(28, 2, 2, 28);
+                ctx.fillRect(14, 14, 4, 4);
+            });
+        }
+
+        function makeScrollCanvas() {
+            return makeClutterCanvas(['#e8dcc0', '#d4c8a8', '#f0e8d0', '#c4b490'], (ctx, size) => {
+                ctx.fillStyle = '#6a5a40';
+                for (let y = 6; y < 28; y += 4) {
+                    ctx.fillRect(4, y, 20 + (y % 8), 1);
+                }
+            });
+        }
+
+        function makeHamCanvas() {
+            return makeClutterCanvas(['#c46858', '#a84840', '#e08870', '#8a3028'], (ctx, size) => {
+                ctx.fillStyle = '#f0c0a8';
+                ctx.fillRect(10, 8, 12, 4);
+                ctx.fillStyle = '#5a2018';
+                ctx.fillRect(6, 14, 20, 2);
+            });
+        }
+
         function makeFloorCanvas(kind) {
             const size = 32;
             const canvas = document.createElement('canvas');
@@ -2132,6 +2251,50 @@
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
         const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
         const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
+        const strawMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeStrawCanvas(), 1, 1), roughness: 0.95, metalness: 0,
+        });
+        const sackclothMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeSackclothCanvas(), 1, 1), roughness: 0.92, metalness: 0,
+        });
+        const linenMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeLinenCanvas(), 1, 1), roughness: 0.88, metalness: 0,
+        });
+        const boneMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeBoneCanvas(), 1, 1), roughness: 0.78, metalness: 0.04,
+        });
+        const rustMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeRustCanvas(), 1, 1), roughness: 0.72, metalness: 0.22,
+        });
+        const waxMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeWaxCanvas(), 1, 1), roughness: 0.55, metalness: 0,
+        });
+        const crystalMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeCrystalCanvas(), 1, 1),
+            roughness: 0.28,
+            metalness: 0.12,
+            emissive: 0x224466,
+            emissiveIntensity: 0.45,
+        });
+        const slimeClutterMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeSlimeClutterCanvas(), 1, 1),
+            roughness: 0.35,
+            metalness: 0.08,
+            emissive: 0x1a3a08,
+            emissiveIntensity: 0.25,
+        });
+        const goldTrimMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeGoldTrimCanvas(), 1, 1), roughness: 0.4, metalness: 0.45,
+        });
+        const scrollMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeScrollCanvas(), 1, 1), roughness: 0.9, metalness: 0,
+        });
+        const hamMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeHamCanvas(), 1, 1), roughness: 0.7, metalness: 0,
+        });
+        const inkMat = new THREE.MeshStandardMaterial({ color: 0x1a1420, roughness: 0.5, metalness: 0.1 });
+        const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1816, roughness: 0.95, metalness: 0.05 });
+        const tinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4a8, roughness: 0.35, metalness: 0.55 });
         const goblinMat = new THREE.MeshStandardMaterial({ color: 0x3a8a28, roughness: 0.72, metalness: 0.04 });
         const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
         const ghostMat = new THREE.MeshBasicMaterial({
@@ -2319,7 +2482,8 @@
             nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinEyeMat, ghostMat, mushStemMat, mushGlowMat, voidMat,
-            goldMat, pillarMat,
+            goldMat, pillarMat, strawMat, sackclothMat, linenMat, boneMat, rustMat, waxMat, crystalMat, slimeClutterMat,
+            goldTrimMat, scrollMat, hamMat, inkMat, coalMat, tinMat,
             ...floorMats, ...ceilMats, ...frameMats, ...mushCapMats, ...paintMats, ...clothMats,
             ...stainedGlassMats,
         ]);
@@ -3348,6 +3512,825 @@
             return group;
         }
 
+        function makeBucket() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 8), rustMat);
+            body.position.y = 0.06;
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.008, 6, 10), ironMat);
+            rim.rotation.x = Math.PI / 2;
+            rim.position.y = 0.12;
+            const handle = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.007, 5, 8, Math.PI), rustMat);
+            handle.position.y = 0.14;
+            group.add(body, rim, handle);
+            return group;
+        }
+
+        function makeSack() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), sackclothMat);
+            body.scale.set(1, 0.85, 0.92);
+            body.position.y = 0.08;
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.06, 6), sackclothMat);
+            neck.position.y = 0.16;
+            group.add(body, neck);
+            return group;
+        }
+
+        function makeGrainSack() {
+            const group = makeSack();
+            group.scale.set(1.15, 1.05, 1.1);
+            const patch = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.01), strawMat);
+            patch.position.set(0.06, 0.08, 0.08);
+            group.add(patch);
+            return group;
+        }
+
+        function makeCandleCluster(hash = 0) {
+            const group = new THREE.Group();
+            const n = 2 + (hash % 3);
+            for (let i = 0; i < n; i++) {
+                const h = 0.08 + ((hash + i) % 4) * 0.02;
+                const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.018, h, 6), waxMat);
+                const x = (i - (n - 1) / 2) * 0.045;
+                stick.position.set(x, h / 2, (i % 2) * 0.02);
+                const flame = new THREE.Mesh(torchFlameGeo, torchFlameMat);
+                flame.scale.set(0.45, 0.55, 0.45);
+                flame.position.set(x, h + 0.03, (i % 2) * 0.02);
+                group.add(stick, flame);
+            }
+            const puddle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.015, 8), waxMat);
+            puddle.position.y = 0.008;
+            group.add(puddle);
+            return group;
+        }
+
+        function makeFloorLantern() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.04, 8), rustMat);
+            base.position.y = 0.02;
+            const cage = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), ironMat);
+            cage.position.y = 0.1;
+            const flame = new THREE.Mesh(torchFlameGeo, torchFlameMat);
+            flame.scale.set(0.7, 0.85, 0.7);
+            flame.position.y = 0.1;
+            const cap = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.04, 8), rustMat);
+            cap.position.y = 0.18;
+            group.add(base, cage, flame, cap);
+            return group;
+        }
+
+        function makeBonePile(hash = 0) {
+            const group = new THREE.Group();
+            for (let i = 0; i < 4; i++) {
+                const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.16 + (i % 3) * 0.03, 5), boneMat);
+                bone.position.set(((i % 2) * 2 - 1) * 0.04, 0.03 + i * 0.012, ((hash + i) % 3 - 1) * 0.03);
+                bone.rotation.set(0.4 + i * 0.2, i * 0.7, 0.3);
+                group.add(bone);
+            }
+            const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), boneMat);
+            knuckle.position.set(0.02, 0.04, -0.02);
+            group.add(knuckle);
+            return group;
+        }
+
+        function makeBone() {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.2, 6), boneMat);
+            shaft.position.y = 0.04;
+            shaft.rotation.z = 0.85;
+            const knobby = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 5), boneMat);
+            knobby.position.set(-0.07, 0.03, 0);
+            const knobby2 = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 5), boneMat);
+            knobby2.position.set(0.08, 0.06, 0);
+            group.add(shaft, knobby, knobby2);
+            return group;
+        }
+
+        function makeBrokenStool() {
+            const group = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 8), woodMat);
+            seat.position.y = 0.14;
+            seat.rotation.z = 0.35;
+            const legA = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.16, 0.025), woodMat);
+            legA.position.set(-0.05, 0.07, -0.04);
+            const legB = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.025), woodMat);
+            legB.position.set(0.05, 0.05, 0.04);
+            legB.rotation.z = 0.5;
+            group.add(seat, legA, legB);
+            return group;
+        }
+
+        function makeStackedBowls() {
+            const group = new THREE.Group();
+            for (let i = 0; i < 3; i++) {
+                const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.07 - i * 0.008, 0.05, 0.035, 8), potMat);
+                bowl.position.y = 0.02 + i * 0.032;
+                group.add(bowl);
+            }
+            return group;
+        }
+
+        function makeRopeCoil() {
+            const group = new THREE.Group();
+            const coil = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.028, 6, 12), sackclothMat);
+            coil.rotation.x = Math.PI / 2;
+            coil.position.y = 0.03;
+            const inner = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.02, 6, 10), sackclothMat);
+            inner.rotation.x = Math.PI / 2;
+            inner.position.y = 0.045;
+            group.add(coil, inner);
+            return group;
+        }
+
+        function makeHangingChain() {
+            const group = new THREE.Group();
+            for (let i = 0; i < 6; i++) {
+                const link = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.008, 5, 8), rustMat);
+                link.position.y = -i * 0.055;
+                link.rotation.y = i % 2 ? Math.PI / 2 : 0;
+                group.add(link);
+            }
+            group.userData.wallY = 1.22;
+            return group;
+        }
+
+        function makeDebrisPile(hash = 0) {
+            const group = new THREE.Group();
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.06), woodMat);
+            plank.position.set(0, 0.025, 0.02);
+            plank.rotation.y = 0.4;
+            const shard = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.1), rustMat);
+            shard.position.set(0.06, 0.03, -0.04);
+            shard.rotation.y = -0.5;
+            const scrap = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.08), ironMat);
+            scrap.position.set(-0.05, 0.025, -0.02);
+            scrap.rotation.z = 0.2 + (hash % 3) * 0.05;
+            group.add(plank, shard, scrap);
+            return group;
+        }
+
+        function makeShackles() {
+            const group = new THREE.Group();
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.03), rustMat);
+            const left = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.01, 5, 8), rustMat);
+            left.position.set(-0.08, -0.04, 0.02);
+            const right = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.01, 5, 8), rustMat);
+            right.position.set(0.08, -0.04, 0.02);
+            const chain = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.015), rustMat);
+            chain.position.y = -0.04;
+            group.add(plate, left, right, chain);
+            group.userData.wallY = 0.95;
+            return group;
+        }
+
+        function makeStrawPile() {
+            const group = new THREE.Group();
+            const heap = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 5), strawMat);
+            heap.scale.set(1.2, 0.45, 0.95);
+            heap.position.y = 0.05;
+            const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.1, 5), strawMat);
+            tuft.position.set(0.05, 0.08, 0.02);
+            tuft.rotation.z = -0.4;
+            group.add(heap, tuft);
+            return group;
+        }
+
+        function makeTinCup() {
+            const group = new THREE.Group();
+            const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.06, 8), tinMat);
+            cup.position.y = 0.03;
+            const handle = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 5, 8, Math.PI), tinMat);
+            handle.position.set(0.04, 0.03, 0);
+            handle.rotation.y = Math.PI / 2;
+            group.add(cup, handle);
+            return group;
+        }
+
+        function makeChainedBucket() {
+            const group = makeBucket();
+            const chain = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 5, 8), rustMat);
+            chain.position.y = 0.16;
+            group.add(chain);
+            return group;
+        }
+
+        function makeHangingHam() {
+            const group = new THREE.Group();
+            const hook = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.008, 5, 8, Math.PI), rustMat);
+            hook.position.y = 0.08;
+            const ham = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), hamMat);
+            ham.scale.set(0.7, 1.15, 0.75);
+            ham.position.y = -0.04;
+            const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 5), boneMat);
+            bone.position.y = 0.08;
+            group.add(hook, ham, bone);
+            group.userData.wallY = 1.05;
+            return group;
+        }
+
+        function makeCrocks() {
+            const group = new THREE.Group();
+            const a = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 8), potMat);
+            a.position.set(-0.05, 0.05, 0);
+            const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 8), potMat);
+            lid.position.set(-0.05, 0.11, 0);
+            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.07, 8), potMat);
+            b.position.set(0.055, 0.035, 0.02);
+            group.add(a, lid, b);
+            return group;
+        }
+
+        function makeCuttingBoard() {
+            const group = new THREE.Group();
+            const board = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.12), woodMat);
+            board.position.y = 0.015;
+            const slice = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.025, 0.05), hamMat);
+            slice.position.set(-0.02, 0.03, 0);
+            const knife = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.01, 0.02), ironMat);
+            knife.position.set(0.04, 0.028, 0.03);
+            knife.rotation.y = 0.4;
+            group.add(board, slice, knife);
+            return group;
+        }
+
+        function makeKettle() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), rustMat);
+            body.position.y = 0.07;
+            const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.08, 6), rustMat);
+            spout.position.set(0.07, 0.08, 0);
+            spout.rotation.z = -Math.PI / 3;
+            const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.015, 8), ironMat);
+            lid.position.y = 0.13;
+            group.add(body, spout, lid);
+            return group;
+        }
+
+        function makeOverturnedPot() {
+            const group = new THREE.Group();
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.1, 8), potMat);
+            pot.position.set(0, 0.05, 0);
+            pot.rotation.z = Math.PI / 2;
+            pot.rotation.y = 0.3;
+            group.add(pot);
+            return group;
+        }
+
+        function makeFoldedLinens() {
+            const group = new THREE.Group();
+            for (let i = 0; i < 3; i++) {
+                const fold = new THREE.Mesh(new THREE.BoxGeometry(0.16 - i * 0.02, 0.03, 0.12), linenMat);
+                fold.position.set(i * 0.01, 0.02 + i * 0.032, 0);
+                fold.rotation.y = i * 0.08;
+                group.add(fold);
+            }
+            return group;
+        }
+
+        function makeHatBox() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.1, 10), linenMat);
+            box.position.y = 0.05;
+            const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 10), clothMats[2]);
+            lid.position.y = 0.11;
+            group.add(box, lid);
+            return group;
+        }
+
+        function makeBroom() {
+            const group = new THREE.Group();
+            const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), woodMat);
+            stick.position.y = 0.21;
+            stick.rotation.z = 0.35;
+            const head = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), strawMat);
+            head.position.set(0.07, 0.02, 0);
+            head.rotation.z = Math.PI + 0.35;
+            group.add(stick, head);
+            return group;
+        }
+
+        function makeBoots() {
+            const group = new THREE.Group();
+            for (const x of [-0.04, 0.05]) {
+                const boot = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.1), rustMat);
+                boot.position.set(x, 0.03, 0);
+                const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.04, 0.055), sackclothMat);
+                cuff.position.set(x, 0.07, -0.02);
+                group.add(boot, cuff);
+            }
+            return group;
+        }
+
+        function makeNightstandCandle() {
+            const group = new THREE.Group();
+            const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.015, 8), tinMat);
+            dish.position.y = 0.01;
+            const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.1, 6), waxMat);
+            stick.position.y = 0.065;
+            const flame = new THREE.Mesh(torchFlameGeo, torchFlameMat);
+            flame.scale.set(0.4, 0.5, 0.4);
+            flame.position.y = 0.13;
+            group.add(dish, stick, flame);
+            return group;
+        }
+
+        function makeChamberPot() {
+            const group = new THREE.Group();
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.08, 8), potMat);
+            pot.position.y = 0.04;
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.01, 6, 10), potMat);
+            rim.rotation.x = Math.PI / 2;
+            rim.position.y = 0.08;
+            group.add(pot, rim);
+            return group;
+        }
+
+        function makeClothesPile() {
+            const group = new THREE.Group();
+            const heap = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 5), linenMat);
+            heap.scale.set(1.15, 0.4, 0.9);
+            heap.position.y = 0.04;
+            const fold = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.08), clothMats[0]);
+            fold.position.set(0.02, 0.07, 0.02);
+            fold.rotation.y = 0.4;
+            group.add(heap, fold);
+            return group;
+        }
+
+        function makeWashbasin() {
+            const group = new THREE.Group();
+            const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.06, 10), tinMat);
+            bowl.position.y = 0.04;
+            const water = new THREE.Mesh(new THREE.CircleGeometry(0.07, 10), waterMat);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = 0.055;
+            group.add(bowl, water);
+            return group;
+        }
+
+        function makeLectern() {
+            const group = new THREE.Group();
+            const stand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), woodMat);
+            stand.position.y = 0.14;
+            const slope = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.16), woodMat);
+            slope.position.set(0, 0.3, 0.02);
+            slope.rotation.x = -0.35;
+            const page = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.008, 0.12), scrollMat);
+            page.position.set(0, 0.32, 0.02);
+            page.rotation.x = -0.35;
+            group.add(stand, slope, page);
+            return group;
+        }
+
+        function makeInkQuill() {
+            const group = new THREE.Group();
+            const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.06, 8), inkMat);
+            bottle.position.y = 0.03;
+            const quill = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.14, 5), boneMat);
+            quill.position.set(0.04, 0.07, 0);
+            quill.rotation.z = 0.6;
+            const nib = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.03, 4), inkMat);
+            nib.position.set(0.08, 0.02, 0);
+            nib.rotation.z = 0.6 + Math.PI;
+            group.add(bottle, quill, nib);
+            return group;
+        }
+
+        function makeScrollPile() {
+            const group = new THREE.Group();
+            for (let i = 0; i < 3; i++) {
+                const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 8), scrollMat);
+                roll.rotation.z = Math.PI / 2;
+                roll.position.set(0, 0.025 + i * 0.04, (i - 1) * 0.03);
+                roll.rotation.y = i * 0.4;
+                group.add(roll);
+            }
+            return group;
+        }
+
+        function makeTinyGlobe() {
+            const group = new THREE.Group();
+            const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.03, 8), woodMat);
+            stand.position.y = 0.015;
+            const ball = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), plantMat);
+            ball.position.y = 0.08;
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.006, 5, 12), goldTrimMat);
+            ring.position.y = 0.08;
+            ring.rotation.x = 0.4;
+            group.add(stand, ball, ring);
+            return group;
+        }
+
+        function makeFallenBook() {
+            const group = new THREE.Group();
+            const cover = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.1), paintMats[1]);
+            cover.position.y = 0.02;
+            cover.rotation.y = 0.5;
+            cover.rotation.z = 0.08;
+            const pages = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.08), scrollMat);
+            pages.position.set(0.01, 0.03, 0);
+            pages.rotation.copy(cover.rotation);
+            group.add(cover, pages);
+            return group;
+        }
+
+        function makePlaceSetting() {
+            const group = new THREE.Group();
+            const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.012, 10), linenMat);
+            plate.position.y = 0.01;
+            const fork = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.008, 0.1), tinMat);
+            fork.position.set(-0.09, 0.012, 0);
+            const knife = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.008, 0.11), ironMat);
+            knife.position.set(0.09, 0.012, 0);
+            group.add(plate, fork, knife);
+            return group;
+        }
+
+        function makeGoblet() {
+            const group = new THREE.Group();
+            const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, 0.06, 8), goldTrimMat);
+            cup.position.y = 0.07;
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6), goldTrimMat);
+            stem.position.y = 0.035;
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.012, 8), goldTrimMat);
+            base.position.y = 0.006;
+            group.add(cup, stem, base);
+            return group;
+        }
+
+        function makeCandelabra() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 8), goldTrimMat);
+            base.position.y = 0.015;
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), goldTrimMat);
+            stem.position.y = 0.1;
+            group.add(base, stem);
+            for (const x of [-0.06, 0, 0.06]) {
+                const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.012), goldTrimMat);
+                arm.position.set(x / 2, 0.16, 0);
+                const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.06, 5), waxMat);
+                stick.position.set(x, 0.2, 0);
+                const flame = new THREE.Mesh(torchFlameGeo, torchFlameMat);
+                flame.scale.set(0.35, 0.45, 0.35);
+                flame.position.set(x, 0.25, 0);
+                group.add(arm, stick, flame);
+            }
+            return group;
+        }
+
+        function makePlatter() {
+            const group = new THREE.Group();
+            const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.02, 10), tinMat);
+            dish.position.y = 0.012;
+            const food = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.06), hamMat);
+            food.position.y = 0.03;
+            group.add(dish, food);
+            return group;
+        }
+
+        function makeKneelingCushion() {
+            const group = new THREE.Group();
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.16), linenMat);
+            pad.position.y = 0.03;
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.015, 0.18), goldTrimMat);
+            trim.position.y = 0.008;
+            group.add(pad, trim);
+            return group;
+        }
+
+        function makeOfferingBowl() {
+            const group = new THREE.Group();
+            const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 0.05, 10), goldTrimMat);
+            bowl.position.y = 0.03;
+            const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.006, 8), goldMat);
+            coin.position.set(0.02, 0.055, 0);
+            group.add(bowl, coin);
+            return group;
+        }
+
+        function makeIncense() {
+            const group = new THREE.Group();
+            const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.02, 8), rustMat);
+            dish.position.y = 0.01;
+            const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.14, 5), woodMat);
+            stick.position.y = 0.08;
+            stick.rotation.z = 0.15;
+            const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), mushGlowMat);
+            smoke.position.set(0.02, 0.16, 0);
+            group.add(dish, stick, smoke);
+            return group;
+        }
+
+        function makeHolyPlaque() {
+            const group = new THREE.Group();
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.03), goldTrimMat);
+            const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.06, 8), goldMat);
+            emblem.position.z = 0.02;
+            group.add(plate, emblem);
+            group.userData.wallY = 1.05;
+            return group;
+        }
+
+        function makeCoalHeap() {
+            const group = new THREE.Group();
+            for (let i = 0; i < 5; i++) {
+                const lump = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.05), coalMat);
+                lump.position.set(((i % 3) - 1) * 0.05, 0.025 + (i % 2) * 0.02, (Math.floor(i / 3) - 0.3) * 0.05);
+                lump.rotation.y = i * 0.5;
+                group.add(lump);
+            }
+            return group;
+        }
+
+        function makeTongs() {
+            const group = new THREE.Group();
+            const a = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.22), ironMat);
+            a.position.set(-0.015, 0.02, 0);
+            a.rotation.y = 0.08;
+            const b = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.22), rustMat);
+            b.position.set(0.015, 0.02, 0);
+            b.rotation.y = -0.08;
+            const hinge = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 5), ironMat);
+            hinge.position.set(0, 0.02, -0.08);
+            group.add(a, b, hinge);
+            return group;
+        }
+
+        function makeIngot() {
+            const group = new THREE.Group();
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.07), rustMat);
+            bar.position.y = 0.025;
+            group.add(bar);
+            return group;
+        }
+
+        function makeBellows() {
+            const group = new THREE.Group();
+            const bag = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.12), sackclothMat);
+            bag.position.y = 0.05;
+            const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.1, 6), rustMat);
+            nozzle.rotation.z = Math.PI / 2;
+            nozzle.position.set(0.12, 0.05, 0);
+            const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.02), woodMat);
+            handle.position.set(0, 0.1, 0);
+            group.add(bag, nozzle, handle);
+            return group;
+        }
+
+        function makeSlag() {
+            const group = new THREE.Group();
+            const blob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), rustMat);
+            blob.scale.set(1.2, 0.4, 0.9);
+            blob.position.y = 0.025;
+            const chip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.04), coalMat);
+            chip.position.set(0.05, 0.02, 0.03);
+            group.add(blob, chip);
+            return group;
+        }
+
+        function makeHelm() {
+            const group = new THREE.Group();
+            const dome = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), ironMat);
+            dome.position.y = 0.04;
+            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.02, 10), rustMat);
+            brim.position.y = 0.04;
+            group.add(dome, brim);
+            return group;
+        }
+
+        function makeFloorShield() {
+            const group = new THREE.Group();
+            const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 10), ironMat);
+            shield.rotation.x = Math.PI / 2.4;
+            shield.position.y = 0.06;
+            const boss = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), rustMat);
+            boss.position.set(0, 0.08, 0.02);
+            group.add(shield, boss);
+            return group;
+        }
+
+        function makeBedroll() {
+            const group = new THREE.Group();
+            const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.28, 8), sackclothMat);
+            roll.rotation.z = Math.PI / 2;
+            roll.position.y = 0.06;
+            const strap = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.01, 5, 10), rustMat);
+            strap.rotation.z = Math.PI / 2;
+            strap.position.y = 0.06;
+            group.add(roll, strap);
+            return group;
+        }
+
+        function makeSpearStand() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.08), woodMat);
+            base.position.y = 0.02;
+            for (const x of [-0.03, 0.03]) {
+                const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.38, 5), woodMat);
+                shaft.position.set(x, 0.21, 0);
+                shaft.rotation.z = x * 0.4;
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.06, 4), ironMat);
+                tip.position.set(x + x * 0.12, 0.42, 0);
+                tip.rotation.z = x * 0.4;
+                group.add(shaft, tip);
+            }
+            group.add(base);
+            return group;
+        }
+
+        function makeSkullStack() {
+            const group = new THREE.Group();
+            const skull = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), boneMat);
+            skull.position.y = 0.055;
+            const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.04), boneMat);
+            jaw.position.set(0, 0.02, 0.03);
+            const top = new THREE.Mesh(new THREE.SphereGeometry(0.04, 7, 5), boneMat);
+            top.position.set(0.04, 0.1, -0.02);
+            group.add(skull, jaw, top);
+            return group;
+        }
+
+        function makeUrn() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), goldTrimMat);
+            body.scale.set(0.85, 1.1, 0.85);
+            body.position.y = 0.08;
+            const lid = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.05, 8), goldTrimMat);
+            lid.position.y = 0.16;
+            group.add(body, lid);
+            return group;
+        }
+
+        function makeGoldUrn() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), goldTrimMat);
+            body.scale.set(0.8, 1.25, 0.8);
+            body.position.y = 0.1;
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.06, 8), goldMat);
+            neck.position.y = 0.18;
+            const lid = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.06, 8), goldTrimMat);
+            lid.position.y = 0.24;
+            group.add(body, neck, lid);
+            return group;
+        }
+
+        function makeMeltedCandles() {
+            const group = new THREE.Group();
+            const puddle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.02, 8), waxMat);
+            puddle.position.y = 0.01;
+            const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.05, 6), waxMat);
+            stub.position.set(-0.03, 0.04, 0);
+            const stub2 = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.022, 0.03, 6), waxMat);
+            stub2.position.set(0.04, 0.03, 0.02);
+            group.add(puddle, stub, stub2);
+            return group;
+        }
+
+        function makeCoffinFragment() {
+            const group = new THREE.Group();
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.1), woodMat);
+            plank.position.y = 0.03;
+            plank.rotation.y = 0.25;
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.015, 0.04), rustMat);
+            trim.position.set(0, 0.05, 0);
+            group.add(plank, trim);
+            return group;
+        }
+
+        function makeGrateCover() {
+            const group = new THREE.Group();
+            const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.02, 10), rustMat);
+            ring.position.y = 0.012;
+            for (let i = 0; i < 3; i++) {
+                const bar = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.012, 0.018), ironMat);
+                bar.position.y = 0.02;
+                bar.rotation.y = (i / 3) * Math.PI;
+                group.add(bar);
+            }
+            group.add(ring);
+            return group;
+        }
+
+        function makeDripPipe() {
+            const group = new THREE.Group();
+            const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8), rustMat);
+            pipe.rotation.z = Math.PI / 2;
+            pipe.position.set(0, 0, 0);
+            const elbow = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.1, 8), rustMat);
+            elbow.position.set(0.14, -0.04, 0);
+            const drop = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 5), slimeClutterMat);
+            drop.position.set(0.14, -0.12, 0);
+            group.add(pipe, elbow, drop);
+            group.userData.wallY = 1.18;
+            return group;
+        }
+
+        function makeSlimeBucket() {
+            const group = makeBucket();
+            const slime = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 8), slimeClutterMat);
+            slime.position.y = 0.1;
+            group.add(slime);
+            return group;
+        }
+
+        function makeMossTuft() {
+            const group = new THREE.Group();
+            const pad = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 5), plantMat);
+            pad.scale.set(1.2, 0.35, 1);
+            pad.position.y = 0.025;
+            const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 5), plantMat);
+            tuft.position.set(0.03, 0.05, 0);
+            group.add(pad, tuft);
+            return group;
+        }
+
+        function makeWateringCan() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 8), tinMat);
+            body.position.y = 0.05;
+            const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.016, 0.1, 6), tinMat);
+            spout.position.set(0.08, 0.07, 0);
+            spout.rotation.z = -0.7;
+            group.add(body, spout);
+            return group;
+        }
+
+        function makeFlowerCrate() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.14), woodMat);
+            box.position.y = 0.05;
+            const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), clothMats[0]);
+            bloom.position.set(-0.03, 0.12, 0);
+            const bloom2 = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), clothMats[1]);
+            bloom2.position.set(0.04, 0.11, 0.02);
+            group.add(box, bloom, bloom2);
+            return group;
+        }
+
+        function makeBirdBath() {
+            const group = new THREE.Group();
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.16, 8), wallMat);
+            stem.position.y = 0.08;
+            const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.04, 10), wallMat);
+            bowl.position.y = 0.18;
+            const water = new THREE.Mesh(new THREE.CircleGeometry(0.07, 10), waterMat);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = 0.195;
+            group.add(stem, bowl, water);
+            return group;
+        }
+
+        function makeCrystalShard() {
+            const group = new THREE.Group();
+            const shard = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 5), crystalMat);
+            shard.position.y = 0.11;
+            shard.rotation.z = 0.15;
+            const small = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.12, 5), crystalMat);
+            small.position.set(0.05, 0.06, 0.02);
+            small.rotation.z = -0.4;
+            group.add(shard, small);
+            return group;
+        }
+
+        function makeNest() {
+            const group = new THREE.Group();
+            const bowl = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.03, 6, 10), strawMat);
+            bowl.rotation.x = Math.PI / 2;
+            bowl.position.y = 0.03;
+            const egg = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), boneMat);
+            egg.position.set(0.02, 0.04, 0);
+            group.add(bowl, egg);
+            return group;
+        }
+
+        function makePebbleCluster(hash = 0) {
+            const group = new THREE.Group();
+            for (let i = 0; i < 4; i++) {
+                const r = 0.025 + ((hash + i) % 3) * 0.012;
+                const rock = new THREE.Mesh(new THREE.SphereGeometry(r, 6, 5), crackedWallMat);
+                rock.scale.set(1.2, 0.55, 1);
+                rock.position.set(((i % 2) * 2 - 1) * 0.05, r * 0.4, (Math.floor(i / 2) - 0.5) * 0.05);
+                group.add(rock);
+            }
+            return group;
+        }
+
+        function makeVelvetStool() {
+            const group = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 10), clothMats[2]);
+            seat.position.y = 0.2;
+            const trim = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.01, 6, 12), goldTrimMat);
+            trim.rotation.x = Math.PI / 2;
+            trim.position.y = 0.18;
+            for (const [lx, lz] of [[-0.05, -0.05], [0.05, -0.05], [-0.05, 0.05], [0.05, 0.05]]) {
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.025), goldTrimMat);
+                leg.position.set(lx, 0.09, lz);
+                group.add(leg);
+            }
+            group.add(seat, trim);
+            return group;
+        }
+
         function mushroomBudget(paletteId) {
             if (paletteId === 'cave') {
                 return { max: 8, step: 3 };
@@ -3954,6 +4937,107 @@
             return group;
         }
 
+        function makeShelf() {
+            const group = new THREE.Group();
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.05, 0.08), woodMat);
+            back.position.set(0, 0.52, -0.12);
+            back.castShadow = true;
+            group.add(back);
+            for (const y of [0.22, 0.52, 0.82]) {
+                const plank = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.04, 0.28), woodMat);
+                plank.position.set(0, y, 0.02);
+                group.add(plank);
+            }
+            const crock = makeCrocks();
+            crock.scale.set(0.85, 0.85, 0.85);
+            crock.position.set(-0.22, 0.22, 0.04);
+            const sack = makeGrainSack();
+            sack.scale.set(0.7, 0.7, 0.7);
+            sack.position.set(0.2, 0.52, 0.02);
+            const ham = makeHangingHam();
+            ham.position.set(0, 0.95, 0.08);
+            ham.scale.set(0.7, 0.7, 0.7);
+            group.add(crock, sack, ham);
+            return group;
+        }
+
+        function makeBunk(doubleDeck = false) {
+            const group = new THREE.Group();
+            const postH = doubleDeck ? 1.12 : 0.52;
+            const postGeo = new THREE.BoxGeometry(0.06, postH, 0.06);
+            for (const [lx, lz] of [[-0.42, -0.28], [0.42, -0.28], [-0.42, 0.28], [0.42, 0.28]]) {
+                const post = new THREE.Mesh(postGeo, woodMat);
+                post.position.set(lx, postH / 2, lz);
+                group.add(post);
+            }
+            const deck = (y) => {
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.62), woodMat);
+                frame.position.y = y;
+                const mattress = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.08, 0.54), strawMat);
+                mattress.position.y = y + 0.06;
+                const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.28), sackclothMat);
+                pillow.position.set(-0.28, y + 0.12, 0);
+                group.add(frame, mattress, pillow);
+            };
+            deck(0.28);
+            if (doubleDeck) {
+                deck(0.78);
+                const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.7, 0.04), woodMat);
+                ladder.position.set(0.48, 0.5, 0.22);
+                group.add(ladder);
+            }
+            return group;
+        }
+
+        function makeStove() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.48, 0.52), ironMat);
+            body.position.y = 0.24;
+            body.castShadow = true;
+            const rustBand = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.08, 0.54), rustMat);
+            rustBand.position.y = 0.18;
+            const grate = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.04, 0.28), rustMat);
+            grate.position.set(0, 0.28, 0.22);
+            const glow = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.08, 0.04), torchFlameMat);
+            glow.position.set(0, 0.22, 0.26);
+            const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.55, 8), rustMat);
+            pipe.position.set(0.22, 0.72, -0.12);
+            const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10), ironMat);
+            lid.position.set(-0.12, 0.5, 0);
+            const kettle = makeKettle();
+            kettle.scale.set(0.7, 0.7, 0.7);
+            kettle.position.set(0.12, 0.5, 0.04);
+            group.add(body, rustBand, grate, glow, pipe, lid, kettle);
+            return group;
+        }
+
+        function makeDesk() {
+            const group = makeTable(0.95, 0.58);
+            const pages = makeScrollPile();
+            pages.position.set(-0.22, 0.45, 0.04);
+            const ink = makeInkQuill();
+            ink.position.set(0.18, 0.45, -0.06);
+            const book = makeFallenBook();
+            book.position.set(0.22, 0.45, 0.12);
+            const candle = makeNightstandCandle();
+            candle.position.set(-0.32, 0.45, -0.14);
+            group.add(pages, ink, book, candle);
+            return group;
+        }
+
+        function makeCistern() {
+            const group = new THREE.Group();
+            const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.42, 0.28, 12), wallMat);
+            ring.position.y = 0.14;
+            const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 12), voidMat);
+            inner.position.y = 0.18;
+            const grate = makeGrateCover();
+            grate.scale.set(1.4, 1, 1.4);
+            grate.position.y = 0.22;
+            group.add(ring, inner, grate);
+            return group;
+        }
+
         function makeWeaponRack() {
             const group = new THREE.Group();
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.08), woodMat);
@@ -4049,19 +5133,15 @@
                 if (kind === 'bedroom') {
                     prop = n >= 2 ? makeBed() : makeCabinet();
                 } else if (kind === 'kitchen') {
-                    prop = makeTable(n >= 2 ? 1.55 : 0.72, 0.7);
-                    if (n >= 2) {
-                        const c1 = makeChair();
-                        c1.position.set(0, 0, -0.48);
-                        const c2 = makeChair();
-                        c2.position.set(0, 0, 0.48);
-                        c2.rotation.y = Math.PI;
-                        prop.add(c1, c2);
-                    }
-                } else if (kind === 'study' || kind === 'library') {
+                    prop = makeStove();
+                } else if (kind === 'study') {
+                    prop = makeDesk();
+                } else if (kind === 'library') {
                     prop = n >= 2 ? makeBookshelf() : makeCabinet();
-                } else if (kind === 'dining' || kind === 'barracks') {
+                } else if (kind === 'dining') {
                     prop = n >= 4 ? makeDiningTable() : makeTable(1.55, 0.7);
+                } else if (kind === 'barracks') {
+                    prop = makeBunk(n >= 2);
                 } else if (kind === 'chapel' || kind === 'shrine') {
                     prop = n >= 2 ? makeAltar() : makePew();
                 } else if (kind === 'forge') {
@@ -4074,6 +5154,8 @@
                     prop = makePlanter();
                 } else if (kind === 'well') {
                     prop = makeWell();
+                } else if (kind === 'sewer') {
+                    prop = makeCistern();
                 } else if (kind === 'cave') {
                     prop = n >= 2 ? makeBoulder(group.hash) : makeStalagmite(group.hash);
                     if (n >= 2) {
@@ -4082,13 +5164,12 @@
                         extra.scale.set(0.72, 0.72, 0.72);
                         prop.add(extra);
                     }
-                } else if (kind === 'cell' || kind === 'pantry' || kind === 'closet') {
-                    if (kind === 'closet') {
-                        prop = makeCabinet();
-                    } else {
-                        prop = makeCrate();
-                        prop.scale.set(1.7, 1.7, 1.7);
-                    }
+                } else if (kind === 'cell') {
+                    prop = makeBunk(false);
+                } else if (kind === 'pantry') {
+                    prop = makeShelf();
+                } else if (kind === 'closet') {
+                    prop = makeCabinet();
                 } else if (n >= 4) {
                     prop = group.hash % 3 === 0 ? makeBed() : makeDiningTable();
                 } else if (n >= 2) {
@@ -4112,7 +5193,8 @@
                     prop.scale.set(1.7, 1.7, 1.7);
                 }
                 prop.position.set(cx, propLiftAt(cx, cz, rooms, paletteId), cz);
-                if (kind === 'study' || kind === 'library' || kind === 'closet' || n === 1) {
+                if (kind === 'study' || kind === 'library' || kind === 'closet' || kind === 'pantry'
+                    || kind === 'cell' || kind === 'kitchen' || kind === 'sewer' || kind === 'barracks' || n === 1) {
                     prop.rotation.y = facingFromWalls(grid, group.cells);
                 } else {
                     prop.rotation.y = alongX ? 0 : Math.PI / 2;
@@ -4121,9 +5203,104 @@
             }
         }
 
-        const WALL_PROP_MAKERS = [makeWeapons, makeBanner];
-        const FLOOR_PROP_MAKERS = [makePlant, makeBarrel, makeCrate, makeChair];
-        const DETAIL_PROP_MAKERS = [makePit, makeRug];
+        const HALL_FLOOR_MAKERS = [makeBucket, makeSack, makeCandleCluster, makeFloorLantern, makeBonePile, makeBrokenStool, makeStackedBowls, makeRopeCoil, makeDebrisPile];
+        const HALL_WALL_MAKERS = [makeHangingChain, makeBanner, makeWeapons];
+        const PALETTE_FLOOR_MAKERS = {
+            gilt: [makeGoldUrn, makeCandelabra, makeVelvetStool, makeGoblet],
+            sewer: [makeGrateCover, makeSlimeBucket, makeMossTuft, makeBucket, makeDebrisPile],
+            crypt: [makeBonePile, makeSkullStack, makeMeltedCandles, makeUrn, makeCandleCluster],
+            blood: [makeBonePile, makeSkullStack, makeDebrisPile, makeCandleCluster],
+            ember: [makeFloorLantern, makeKettle, makeCoalHeap, makeBucket, makeDebrisPile],
+            iron: [makeBucket, makeHelm, makeIngot, makeDebrisPile, makeRopeCoil],
+            moss: [makeBucket, makeMossTuft, makePlant, makeRopeCoil, makeSack],
+            cave: [makeStalagmite, makeBoulder, makeBone, makeCrystalShard, makeNest, makePebbleCluster],
+        };
+        const PALETTE_WALL_MAKERS = {
+            gilt: [makeBanner, makeHolyPlaque],
+            sewer: [makeDripPipe, makeHangingChain],
+            crypt: [makeHangingChain, makeHolyPlaque],
+            cave: [],
+        };
+        const ROOM_FLOOR_MAKERS = {
+            cell: [makeStrawPile, makeTinCup, makeChainedBucket, makeBucket],
+            pantry: [makeCrocks, makeGrainSack, makeCuttingBoard, makeKettle, makeOverturnedPot],
+            kitchen: [makeCrocks, makeCuttingBoard, makeKettle, makeGrainSack, makeOverturnedPot, makeBarrel],
+            closet: [makeFoldedLinens, makeHatBox, makeBroom, makeBoots],
+            bedroom: [makeNightstandCandle, makeChamberPot, makeClothesPile, makeWashbasin],
+            study: [makeLectern, makeInkQuill, makeScrollPile, makeTinyGlobe, makeFallenBook],
+            library: [makeLectern, makeScrollPile, makeFallenBook, makeTinyGlobe, makeInkQuill],
+            dining: [makePlaceSetting, makeGoblet, makeCandelabra, makePlatter],
+            chapel: [makeKneelingCushion, makeOfferingBowl, makeIncense],
+            shrine: [makeKneelingCushion, makeOfferingBowl, makeIncense],
+            forge: [makeCoalHeap, makeTongs, makeIngot, makeBellows, makeSlag],
+            armory: [makeHelm, makeFloorShield, makeBedroll, makeSpearStand, makeBoots],
+            barracks: [makeHelm, makeFloorShield, makeBedroll, makeSpearStand, makeBoots],
+            crypt: [makeSkullStack, makeUrn, makeMeltedCandles, makeCoffinFragment],
+            sewer: [makeGrateCover, makeSlimeBucket, makeMossTuft],
+            well: [makeGrateCover, makeSlimeBucket, makeMossTuft, makeBucket],
+            garden: [makePlanter, makeWateringCan, makeFlowerCrate, makeBirdBath, makePlant],
+            cave: [makeStalagmite, makeBoulder, makeBone, makeCrystalShard, makeNest, makePebbleCluster],
+        };
+        const ROOM_WALL_MAKERS = {
+            cell: [makeShackles, makeHangingChain],
+            pantry: [makeHangingHam],
+            kitchen: [makeHangingHam],
+            chapel: [makeHolyPlaque, makeBanner],
+            shrine: [makeHolyPlaque, makeBanner],
+            sewer: [makeDripPipe],
+            well: [makeDripPipe],
+            armory: [makeWeapons],
+            barracks: [makeWeapons],
+            forge: [makeWeapons],
+            cave: [],
+        };
+        const ROOM_DETAIL_MAKERS = {
+            chapel: [makeRug, makeOfferingBowl],
+            shrine: [makeRug, makeKneelingCushion],
+            bedroom: [makeRug, makeClothesPile],
+            cave: [makePebbleCluster, makeBone, makeNest],
+            crypt: [makeSkullStack, makeMeltedCandles],
+            cell: [makeStrawPile, makeTinCup],
+            dining: [makePlaceSetting, makeGoblet],
+            garden: [makeMossTuft, makeWateringCan],
+        };
+
+        function pickClutterMaker(list, hash) {
+            if (!list?.length) {
+                return null;
+            }
+            return list[hash % list.length];
+        }
+
+        function floorMakersFor(kind, paletteId) {
+            if (kind && ROOM_FLOOR_MAKERS[kind]) {
+                return ROOM_FLOOR_MAKERS[kind];
+            }
+            return PALETTE_FLOOR_MAKERS[paletteId] || HALL_FLOOR_MAKERS;
+        }
+
+        function wallMakersFor(kind, paletteId) {
+            if (kind && ROOM_WALL_MAKERS[kind]) {
+                return ROOM_WALL_MAKERS[kind];
+            }
+            if (PALETTE_WALL_MAKERS[paletteId]) {
+                return PALETTE_WALL_MAKERS[paletteId];
+            }
+            return HALL_WALL_MAKERS;
+        }
+
+        function detailMakersFor(kind, paletteId) {
+            if (kind && ROOM_DETAIL_MAKERS[kind]) {
+                return ROOM_DETAIL_MAKERS[kind];
+            }
+            if (kind === 'cave' || paletteId === 'cave') {
+                return [makePebbleCluster, makeBone, makeNest];
+            }
+            if (paletteId === 'gilt') {
+                return [makeRug, makeGoblet];
+            }
+            return [makeRug, makeDebrisPile, makeBonePile];
+        }
 
         function placeTorches(grid, width, height) {
             clearTorches();
@@ -4388,23 +5565,20 @@
                 .filter((face) => !paintingFaces.has(faceKey(face.wx, face.wz, face.dx, face.dz)))
                 .filter((face) => face.propHash % 5 === 0)
                 .sort((a, b) => a.propHash - b.propHash)
-                .slice(0, 10);
+                .slice(0, 12);
             for (const spot of wallSpots) {
                 const room = roomContaining(rooms, spot.x, spot.z);
-                if (room?.kind === 'cave') {
+                const makers = wallMakersFor(room?.kind, paletteId);
+                const maker = pickClutterMaker(makers, spot.propHash);
+                if (!maker) {
                     continue;
-                }
-                let maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
-                if (room?.kind === 'armory' || room?.kind === 'barracks') {
-                    maker = makeWeapons;
-                } else if (room?.kind === 'chapel' || room?.kind === 'shrine') {
-                    maker = makeBanner;
                 }
                 const prop = maker(spot.propHash);
                 const px = spot.wx - spot.dx * WALL_PUSH;
                 const pz = spot.wz - spot.dz * WALL_PUSH;
                 const heights = [0.72, 0.92, 0.78, 0.95];
-                prop.position.set(px, heights[spot.propHash % heights.length], pz);
+                const py = prop.userData.wallY || heights[spot.propHash % heights.length];
+                prop.position.set(px, py, pz);
                 prop.rotation.y = Math.atan2(-spot.dx, -spot.dz);
                 propRoot.add(prop);
                 usedCells.add(`${spot.x},${spot.z}`);
@@ -4426,19 +5600,19 @@
             }
             floorCells.sort((a, b) => a.hash - b.hash);
 
-            const furniture = floorCells.filter((cell) => cell.hash % 7 === 0).slice(0, 12);
+            const nearWall = floorCells.filter((cell) =>
+                WALL_DIRS.some((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx])));
+            const scatterPool = nearWall.length ? nearWall : floorCells;
+            const furniture = scatterPool.filter((cell) => cell.hash % 6 === 0).slice(0, 16);
             const furnitureCells = new Set(furniture.map((cell) => `${cell.x},${cell.z}`));
             for (const cell of furniture) {
                 const walls = WALL_DIRS.filter((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx]));
                 const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 1 };
                 const room = roomContaining(rooms, cell.x, cell.z);
-                let maker = FLOOR_PROP_MAKERS[cell.hash % FLOOR_PROP_MAKERS.length];
-                if (room?.kind === 'garden') {
-                    maker = makePlant;
-                } else if (room?.kind === 'kitchen') {
-                    maker = makeBarrel;
-                } else if (room?.kind === 'cave') {
-                    maker = cell.hash % 2 === 0 ? makeStalagmite : makeBoulder;
+                const makers = floorMakersFor(room?.kind, paletteId);
+                const maker = pickClutterMaker(makers, cell.hash);
+                if (!maker) {
+                    continue;
                 }
                 const prop = maker(cell.hash);
                 prop.position.set(cell.x + dir.dx * 0.32, propLiftAt(cell.x, cell.z, rooms, paletteId), cell.z + dir.dz * 0.32);
@@ -4446,24 +5620,26 @@
                 propRoot.add(prop);
             }
 
-            const details = floorCells
+            const details = scatterPool
                 .filter((cell) => !furnitureCells.has(`${cell.x},${cell.z}`) && cell.hash % 11 === 0)
-                .slice(0, 8);
+                .slice(0, 12);
             const detailCells = new Set(details.map((cell) => `${cell.x},${cell.z}`));
             for (const cell of details) {
                 const room = roomContaining(rooms, cell.x, cell.z);
-                const maker = DETAIL_PROP_MAKERS[cell.hash % DETAIL_PROP_MAKERS.length];
-                if (maker === makePit && ['cell', 'crypt', 'armory', 'barracks'].includes(room?.kind)) {
+                const makers = detailMakersFor(room?.kind, paletteId);
+                const maker = pickClutterMaker(makers, cell.hash);
+                if (!maker) {
                     continue;
                 }
-                if (room?.kind === 'cave' && maker === makeRug) {
-                    continue;
-                }
-                const prop = room?.kind === 'cave' ? makeBoulder(cell.hash) : maker(cell.hash);
-                const ox = ((cell.hash % 5) - 2) * 0.06;
-                const oz = ((cell.hash % 3) - 1) * 0.06;
-                prop.position.set(cell.x + ox, propLiftAt(cell.x, cell.z, rooms, paletteId), cell.z + oz);
-                prop.rotation.y = (cell.hash % 4) * (Math.PI / 2);
+                const walls = WALL_DIRS.filter((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx]));
+                const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 0 };
+                const prop = maker(cell.hash);
+                prop.position.set(
+                    cell.x + dir.dx * 0.32,
+                    propLiftAt(cell.x, cell.z, rooms, paletteId),
+                    cell.z + dir.dz * 0.32,
+                );
+                prop.rotation.y = Math.atan2(-dir.dx, -dir.dz) || (cell.hash % 4) * (Math.PI / 2);
                 propRoot.add(prop);
             }
 

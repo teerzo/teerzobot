@@ -279,9 +279,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { parseGIF, decompressFrames } from 'gifuct-js';
-        import { RectAreaLightUniformsLib } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/lights/RectAreaLightUniformsLib.js';
-
-        RectAreaLightUniformsLib.init();
 
         const params = new URLSearchParams(location.search);
         const preview = params.has('preview');
@@ -308,12 +305,15 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 80);
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 18);
+        const renderer = new THREE.WebGLRenderer({
+            antialias: false,
+            powerPreference: 'high-performance',
+            stencil: false,
+        });
+        renderer.setPixelRatio(1);
         renderer.setSize(640, 480);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.BasicShadowMap;
+        renderer.shadowMap.enabled = false;
         document.getElementById('stage').prepend(renderer.domElement);
 
         const ambient = new THREE.AmbientLight(0x2a241c, 0.4);
@@ -421,10 +421,6 @@
         scene.add(exitMesh);
 
         const exitSpot = new THREE.SpotLight(0xffd078, 28, 6.5, Math.PI / 6, 0.4, 1.15);
-        exitSpot.castShadow = true;
-        exitSpot.shadow.mapSize.set(256, 256);
-        exitSpot.shadow.camera.near = 0.1;
-        exitSpot.shadow.camera.far = 7;
         const exitTarget = new THREE.Object3D();
         exitSpot.target = exitTarget;
         scene.add(exitSpot);
@@ -1301,6 +1297,16 @@
         });
         const spikeMat = new THREE.MeshStandardMaterial({ color: 0x6a6460, roughness: 0.4, metalness: 0.65 });
         const pitMat = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 1, metalness: 0 });
+        const PIT_DEPTH = 0.48;
+        const PIT_INNER = 0.86;
+        const PIT_THICK = 0.08;
+        const pitBottomGeo = new THREE.BoxGeometry(PIT_INNER, 0.05, PIT_INNER);
+        const pitNsGeo = new THREE.BoxGeometry(PIT_INNER + PIT_THICK, PIT_DEPTH, PIT_THICK);
+        const pitEwGeo = new THREE.BoxGeometry(PIT_THICK, PIT_DEPTH, PIT_INNER);
+        const pitRimNsGeo = new THREE.BoxGeometry(1.02, 0.05, 0.12);
+        const pitRimEwGeo = new THREE.BoxGeometry(0.12, 0.05, 0.78);
+        const pitWaterGeo = new THREE.PlaneGeometry(0.78, 0.78);
+        const pitSpikeGeo = new THREE.ConeGeometry(0.05, 0.32, 5);
         const torchBracketMat = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.8, metalness: 0.35 });
         const torchFlameMat = new THREE.MeshStandardMaterial({
             color: 0xffb040,
@@ -1335,7 +1341,7 @@
             return tex;
         }
 
-        const TORCH_EMBER_COUNT = 168;
+        const TORCH_EMBER_COUNT = 64;
         const emberPositions = new Float32Array(TORCH_EMBER_COUNT * 3);
         const emberColors = new Float32Array(TORCH_EMBER_COUNT * 3);
         const emberSizes = new Float32Array(TORCH_EMBER_COUNT);
@@ -1416,7 +1422,7 @@
             return tex;
         }
 
-        const MUSHROOM_SPORE_COUNT = 120;
+        const MUSHROOM_SPORE_COUNT = 40;
         const sporePositions = new Float32Array(MUSHROOM_SPORE_COUNT * 3);
         const sporeColors = new Float32Array(MUSHROOM_SPORE_COUNT * 3);
         const sporeSizes = new Float32Array(MUSHROOM_SPORE_COUNT);
@@ -1512,8 +1518,27 @@
         const WATER_TILE = 10;
         const SPIKE_TILE = 11;
         const DOOR_TILE = 12;
-        const HALF_H = WALL_H * 0.5;
+        const HALF_H = WALL_H * 0.36;
         const BROKEN_H = WALL_H * 0.32;
+
+        function makeWallBoxGeo(widthX, height, widthZ) {
+            const geo = new THREE.BoxGeometry(widthX, height, widthZ);
+            const uv = geo.attributes.uv;
+            const scaleY = height / WALL_H;
+            if (scaleY < 0.999) {
+                for (let face = 0; face < 6; face++) {
+                    if (face === 2 || face === 3) {
+                        continue;
+                    }
+                    const base = face * 4;
+                    for (let i = 0; i < 4; i++) {
+                        uv.setY(base + i, uv.getY(base + i) * scaleY);
+                    }
+                }
+                uv.needsUpdate = true;
+            }
+            return geo;
+        }
         const fencePostGeo = new THREE.BoxGeometry(0.08, 0.72, 0.08);
         const fenceRailGeo = new THREE.BoxGeometry(0.94, 0.045, 0.045);
 
@@ -1591,6 +1616,7 @@
             fencePostGeo, fenceRailGeo,
             emberGeo, sporeGeo,
             boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo,
+            pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -1846,7 +1872,7 @@
             }
 
             const t = clock.elapsedTime;
-            const active = Math.min(TORCH_EMBER_COUNT, n * 14);
+            const active = Math.min(TORCH_EMBER_COUNT, n * 8);
             for (let i = 0; i < torchMeshes.length; i += 1) {
                 const torch = torchMeshes[i];
                 const flicker = 1 + Math.sin(t * 17 + i * 2.3) * 0.14 + Math.sin(t * 29 + i * 1.1) * 0.08;
@@ -1934,7 +1960,7 @@
                 light.intensity = light.userData.base * (0.82 + Math.sin(t * 1.8 + i * 1.3) * 0.18);
             }
 
-            const active = Math.min(MUSHROOM_SPORE_COUNT, n * 10);
+            const active = Math.min(MUSHROOM_SPORE_COUNT, n * 6);
             for (let i = 0; i < MUSHROOM_SPORE_COUNT; i += 1) {
                 const spore = sporeState[i];
                 if (i >= active) {
@@ -2371,16 +2397,16 @@
 
         function mushroomBudget(paletteId) {
             if (paletteId === 'moss') {
-                return { max: 11, step: 4 };
+                return { max: 7, step: 4 };
             }
             if (paletteId === 'sewer') {
-                return { max: 9, step: 5 };
+                return { max: 6, step: 5 };
             }
             if (paletteId === 'iron') {
-                return { max: 8, step: 7 };
+                return { max: 5, step: 7 };
             }
             if (paletteId === 'stone') {
-                return { max: 4, step: 11 };
+                return { max: 3, step: 11 };
             }
             return null;
         }
@@ -2445,7 +2471,7 @@
                 cluster.position.set(cell.x + ox, 0, cell.z + oz);
                 cluster.rotation.y = (cell.hash % 6) * 0.7;
                 propRoot.add(cluster);
-                if (mushroomLights.length < 8) {
+                if (mushroomLights.length < 4) {
                     mushroomLights.push(cluster.userData.light);
                 } else {
                     cluster.remove(cluster.userData.light);
@@ -2459,7 +2485,7 @@
             }
             for (let i = 0; i < MUSHROOM_SPORE_COUNT; i += 1) {
                 const spore = sporeState[i];
-                if (!mushroomEmitters.length || i >= mushroomEmitters.length * 10) {
+                if (!mushroomEmitters.length || i >= mushroomEmitters.length * 6) {
                     spore.age = spore.life;
                     sporeAlphas[i] = 0;
                     continue;
@@ -2716,10 +2742,9 @@
             const sky = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.72), nightSkyMat);
             sky.position.set(0, 0.88, -0.54);
             group.add(left, right, sill, lintel, sky);
-            const light = new THREE.RectAreaLight(0xa8c8ff, 2.4, 0.5, 0.55);
-            light.position.set(0, 0.88, -0.18);
-            light.rotation.y = Math.PI;
-            light.userData.base = 1.8;
+            const light = new THREE.PointLight(0xa8c8ff, 0.55, 3.4, 2);
+            light.position.set(0, 0.88, 0.12);
+            light.userData.base = 0.5;
             group.add(light);
             group.userData.light = light;
             return group;
@@ -2741,32 +2766,45 @@
             return group;
         }
 
-        function makeWaterTile(withLight) {
+        function addPitWell(group) {
+            const bottom = new THREE.Mesh(pitBottomGeo, pitMat);
+            bottom.position.y = -PIT_DEPTH;
+            const north = new THREE.Mesh(pitNsGeo, wallMat);
+            north.position.set(0, -PIT_DEPTH / 2, -(PIT_INNER / 2));
+            const south = north.clone();
+            south.position.z = PIT_INNER / 2;
+            const west = new THREE.Mesh(pitEwGeo, wallMat);
+            west.position.set(-(PIT_INNER / 2), -PIT_DEPTH / 2, 0);
+            const east = west.clone();
+            east.position.x = PIT_INNER / 2;
+            const rimN = new THREE.Mesh(pitRimNsGeo, wallMat);
+            rimN.position.set(0, 0.012, -0.45);
+            const rimS = rimN.clone();
+            rimS.position.z = 0.45;
+            const rimW = new THREE.Mesh(pitRimEwGeo, wallMat);
+            rimW.position.set(-0.45, 0.012, 0);
+            const rimE = rimW.clone();
+            rimE.position.x = 0.45;
+            group.add(bottom, north, south, west, east, rimN, rimS, rimW, rimE);
+        }
+
+        function makeWaterTile() {
             const group = new THREE.Group();
-            const lip = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.08, 1.02), wallMat);
-            lip.position.y = -0.02;
-            const water = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), waterMat);
+            addPitWell(group);
+            const water = new THREE.Mesh(pitWaterGeo, waterMat);
             water.rotation.x = -Math.PI / 2;
-            water.position.y = -0.06;
-            group.add(lip, water);
+            water.position.y = -0.32;
+            group.add(water);
             group.userData.water = water;
-            if (withLight) {
-                const light = new THREE.PointLight(0x3a88aa, 0.45, 2.6);
-                light.position.set(0, 0.18, 0);
-                group.add(light);
-            }
             return group;
         }
 
         function makeSpikeTile() {
             const group = new THREE.Group();
-            const pit = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.35, 0.92), pitMat);
-            pit.position.y = -0.18;
-            group.add(pit);
-            const spikeGeo = new THREE.ConeGeometry(0.05, 0.22, 5);
+            addPitWell(group);
             for (let i = 0; i < 7; i++) {
-                const spike = new THREE.Mesh(spikeGeo, spikeMat);
-                spike.position.set(((i % 3) - 1) * 0.22, 0.08, (Math.floor(i / 3) - 1) * 0.22);
+                const spike = new THREE.Mesh(pitSpikeGeo, spikeMat);
+                spike.position.set(((i % 3) - 1) * 0.2, -PIT_DEPTH + 0.185, (Math.floor(i / 3) - 1) * 0.2);
                 group.add(spike);
             }
             return group;
@@ -3018,7 +3056,7 @@
         function placeTorches(grid, width, height) {
             clearTorches();
             const faces = collectFaces(grid, width, height);
-            const spots = faces.filter((face) => face.hash % 5 === 0).sort((a, b) => a.hash - b.hash).slice(0, 12);
+            const spots = faces.filter((face) => face.hash % 5 === 0).sort((a, b) => a.hash - b.hash).slice(0, 8);
             const used = new Set();
             torchRoot = new THREE.Group();
             for (const spot of spots) {
@@ -3032,10 +3070,9 @@
                 torchRoot.add(torch);
                 torchMeshes.push(torch);
 
-                const light = new THREE.RectAreaLight(0xff8a3a, 9, 0.16, 0.28);
-                light.position.set(px - spot.dx * 0.06, py + 0.18, pz - spot.dz * 0.06);
-                light.rotation.y = Math.atan2(spot.dx, spot.dz);
-                light.userData.base = 8 + (spot.hash % 5) * 0.4;
+                const light = new THREE.PointLight(0xff8a3a, 2.1, 5.2, 1.7);
+                light.position.set(px - spot.dx * 0.08, py + 0.18, pz - spot.dz * 0.08);
+                light.userData.base = 1.9 + (spot.hash % 5) * 0.08;
                 scene.add(light);
                 torchLights.push(light);
             }
@@ -3051,7 +3088,7 @@
             }
             for (let i = 0; i < TORCH_EMBER_COUNT; i += 1) {
                 const ember = emberState[i];
-                if (i >= torchEmitters.length * 14) {
+                if (i >= torchEmitters.length * 8) {
                     ember.age = ember.life;
                     emberAlphas[i] = 0;
                     continue;
@@ -3166,7 +3203,7 @@
             const paintingSpots = openFaces
                 .filter((face) => face.propHash % 2 === 0)
                 .sort((a, b) => a.propHash - b.propHash)
-                .slice(0, 28);
+                .slice(0, 12);
             const paintingFaces = new Set(paintingSpots.map((face) => faceKey(face.wx, face.wz, face.dx, face.dz)));
 
             const usedCells = new Set();
@@ -3300,7 +3337,7 @@
             const floorGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
             floorGeo.rotateX(-Math.PI / 2);
             floorBase = new THREE.Mesh(floorGeo, floorBaseMat);
-            floorBase.position.set((w - 1) / 2, -0.02, (h - 1) / 2);
+            floorBase.position.set((w - 1) / 2, -0.55, (h - 1) / 2);
             floorBase.receiveShadow = true;
             scene.add(floorBase);
 
@@ -3367,9 +3404,9 @@
 
             function buildWalls(positions, material, height, widthX = 1.02, widthZ = 1.02) {
                 const count = positions.length / 2 || 1;
-                const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(widthX, height, widthZ), material, count);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
+                const mesh = new THREE.InstancedMesh(makeWallBoxGeo(widthX, height, widthZ), material, count);
+                mesh.castShadow = false;
+                mesh.receiveShadow = false;
                 const dummy = new THREE.Object3D();
                 const color = new THREE.Color();
                 for (let i = 0; i < positions.length; i += 2) {
@@ -3414,8 +3451,11 @@
                 win.position.set(windowWalls[i], 0, windowWalls[i + 1]);
                 win.rotation.y = facingOpen(state.grid, windowWalls[i], windowWalls[i + 1]);
                 extraWallRoot.add(win);
-                if (win.userData.light && windowLights.length < 6) {
+                if (win.userData.light && windowLights.length < 3) {
                     windowLights.push(win.userData.light);
+                } else if (win.userData.light) {
+                    win.remove(win.userData.light);
+                    win.userData.light = null;
                 }
             }
             for (let i = 0; i < breachWalls.length; i += 2) {
@@ -3428,15 +3468,16 @@
                 const dz = doorTiles[i + 1];
                 const room = roomContaining(state.rooms, dx, dz) || roomBeside(state.rooms, dx, dz);
                 const door = makeDoorway(room?.kind);
-                door.position.set(dx, 0, dz);
-                door.rotation.y = facingHall(state.grid, dx, dz, state.rooms);
+                const yaw = facingHall(state.grid, dx, dz, state.rooms);
+                door.rotation.y = yaw;
+                door.position.set(dx + Math.sin(yaw) * 0.5, 0, dz + Math.cos(yaw) * 0.5);
                 extraWallRoot.add(door);
             }
             scene.add(extraWallRoot);
 
             hazardRoot = new THREE.Group();
             for (let i = 0; i < waterTiles.length; i += 2) {
-                const tile = makeWaterTile(i === 0);
+                const tile = makeWaterTile();
                 tile.position.set(waterTiles[i], 0, waterTiles[i + 1]);
                 hazardRoot.add(tile);
                 if (tile.userData.water) {
@@ -3639,6 +3680,7 @@
             const h = canvasH || 480;
             camera.aspect = w / Math.max(1, h);
             camera.updateProjectionMatrix();
+            renderer.setPixelRatio(1);
             renderer.setSize(w, h);
         }
 
@@ -3833,8 +3875,8 @@
             }
             for (let i = 0; i < torchLights.length; i++) {
                 const light = torchLights[i];
-                const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 1.1 + Math.sin(clock.elapsedTime * 23 + i) * 0.6;
-                light.intensity = light.userData.base + flicker;
+                const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 0.12 + Math.sin(clock.elapsedTime * 23 + i) * 0.06;
+                light.intensity = light.userData.base * (1 + flicker);
             }
             goldMat.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.18;
             exitCrown.rotation.y = clock.elapsedTime * 0.7;

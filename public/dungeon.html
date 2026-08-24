@@ -639,12 +639,143 @@
             return canvas;
         }
 
+        function makeWoodCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1c140e';
+            ctx.fillRect(0, 0, size, size);
+            const boards = [[92, 68, 42], [78, 56, 34], [108, 80, 50], [70, 50, 30]];
+            const bw = 8;
+            for (let x = 0, i = 0; x < size; x += bw, i += 1) {
+                const pal = boards[i % boards.length];
+                const shade = 0.82 + (i % 5) * 0.04;
+                ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
+                ctx.fillRect(x + 1, 0, bw - 1, size);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(x, 0, 1, size);
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.fillRect(x + 1, 0, 1, size);
+            }
+            return canvas;
+        }
+
+        function makeMetalCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a3038';
+            ctx.fillRect(0, 0, size, size);
+            for (let y = 0; y < size; y += 16) {
+                for (let x = 0; x < size; x += 16) {
+                    ctx.fillStyle = (x + y) % 32 === 0 ? '#4a5560' : '#3a444e';
+                    ctx.fillRect(x + 1, y + 1, 14, 14);
+                    ctx.fillStyle = '#8a949e';
+                    ctx.fillRect(x + 2, y + 2, 2, 2);
+                    ctx.fillRect(x + 12, y + 2, 2, 2);
+                    ctx.fillRect(x + 2, y + 12, 2, 2);
+                    ctx.fillRect(x + 12, y + 12, 2, 2);
+                }
+            }
+            return canvas;
+        }
+
+        function makeNightSkyCanvas() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const g = ctx.createLinearGradient(0, 0, 0, size);
+            g.addColorStop(0, '#070818');
+            g.addColorStop(0.45, '#12143a');
+            g.addColorStop(1, '#1a1430');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#f4f0d8';
+            ctx.beginPath();
+            ctx.arc(48, 14, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#12143a';
+            ctx.beginPath();
+            ctx.arc(51, 12, 5, 0, Math.PI * 2);
+            ctx.fill();
+            for (let n = 0; n < 40; n++) {
+                const x = (n * 13 + 5) % size;
+                const y = (n * 17 + 3) % size;
+                ctx.fillStyle = n % 5 === 0 ? '#ffe8a0' : '#d8e8ff';
+                ctx.fillRect(x, y, n % 7 === 0 ? 2 : 1, n % 7 === 0 ? 2 : 1);
+            }
+            return canvas;
+        }
+
+        function makeSplatterCanvas(kind) {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const colors = kind === 'blood'
+                ? ['#5a0808', '#3a0404', '#7a1010', '#1a0202']
+                : ['#3a5a18', '#2a4a10', '#4a7020', '#1a3008'];
+            for (let i = 0; i < 8; i++) {
+                const cx = 18 + (i * 7) % 28;
+                const cy = 16 + (i * 11) % 30;
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, 8 + (i % 4), 6 + (i % 3), i * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(cx - 1, cy, 2, 10 + (i % 8));
+            }
+            return canvas;
+        }
+
         function makeFloorCanvas(kind) {
             const size = 32;
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
+
+            function px(x, y, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(((x % size) + size) % size, ((y % size) + size) % size, 1, 1);
+            }
+
+            if (kind === 'dirt') {
+                ctx.fillStyle = '#2a2016';
+                ctx.fillRect(0, 0, size, size);
+                const dirt = ['#3a2a1c', '#4a3624', '#2e2218', '#5a4030', '#241810'];
+                for (let n = 0; n < 220; n++) {
+                    px((n * 11 + 3) % size, (n * 17 + 7) % size, dirt[n % dirt.length]);
+                }
+                return canvas;
+            }
+
+            if (kind === 'plank') {
+                ctx.fillStyle = '#1a120c';
+                ctx.fillRect(0, 0, size, size);
+                const boards = [
+                    [86, 62, 38], [102, 74, 46], [74, 54, 34], [94, 68, 42],
+                ];
+                const bh = 8;
+                for (let y = 0, i = 0; y < size; y += bh, i += 1) {
+                    const pal = boards[i % boards.length];
+                    const shade = 0.88 + (i % 4) * 0.04;
+                    ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
+                    ctx.fillRect(0, y + 1, size, bh - 1);
+                    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+                    ctx.fillRect(0, y, size, 1);
+                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                    ctx.fillRect(0, y + 1, size, 1);
+                }
+                return canvas;
+            }
+
             const grout = kind === 'moss' ? '#1c2a18' : '#1a1613';
             ctx.fillStyle = grout;
             ctx.fillRect(0, 0, size, size);
@@ -729,6 +860,9 @@
             ember: { fog: 0x140a06, dark: 0x1a0e08, wall: 0xffd2a8, floor: 0xe8b078, torch: 0xff9030, flame: 0xff5010 },
             iron: { fog: 0x080a12, dark: 0x0c1018, wall: 0xc0d0e4, floor: 0xa0b4cc, torch: 0x88bbff, flame: 0x4060c0 },
             blood: { fog: 0x120606, dark: 0x180808, wall: 0xecc0b4, floor: 0xd08070, torch: 0xff5533, flame: 0xc02010 },
+            crypt: { fog: 0x0c0c12, dark: 0x12141a, wall: 0xd8d4cc, floor: 0xc4c0b8, torch: 0xc8d8ff, flame: 0x6070a0 },
+            sewer: { fog: 0x0c1008, dark: 0x10140c, wall: 0xb8c4a0, floor: 0x8a9a70, torch: 0x9ad060, flame: 0x4a7028 },
+            gilt: { fog: 0x120e08, dark: 0x1a140c, wall: 0xf0e0b8, floor: 0xe8d090, torch: 0xffd060, flame: 0xc08020 },
         };
         const ROOM_ACCENTS = {
             cell: 0xa8b0c0,
@@ -740,7 +874,23 @@
             dining: 0xd8b070,
             library: 0xb89878,
             barracks: 0xb0a090,
+            shrine: 0xd8c878,
+            well: 0x88a8a0,
+            armory: 0xa8a090,
+            forge: 0xc87840,
+            crypt: 0xb0b8c0,
+            sewer: 0x8a9a70,
+            chapel: 0xe8d8b0,
+            garden: 0x78a868,
         };
+        const WOOD_ROOMS = new Set(['library', 'bedroom', 'dining', 'study', 'closet', 'chapel']);
+        const DIRT_ROOMS = new Set(['garden', 'well']);
+        const CARPET_ROOMS = new Set(['bedroom', 'chapel', 'dining', 'library', 'shrine']);
+        const CARPET_SOMETIMES = new Set(['study', 'closet']);
+        const MUSHROOM_PALETTES = new Set(['moss', 'iron', 'sewer', 'stone']);
+        const BLOOD_ROOMS = new Set(['crypt', 'cell', 'barracks', 'armory']);
+        const SLIME_ROOMS = new Set(['sewer', 'garden', 'well']);
+        const CLEAN_ROOMS = new Set(['chapel', 'bedroom']);
 
         function paletteOf(id) {
             return PALETTES[id] || PALETTES.stone;
@@ -759,6 +909,20 @@
             torchFlameMat.emissive.setHex(palette.flame);
             torchHot.setHex(palette.torch).lerp(torchWhite, 0.42);
             torchCool.setHex(palette.flame);
+            woodWallMat.color.setHex(palette.wall);
+            if (id === 'moss') {
+                woodWallMat.color.lerp(new THREE.Color(0x88aa70), 0.22);
+            } else if (id === 'gilt') {
+                woodWallMat.color.lerp(new THREE.Color(0xe8c878), 0.28);
+            }
+            metalWallMat.color.setHex(palette.wall);
+            nightSkyMat.color.setHex(
+                id === 'ember' ? 0xffd8b0
+                    : id === 'crypt' ? 0xc0d0ff
+                    : id === 'blood' ? 0xffc8c0
+                    : id === 'gilt' ? 0xffe8c8
+                    : 0xffffff,
+            );
             torch.color.setHex(palette.torch);
             ambient.color.setHex(palette.dark);
             return palette;
@@ -769,7 +933,30 @@
                 x >= room.x && x < room.x + room.w && z >= room.y && z < room.y + room.h);
         }
 
-        const FLOOR_KINDS = ['flag', 'worn', 'moss', 'dark', 'gravel'];
+        function roomBeside(rooms, x, z) {
+            return roomContaining(rooms, x, z) || (rooms || []).find((room) =>
+                x >= room.x - 1 && x < room.x + room.w + 1 && z >= room.y - 1 && z < room.y + room.h + 1);
+        }
+
+        function pickFloorKind(x, z, rooms, paletteId) {
+            const room = roomContaining(rooms, x, z);
+            const hash = Math.abs(x * 11 + z * 29);
+            if (DIRT_ROOMS.has(room?.kind)
+                || (paletteId === 'moss' && room && hash % 3 !== 0)
+                || (room && MUSHROOM_PALETTES.has(paletteId) && hash % 11 === 2)) {
+                return 'dirt';
+            }
+            if (WOOD_ROOMS.has(room?.kind)) {
+                return 'plank';
+            }
+            return FLOOR_KINDS[hash % 5];
+        }
+
+        function isDirtFloor(x, z, rooms, paletteId) {
+            return pickFloorKind(x, z, rooms, paletteId) === 'dirt';
+        }
+
+        const FLOOR_KINDS = ['flag', 'worn', 'moss', 'dark', 'gravel', 'plank', 'dirt'];
         const floorMats = FLOOR_KINDS.map((kind) => new THREE.MeshStandardMaterial({
             map: canvasToTexture(makeFloorCanvas(kind), 1, 1),
             roughness: 0.96,
@@ -793,6 +980,53 @@
             roughness: 0.94,
             metalness: 0.03,
         });
+        const woodWallMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeWoodCanvas()),
+            roughness: 0.88,
+            metalness: 0.04,
+        });
+        const metalWallMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeMetalCanvas()),
+            roughness: 0.42,
+            metalness: 0.72,
+        });
+        const nightSkyMat = new THREE.MeshBasicMaterial({
+            map: canvasToTexture(makeNightSkyCanvas()),
+            fog: false,
+            depthWrite: true,
+        });
+        const bloodSplatterMat = new THREE.MeshBasicMaterial({
+            map: canvasToTexture(makeSplatterCanvas('blood')),
+            transparent: true,
+            opacity: 0.82,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+        });
+        const slimeSplatterMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeSplatterCanvas('slime')),
+            transparent: true,
+            opacity: 0.72,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            color: 0xb8ff88,
+            emissive: 0x3a6a18,
+            emissiveIntensity: 0.45,
+            roughness: 1,
+            metalness: 0,
+        });
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x1a4858,
+            emissive: 0x0a2838,
+            emissiveIntensity: 0.55,
+            roughness: 0.18,
+            metalness: 0.35,
+            transparent: true,
+            opacity: 0.82,
+        });
+        const spikeMat = new THREE.MeshStandardMaterial({ color: 0x6a6460, roughness: 0.4, metalness: 0.65 });
+        const pitMat = new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 1, metalness: 0 });
         const torchBracketMat = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.8, metalness: 0.35 });
         const torchFlameMat = new THREE.MeshStandardMaterial({
             color: 0xffb040,
@@ -999,6 +1233,10 @@
         const HOLE_WALL = 5;
         const FENCE_WALL = 6;
         const FURNITURE = 7;
+        const WINDOW_WALL = 8;
+        const BREACH_WALL = 9;
+        const WATER_TILE = 10;
+        const SPIKE_TILE = 11;
         const HALF_H = WALL_H * 0.5;
         const BROKEN_H = WALL_H * 0.32;
         const fencePostGeo = new THREE.BoxGeometry(0.08, 0.72, 0.08);
@@ -1012,7 +1250,12 @@
         let crackedWallMesh = null;
         let halfWallMesh = null;
         let brokenWallMesh = null;
+        let woodWallMesh = null;
+        let metalWallMesh = null;
         let extraWallRoot = null;
+        let hazardRoot = null;
+        let waterMeshes = [];
+        let windowLights = [];
         let torchRoot = null;
         let torchLights = [];
         let torchMeshes = [];
@@ -1656,6 +1899,15 @@
                 scene.remove(extraWallRoot);
                 extraWallRoot = null;
             }
+            windowLights = [];
+        }
+
+        function clearHazards() {
+            if (hazardRoot) {
+                scene.remove(hazardRoot);
+                hazardRoot = null;
+            }
+            waterMeshes = [];
         }
 
         function isWalkable(cell) {
@@ -1672,7 +1924,7 @@
 
         function isWallLike(cell) {
             return cell === FULL_WALL || cell === HALF_WALL || cell === BROKEN_WALL
-                || cell === HOLE_WALL || cell === FENCE_WALL;
+                || cell === HOLE_WALL || cell === FENCE_WALL || cell === WINDOW_WALL || cell === BREACH_WALL;
         }
 
         function faceKey(wx, wz, dx, dz) {
@@ -1810,6 +2062,9 @@
             if (paletteId === 'moss') {
                 return { max: 11, step: 4 };
             }
+            if (paletteId === 'sewer') {
+                return { max: 9, step: 5 };
+            }
             if (paletteId === 'iron') {
                 return { max: 8, step: 7 };
             }
@@ -1852,14 +2107,16 @@
             return group;
         }
 
-        function placeMushrooms(grid, floorCells, taken, paletteId) {
+        function placeMushrooms(grid, floorCells, taken, paletteId, rooms) {
             const budget = mushroomBudget(paletteId);
             if (!budget) {
                 return;
             }
             const blueBias = paletteId === 'iron' ? 1 : 0;
             let candidates = floorCells.filter((cell) =>
-                !taken.has(`${cell.x},${cell.z}`) && cell.hash % budget.step === 2);
+                !taken.has(`${cell.x},${cell.z}`)
+                && isDirtFloor(cell.x, cell.z, rooms, paletteId)
+                && cell.hash % budget.step === 2);
             if (paletteId !== 'moss') {
                 const nearWall = candidates.filter((cell) =>
                     WALL_DIRS.some((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx])));
@@ -2080,6 +2337,188 @@
             return group;
         }
 
+        function facingOpen(grid, x, z) {
+            for (const { dx, dz } of WALL_DIRS) {
+                if (isWalkable(grid[z + dz]?.[x + dx])) {
+                    return Math.atan2(dx, dz);
+                }
+            }
+            return 0;
+        }
+
+        function makeWindowWall() {
+            const group = new THREE.Group();
+            const left = new THREE.Mesh(new THREE.BoxGeometry(0.22, WALL_H, 1.02), wallMat);
+            left.position.set(-0.4, WALL_H / 2, 0);
+            const right = new THREE.Mesh(new THREE.BoxGeometry(0.22, WALL_H, 1.02), wallMat);
+            right.position.set(0.4, WALL_H / 2, 0);
+            const sill = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 1.02), wallMat);
+            sill.position.set(0, 0.42, 0);
+            const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 1.02), wallMat);
+            lintel.position.set(0, WALL_H - 0.12, 0);
+            const sky = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.72), nightSkyMat);
+            sky.position.set(0, 0.88, -0.54);
+            group.add(left, right, sill, lintel, sky);
+            const light = new THREE.RectAreaLight(0xa8c8ff, 2.4, 0.5, 0.55);
+            light.position.set(0, 0.88, -0.18);
+            light.rotation.y = Math.PI;
+            light.userData.base = 1.8;
+            group.add(light);
+            group.userData.light = light;
+            return group;
+        }
+
+        function makeBreachWall() {
+            const group = new THREE.Group();
+            const sill = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.26, 1.02), crackedWallMat);
+            sill.position.y = 0.13;
+            const left = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wallMat);
+            left.position.set(-0.42, WALL_H / 2, 0);
+            const right = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wallMat);
+            right.position.set(0.42, WALL_H / 2, 0);
+            const top = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 1.02), crackedWallMat);
+            top.position.y = WALL_H - 0.08;
+            const rubble = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.22), crackedWallMat);
+            rubble.position.set(0.12, 0.32, 0.2);
+            group.add(sill, left, right, top, rubble);
+            return group;
+        }
+
+        function makeWaterTile(withLight) {
+            const group = new THREE.Group();
+            const lip = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.08, 1.02), wallMat);
+            lip.position.y = -0.02;
+            const water = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), waterMat);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = -0.06;
+            group.add(lip, water);
+            group.userData.water = water;
+            if (withLight) {
+                const light = new THREE.PointLight(0x3a88aa, 0.45, 2.6);
+                light.position.set(0, 0.18, 0);
+                group.add(light);
+            }
+            return group;
+        }
+
+        function makeSpikeTile() {
+            const group = new THREE.Group();
+            const pit = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.35, 0.92), pitMat);
+            pit.position.y = -0.18;
+            group.add(pit);
+            const spikeGeo = new THREE.ConeGeometry(0.05, 0.22, 5);
+            for (let i = 0; i < 7; i++) {
+                const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                spike.position.set(((i % 3) - 1) * 0.22, 0.08, (Math.floor(i / 3) - 1) * 0.22);
+                group.add(spike);
+            }
+            return group;
+        }
+
+        function makeCarpet(room, hash, paletteId) {
+            const group = new THREE.Group();
+            const w = Math.max(0.8, room.w * 0.62);
+            const d = Math.max(0.6, room.h * 0.55);
+            const color = paletteId === 'gilt'
+                ? 0xc4a24a
+                : (ROOM_ACCENTS[room.kind] || clothMats[hash % clothMats.length].color.getHex());
+            const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0 });
+            if (paletteId === 'gilt') {
+                const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.016, d + 0.1), goldMat);
+                trim.position.y = 0.01;
+                trim.receiveShadow = true;
+                group.add(trim);
+            }
+            const rug = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), mat);
+            rug.position.y = 0.014;
+            rug.receiveShadow = true;
+            group.add(rug);
+            return group;
+        }
+
+        function makeAltar() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.45), stoneish());
+            base.position.y = 0.08;
+            const top = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.08, 0.52), goldMat);
+            top.position.y = 0.2;
+            group.add(base, top);
+            return group;
+        }
+
+        function stoneish() {
+            return wallMat;
+        }
+
+        function makeAnvil() {
+            const group = new THREE.Group();
+            const block = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.22, 0.22), ironMat);
+            block.position.y = 0.22;
+            const horn = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.1), ironMat);
+            horn.position.set(0.22, 0.3, 0);
+            const glow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.2), torchFlameMat);
+            glow.position.set(-0.28, 0.12, 0);
+            group.add(block, horn, glow);
+            return group;
+        }
+
+        function makeSarcophagus() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.32, 0.42), wallMat);
+            box.position.y = 0.16;
+            const lid = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.46), crackedWallMat);
+            lid.position.y = 0.36;
+            group.add(box, lid);
+            return group;
+        }
+
+        function makeWell() {
+            const group = new THREE.Group();
+            const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.22, 10), wallMat);
+            ring.position.y = 0.11;
+            const water = new THREE.Mesh(new THREE.CircleGeometry(0.2, 10), waterMat);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = 0.12;
+            group.add(ring, water);
+            waterMeshes.push(water);
+            return group;
+        }
+
+        function makePlanter() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.28), woodMat);
+            box.position.y = 0.08;
+            const plant = makePlant();
+            plant.scale.set(0.7, 0.7, 0.7);
+            plant.position.y = 0.08;
+            group.add(box, plant);
+            return group;
+        }
+
+        function makeWeaponRack() {
+            const group = new THREE.Group();
+            const post = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.08), woodMat);
+            post.position.y = 0.7;
+            const stand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 0.08), woodMat);
+            stand.position.y = 0.35;
+            const a = makeWeapons(2);
+            a.position.set(-0.18, 0.55, 0);
+            const b = makeWeapons(3);
+            b.position.set(0.18, 0.55, 0);
+            group.add(post, stand, a, b);
+            return group;
+        }
+
+        function makePew() {
+            const group = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.28), woodMat);
+            seat.position.y = 0.22;
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.32, 0.06), woodMat);
+            back.position.set(0, 0.4, -0.12);
+            group.add(seat, back);
+            return group;
+        }
+
         function furnitureGroups(grid, width, height) {
             const seen = new Set();
             const groups = [];
@@ -2164,6 +2603,18 @@
                     prop = n >= 2 ? makeBookshelf() : makeCabinet();
                 } else if (kind === 'dining' || kind === 'barracks') {
                     prop = n >= 4 ? makeDiningTable() : makeTable(1.55, 0.7);
+                } else if (kind === 'chapel' || kind === 'shrine') {
+                    prop = n >= 2 ? makeAltar() : makePew();
+                } else if (kind === 'forge') {
+                    prop = makeAnvil();
+                } else if (kind === 'armory') {
+                    prop = makeWeaponRack();
+                } else if (kind === 'crypt') {
+                    prop = makeSarcophagus();
+                } else if (kind === 'garden') {
+                    prop = makePlanter();
+                } else if (kind === 'well') {
+                    prop = makeWell();
                 } else if (kind === 'cell' || kind === 'pantry' || kind === 'closet') {
                     if (kind === 'closet') {
                         prop = makeCabinet();
@@ -2257,7 +2708,97 @@
             return used;
         }
 
-        function placeProps(grid, width, height, player, exit, torchFaces, rooms, paletteId) {
+        function placeCarpets(rooms, paletteId, grid) {
+            for (const room of rooms || []) {
+                const hash = Math.abs(room.x * 13 + room.y * 17);
+                const yes = CARPET_ROOMS.has(room.kind)
+                    || (CARPET_SOMETIMES.has(room.kind) && hash % 2 === 0);
+                if (!yes) {
+                    continue;
+                }
+                let hazard = false;
+                for (let y = room.y; y < room.y + room.h && !hazard; y++) {
+                    for (let x = room.x; x < room.x + room.w; x++) {
+                        const cell = grid?.[y]?.[x];
+                        if (cell === WATER_TILE || cell === SPIKE_TILE) {
+                            hazard = true;
+                            break;
+                        }
+                    }
+                }
+                if (hazard) {
+                    continue;
+                }
+                const carpet = makeCarpet(room, hash, paletteId);
+                carpet.position.set(room.x + (room.w - 1) / 2, 0, room.y + (room.h - 1) / 2);
+                propRoot.add(carpet);
+            }
+        }
+
+        function placeSplatters(grid, width, height, rooms, paletteId, floor, faces) {
+            if (floor <= 0 || paletteId === 'gilt') {
+                return;
+            }
+            const bloodish = paletteId === 'blood' || paletteId === 'crypt';
+            const slimeish = paletteId === 'sewer' || paletteId === 'moss';
+            let n = 0;
+            for (const face of faces) {
+                if (grid[face.wz]?.[face.wx] === WINDOW_WALL) {
+                    continue;
+                }
+                const room = roomContaining(rooms, face.x, face.z);
+                if (CLEAN_ROOMS.has(room?.kind)) {
+                    continue;
+                }
+                const wantBlood = bloodish || BLOOD_ROOMS.has(room?.kind);
+                const wantSlime = slimeish || SLIME_ROOMS.has(room?.kind);
+                if (!wantBlood && !wantSlime) {
+                    continue;
+                }
+                if (face.propHash % 6 !== 0) {
+                    continue;
+                }
+                const mat = wantBlood && (!wantSlime || face.propHash % 2 === 0)
+                    ? bloodSplatterMat
+                    : slimeSplatterMat;
+                const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.48), mat);
+                decal.position.set(face.wx - face.dx * 0.51, 0.55, face.wz - face.dz * 0.51);
+                decal.rotation.y = Math.atan2(-face.dx, -face.dz);
+                propRoot.add(decal);
+                n += 1;
+                if (n > 18) {
+                    break;
+                }
+            }
+            for (let z = 0; z < height && n < 28; z++) {
+                for (let x = 0; x < width && n < 28; x++) {
+                    if (grid[z][x] !== 0) {
+                        continue;
+                    }
+                    const room = roomContaining(rooms, x, z);
+                    if (CLEAN_ROOMS.has(room?.kind)) {
+                        continue;
+                    }
+                    const wantBlood = bloodish || BLOOD_ROOMS.has(room?.kind);
+                    const wantSlime = slimeish || SLIME_ROOMS.has(room?.kind);
+                    if (!wantBlood && !wantSlime) {
+                        continue;
+                    }
+                    const hash = Math.abs(x * 19 + z * 23);
+                    if (hash % 8 !== 0) {
+                        continue;
+                    }
+                    const mat = wantBlood && hash % 2 === 0 ? bloodSplatterMat : slimeSplatterMat;
+                    const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), mat);
+                    decal.rotation.x = -Math.PI / 2;
+                    decal.position.set(x, 0.03, z);
+                    propRoot.add(decal);
+                    n += 1;
+                }
+            }
+        }
+
+        function placeProps(grid, width, height, player, exit, torchFaces, rooms, paletteId, floor) {
             clearProps();
             propRoot = new THREE.Group();
             const faces = collectFaces(grid, width, height);
@@ -2288,7 +2829,13 @@
                 .sort((a, b) => a.propHash - b.propHash)
                 .slice(0, 10);
             for (const spot of wallSpots) {
-                const maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
+                const room = roomContaining(rooms, spot.x, spot.z);
+                let maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
+                if (room?.kind === 'armory' || room?.kind === 'barracks') {
+                    maker = makeWeapons;
+                } else if (room?.kind === 'chapel' || room?.kind === 'shrine') {
+                    maker = makeBanner;
+                }
                 const prop = maker(spot.propHash);
                 const px = spot.wx - spot.dx * 0.54;
                 const pz = spot.wz - spot.dz * 0.54;
@@ -2320,7 +2867,13 @@
             for (const cell of furniture) {
                 const walls = WALL_DIRS.filter((dir) => isWallLike(grid[cell.z + dir.dz]?.[cell.x + dir.dx]));
                 const dir = walls[cell.hash % Math.max(1, walls.length)] || { dx: 0, dz: 1 };
-                const maker = FLOOR_PROP_MAKERS[cell.hash % FLOOR_PROP_MAKERS.length];
+                const room = roomContaining(rooms, cell.x, cell.z);
+                let maker = FLOOR_PROP_MAKERS[cell.hash % FLOOR_PROP_MAKERS.length];
+                if (room?.kind === 'garden') {
+                    maker = makePlant;
+                } else if (room?.kind === 'kitchen') {
+                    maker = makeBarrel;
+                }
                 const prop = maker(cell.hash);
                 prop.position.set(cell.x + dir.dx * 0.32, 0, cell.z + dir.dz * 0.32);
                 prop.rotation.y = Math.atan2(-dir.dx, -dir.dz);
@@ -2332,7 +2885,11 @@
                 .slice(0, 8);
             const detailCells = new Set(details.map((cell) => `${cell.x},${cell.z}`));
             for (const cell of details) {
+                const room = roomContaining(rooms, cell.x, cell.z);
                 const maker = DETAIL_PROP_MAKERS[cell.hash % DETAIL_PROP_MAKERS.length];
+                if (maker === makePit && ['cell', 'crypt', 'armory', 'barracks'].includes(room?.kind)) {
+                    continue;
+                }
                 const prop = maker(cell.hash);
                 const ox = ((cell.hash % 5) - 2) * 0.06;
                 const oz = ((cell.hash % 3) - 1) * 0.06;
@@ -2342,7 +2899,9 @@
             }
 
             const taken = new Set([...furnitureCells, ...detailCells]);
-            placeMushrooms(grid, floorCells, taken, paletteId);
+            placeCarpets(rooms, paletteId, grid);
+            placeSplatters(grid, width, height, rooms, paletteId, floor, openFaces);
+            placeMushrooms(grid, floorCells, taken, paletteId, rooms);
 
             placeLargeFurniture(grid, width, height, rooms);
             scene.add(propRoot);
@@ -2361,11 +2920,16 @@
             disposeMesh(crackedWallMesh);
             disposeMesh(halfWallMesh);
             disposeMesh(brokenWallMesh);
+            disposeMesh(woodWallMesh);
+            disposeMesh(metalWallMesh);
             clearExtraWalls();
+            clearHazards();
             clearTorches();
             clearProps();
 
             const palette = applyPalette(state.palette);
+            waterMat.color.setHex(state.palette === 'sewer' ? 0x2a4a18 : 0x1a4858);
+            waterMat.emissive.setHex(state.palette === 'sewer' ? 0x14280c : 0x0a2838);
             for (const mat of floorMats) {
                 mat.color.setHex(palette.floor);
             }
@@ -2388,18 +2952,38 @@
             const stoneWalls = [];
             const vineWalls = [];
             const crackedWalls = [];
+            const woodWalls = [];
+            const metalWalls = [];
             const halfWalls = [];
             const brokenWalls = [];
             const holeWalls = [];
             const fenceWalls = [];
+            const windowWalls = [];
+            const breachWalls = [];
+            const waterTiles = [];
+            const spikeTiles = [];
+            const paletteId = state.palette || 'stone';
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
                     const cell = state.grid[y][x];
                     if (cell === FULL_WALL) {
-                        const kind = (x * 7 + y * 13) % 5;
-                        if (kind === 0) {
+                        const room = roomBeside(state.rooms, x, y);
+                        const roll = (x * 7 + y * 13) % 5;
+                        if (WOOD_ROOMS.has(room?.kind) && roll !== 1) {
+                            woodWalls.push(x, y);
+                        } else if ((paletteId === 'iron' || paletteId === 'gilt') && (roll === 0 || roll === 2)) {
+                            metalWalls.push(x, y);
+                        } else if (paletteId === 'moss' && (roll === 0 || roll === 2 || roll === 3)) {
                             vineWalls.push(x, y);
-                        } else if (kind === 1) {
+                        } else if ((paletteId === 'ember' || paletteId === 'blood') && (roll === 0 || roll === 1 || roll === 3)) {
+                            crackedWalls.push(x, y);
+                        } else if ((paletteId === 'sewer' || paletteId === 'crypt') && roll === 0) {
+                            vineWalls.push(x, y);
+                        } else if ((paletteId === 'sewer' || paletteId === 'crypt') && roll === 1) {
+                            crackedWalls.push(x, y);
+                        } else if (roll === 0) {
+                            vineWalls.push(x, y);
+                        } else if (roll === 1) {
                             crackedWalls.push(x, y);
                         } else {
                             stoneWalls.push(x, y);
@@ -2412,6 +2996,14 @@
                         holeWalls.push(x, y);
                     } else if (cell === FENCE_WALL) {
                         fenceWalls.push(x, y);
+                    } else if (cell === WINDOW_WALL) {
+                        windowWalls.push(x, y);
+                    } else if (cell === BREACH_WALL) {
+                        breachWalls.push(x, y);
+                    } else if (cell === WATER_TILE) {
+                        waterTiles.push(x, y);
+                    } else if (cell === SPIKE_TILE) {
+                        spikeTiles.push(x, y);
                     }
                 }
             }
@@ -2443,6 +3035,8 @@
             wallMesh = stoneWalls.length ? buildWalls(stoneWalls, wallMat, WALL_H) : null;
             vineWallMesh = vineWalls.length ? buildWalls(vineWalls, vineWallMat, WALL_H) : null;
             crackedWallMesh = crackedWalls.length ? buildWalls(crackedWalls, crackedWallMat, WALL_H) : null;
+            woodWallMesh = woodWalls.length ? buildWalls(woodWalls, woodWallMat, WALL_H) : null;
+            metalWallMesh = metalWalls.length ? buildWalls(metalWalls, metalWallMat, WALL_H) : null;
             halfWallMesh = halfWalls.length ? buildWalls(halfWalls, wallMat, HALF_H) : null;
             brokenWallMesh = brokenWalls.length ? buildWalls(brokenWalls, crackedWallMat, BROKEN_H, 0.94, 0.88) : null;
 
@@ -2457,7 +3051,37 @@
                 fence.position.set(fenceWalls[i], 0, fenceWalls[i + 1]);
                 extraWallRoot.add(fence);
             }
+            for (let i = 0; i < windowWalls.length; i += 2) {
+                const win = makeWindowWall();
+                win.position.set(windowWalls[i], 0, windowWalls[i + 1]);
+                win.rotation.y = facingOpen(state.grid, windowWalls[i], windowWalls[i + 1]);
+                extraWallRoot.add(win);
+                if (win.userData.light && windowLights.length < 6) {
+                    windowLights.push(win.userData.light);
+                }
+            }
+            for (let i = 0; i < breachWalls.length; i += 2) {
+                const breach = makeBreachWall();
+                breach.position.set(breachWalls[i], 0, breachWalls[i + 1]);
+                extraWallRoot.add(breach);
+            }
             scene.add(extraWallRoot);
+
+            hazardRoot = new THREE.Group();
+            for (let i = 0; i < waterTiles.length; i += 2) {
+                const tile = makeWaterTile(i === 0);
+                tile.position.set(waterTiles[i], 0, waterTiles[i + 1]);
+                hazardRoot.add(tile);
+                if (tile.userData.water) {
+                    waterMeshes.push(tile.userData.water);
+                }
+            }
+            for (let i = 0; i < spikeTiles.length; i += 2) {
+                const tile = makeSpikeTile();
+                tile.position.set(spikeTiles[i], 0, spikeTiles[i + 1]);
+                hazardRoot.add(tile);
+            }
+            scene.add(hazardRoot);
 
             const floorBuckets = FLOOR_KINDS.map(() => []);
             for (let y = 0; y < h; y++) {
@@ -2465,7 +3089,8 @@
                     if (!isFloorTile(state.grid[y][x])) {
                         continue;
                     }
-                    const kind = Math.abs(x * 11 + y * 29) % FLOOR_KINDS.length;
+                    const kindName = pickFloorKind(x, y, state.rooms, paletteId);
+                    const kind = Math.max(0, FLOOR_KINDS.indexOf(kindName));
                     floorBuckets[kind].push(x, y);
                 }
             }
@@ -2508,7 +3133,7 @@
             for (const light of torchLights) {
                 light.color.setHex(palette.torch);
             }
-            placeProps(state.grid, w, h, state.player, state.exit, torchFaces, state.rooms, state.palette);
+            placeProps(state.grid, w, h, state.player, state.exit, torchFaces, state.rooms, state.palette, state.floor);
         }
 
         function applyState(state, snap) {
@@ -2750,6 +3375,15 @@
             torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
             updateTorchEmbers(dt);
             updateMushroomSpores(dt);
+            const pulse = 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.1;
+            for (const water of waterMeshes) {
+                water.material.opacity = pulse;
+                water.material.emissiveIntensity = 0.4 + Math.sin(clock.elapsedTime * 1.8) * 0.12;
+            }
+            for (let i = 0; i < windowLights.length; i++) {
+                const light = windowLights[i];
+                light.intensity = (light.userData.base || 2.6) * (0.85 + Math.sin(clock.elapsedTime * 0.7 + i) * 0.12);
+            }
             for (let i = 0; i < torchLights.length; i++) {
                 const light = torchLights[i];
                 const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 1.1 + Math.sin(clock.elapsedTime * 23 + i) * 0.6;

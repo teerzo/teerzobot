@@ -8,6 +8,10 @@ const BROKEN = 4;
 const HOLE = 5;
 const FENCE = 6;
 const FURNITURE = 7;
+const WINDOW = 8;
+const BREACH = 9;
+const WATER = 10;
+const SPIKES = 11;
 
 const DIRS = [
     { dx: 0, dy: -1 },
@@ -53,10 +57,15 @@ const ANCHORS = {
     br: 'bottom-right',
 };
 
-const PALETTE_IDS = ['stone', 'moss', 'ember', 'iron', 'blood'];
-const SMALL_KINDS = ['cell', 'pantry', 'closet'];
-const MEDIUM_KINDS = ['bedroom', 'kitchen', 'study'];
-const LARGE_KINDS = ['dining', 'library', 'barracks'];
+const PALETTE_IDS = ['stone', 'moss', 'ember', 'iron', 'blood', 'crypt', 'sewer', 'gilt'];
+const SMALL_KINDS = ['cell', 'pantry', 'closet', 'shrine', 'well'];
+const MEDIUM_KINDS = ['bedroom', 'kitchen', 'study', 'armory', 'forge', 'crypt', 'sewer'];
+const LARGE_KINDS = ['dining', 'library', 'barracks', 'chapel', 'garden'];
+const WINDOW_KINDS = new Set(['chapel', 'bedroom', 'garden', 'library', 'shrine']);
+const BREACH_KINDS = new Set(['forge', 'armory', 'crypt', 'barracks', 'sewer']);
+const WATER_KINDS = new Set(['garden', 'well', 'sewer']);
+const SPIKE_KINDS = new Set(['cell', 'crypt', 'armory', 'barracks']);
+const RARE_BREACH_KINDS = new Set(['chapel', 'bedroom']);
 
 export const DUNGEON_ALIASES = {
     u: 'up',
@@ -187,7 +196,8 @@ function pickExit(grid, startX, startY, minDist) {
 
 function paletteForFloor(floor) {
     const n = PALETTE_IDS.length;
-    return PALETTE_IDS[((Number(floor) % n) + n) % n];
+    const i = (((Number(floor) * 3) % n) + n) % n;
+    return PALETTE_IDS[i];
 }
 
 function assignRoomKinds(rooms) {
@@ -242,29 +252,42 @@ function carveRoom(grid, room) {
     }
 }
 
-function carveLine(grid, x0, y0, x1, y1) {
+function carveLine(grid, x0, y0, x1, y1, wide = false) {
     let x = x0;
     let y = y0;
     const sx = Math.sign(x1 - x0);
     const sy = Math.sign(y1 - y0);
-    grid[y][x] = FLOOR;
+    const paint = (px, py) => {
+        if (grid[py]?.[px] === WALL) {
+            grid[py][px] = FLOOR;
+        }
+        if (wide) {
+            const ox = sx !== 0 ? 0 : 1;
+            const oy = sy !== 0 ? 0 : 1;
+            if (grid[py + oy]?.[px + ox] === WALL) {
+                grid[py + oy][px + ox] = FLOOR;
+            }
+        }
+    };
+    paint(x, y);
     while (x !== x1) {
         x += sx;
-        grid[y][x] = FLOOR;
+        paint(x, y);
     }
     while (y !== y1) {
         y += sy;
-        grid[y][x] = FLOOR;
+        paint(x, y);
     }
 }
 
 function carveHall(grid, a, b) {
+    const wide = Math.random() < 0.25;
     if (Math.random() < 0.5) {
-        carveLine(grid, a.x, a.y, b.x, a.y);
-        carveLine(grid, b.x, a.y, b.x, b.y);
+        carveLine(grid, a.x, a.y, b.x, a.y, wide);
+        carveLine(grid, b.x, a.y, b.x, b.y, wide);
     } else {
-        carveLine(grid, a.x, a.y, a.x, b.y);
-        carveLine(grid, a.x, b.y, b.x, b.y);
+        carveLine(grid, a.x, a.y, a.x, b.y, wide);
+        carveLine(grid, a.x, b.y, b.x, b.y, wide);
     }
 }
 
@@ -309,8 +332,87 @@ function touchesRoom(x, y, rooms) {
     return rooms.some((room) => touchesOneRoom(x, y, room));
 }
 
-function cellRoomAt(x, y, rooms) {
-    return rooms.find((room) => room.kind === 'cell' && touchesOneRoom(x, y, room));
+function touchingRooms(x, y, rooms) {
+    return rooms.filter((room) => touchesOneRoom(x, y, room));
+}
+
+function primaryKind(x, y, rooms) {
+    const hit = touchingRooms(x, y, rooms);
+    return hit[0]?.kind || '';
+}
+
+function hasOppositeFloors(grid, x, y) {
+    const n = isOpen(grid[y - 1]?.[x]);
+    const s = isOpen(grid[y + 1]?.[x]);
+    const e = isOpen(grid[y]?.[x + 1]);
+    const w = isOpen(grid[y]?.[x - 1]);
+    return (n && s) || (e && w);
+}
+
+function isExteriorFacing(grid, x, y) {
+    for (const { dx, dy } of DIRS) {
+        if (!isOpen(grid[y + dy]?.[x + dx])) {
+            continue;
+        }
+        const ox = grid[y - dy]?.[x - dx];
+        if (ox === undefined || (!isOpen(ox) && ox !== FENCE && ox !== WINDOW && ox !== BREACH)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function wallStyleForKind(kind, roll) {
+    if (kind === 'cell') {
+        return roll % 5 === 0 ? HOLE : FENCE;
+    }
+    if (kind === 'chapel' || kind === 'library' || kind === 'shrine') {
+        return roll % 8 === 0 ? HALF : WALL;
+    }
+    if (kind === 'forge' || kind === 'armory') {
+        if (roll % 3 === 0) {
+            return BROKEN;
+        }
+        if (roll % 3 === 1) {
+            return HOLE;
+        }
+        return WALL;
+    }
+    if (kind === 'garden' || kind === 'well') {
+        if (roll % 3 === 0) {
+            return FENCE;
+        }
+        if (roll % 7 === 0) {
+            return HALF;
+        }
+        return WALL;
+    }
+    if (kind === 'crypt' || kind === 'sewer') {
+        if (roll % 3 === 0) {
+            return HOLE;
+        }
+        if (roll % 3 === 1) {
+            return BROKEN;
+        }
+        return WALL;
+    }
+    if (roll % 7 === 0) {
+        return HALF;
+    }
+    if (roll % 7 === 1) {
+        return BROKEN;
+    }
+    if (roll % 7 === 2) {
+        return HOLE;
+    }
+    if (roll % 7 === 3) {
+        return FENCE;
+    }
+    return WALL;
+}
+
+function isWallish(cell) {
+    return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE || cell === FENCE;
 }
 
 function styleInteriorWalls(grid, rooms) {
@@ -321,20 +423,28 @@ function styleInteriorWalls(grid, rooms) {
             if (grid[y][x] !== WALL || !touchesRoom(x, y, rooms)) {
                 continue;
             }
-            if (cellRoomAt(x, y, rooms)) {
-                const roll = Math.abs(x * 7 + y * 13) % 5;
-                grid[y][x] = roll === 0 ? HOLE : FENCE;
+            const kind = primaryKind(x, y, rooms);
+            const roll = Math.abs(x * 7 + y * 13);
+            grid[y][x] = wallStyleForKind(kind, roll);
+        }
+    }
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            if (!isWallish(grid[y][x]) || !touchesRoom(x, y, rooms)) {
                 continue;
             }
-            const kind = Math.abs(x * 7 + y * 13) % 7;
-            if (kind === 0) {
-                grid[y][x] = HALF;
-            } else if (kind === 1) {
-                grid[y][x] = BROKEN;
-            } else if (kind === 2) {
-                grid[y][x] = HOLE;
-            } else if (kind === 3) {
-                grid[y][x] = FENCE;
+            const kind = primaryKind(x, y, rooms);
+            const roll = Math.abs(x * 11 + y * 19);
+            if (WINDOW_KINDS.has(kind) && isExteriorFacing(grid, x, y) && roll % 3 === 0) {
+                grid[y][x] = WINDOW;
+                continue;
+            }
+            if (BREACH_KINDS.has(kind) && hasOppositeFloors(grid, x, y) && roll % 4 === 0) {
+                grid[y][x] = BREACH;
+                continue;
+            }
+            if (RARE_BREACH_KINDS.has(kind) && hasOppositeFloors(grid, x, y) && roll % 19 === 0) {
+                grid[y][x] = BREACH;
             }
         }
     }
@@ -344,7 +454,7 @@ function pathExists(grid, ax, ay, bx, by) {
     return (distFrom(grid, ax, ay)[by]?.[bx] ?? -1) >= 0;
 }
 
-function stampFurniture(grid, cells, startX, startY, exitX, exitY) {
+function stampCells(grid, cells, value, startX, startY, exitX, exitY) {
     for (const [x, y] of cells) {
         if (grid[y]?.[x] !== FLOOR) {
             return false;
@@ -354,7 +464,7 @@ function stampFurniture(grid, cells, startX, startY, exitX, exitY) {
         }
     }
     for (const [x, y] of cells) {
-        grid[y][x] = FURNITURE;
+        grid[y][x] = value;
     }
     if (!pathExists(grid, startX, startY, exitX, exitY)) {
         for (const [x, y] of cells) {
@@ -363,6 +473,10 @@ function stampFurniture(grid, cells, startX, startY, exitX, exitY) {
         return false;
     }
     return true;
+}
+
+function stampFurniture(grid, cells, startX, startY, exitX, exitY) {
+    return stampCells(grid, cells, FURNITURE, startX, startY, exitX, exitY);
 }
 
 function wallSideCells(room, grid) {
@@ -374,7 +488,8 @@ function wallSideCells(room, grid) {
             }
             const against = DIRS.some(({ dx, dy }) => {
                 const cell = grid[y + dy]?.[x + dx];
-                return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE || cell === FENCE;
+                return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE
+                    || cell === FENCE || cell === WINDOW || cell === BREACH;
             });
             if (against) {
                 spots.push([x, y]);
@@ -412,13 +527,104 @@ function placeRoomFurniture(grid, rooms, startX, startY, exitX, exitY) {
         const pair = spots[0] ? wallPair(spots[0], hash) : [];
         const kind = room.kind || 'closet';
         let stamped = false;
-        if (kind === 'dining' || kind === 'barracks' || (kind === 'bedroom' && area >= 31)) {
+        if (kind === 'chapel' || kind === 'shrine' || kind === 'dining' || kind === 'barracks'
+            || (kind === 'bedroom' && area >= 31)) {
             stamped = stampFurniture(grid, centerBlock(room), startX, startY, exitX, exitY);
-        } else if (kind === 'bedroom' || kind === 'kitchen' || kind === 'study' || kind === 'library') {
+        } else if (kind === 'forge' || kind === 'armory' || kind === 'bedroom' || kind === 'kitchen'
+            || kind === 'study' || kind === 'library') {
             stamped = pair.length ? stampFurniture(grid, pair, startX, startY, exitX, exitY) : false;
+        } else if (kind === 'crypt') {
+            const origin = spots[0] || [room.x + 1, room.y + 1];
+            stamped = stampFurniture(grid, wallPair(origin, hash + 1), startX, startY, exitX, exitY);
+        } else if (kind === 'garden') {
+            stamped = one.length ? stampFurniture(grid, one, startX, startY, exitX, exitY) : false;
+            if (spots[1]) {
+                stampFurniture(grid, [spots[1]], startX, startY, exitX, exitY);
+            }
+        } else if (kind === 'well') {
+            const c = roomCenter(room);
+            stamped = stampFurniture(grid, [[c.x, c.y]], startX, startY, exitX, exitY);
         }
         if (!stamped && one.length) {
             stampFurniture(grid, one, startX, startY, exitX, exitY);
+        }
+        if (area > 30 && spots[2]) {
+            stampFurniture(grid, [spots[2]], startX, startY, exitX, exitY);
+        }
+        if (area > 30 && hash % 5 === 0) {
+            const c = roomCenter(room);
+            const px = c.x + (hash % 2);
+            const py = c.y + ((hash >> 1) % 2);
+            stampFurniture(grid, [[px, py]], startX, startY, exitX, exitY);
+        }
+    }
+}
+
+function isDoorwayCell(room, x, y, grid) {
+    return DIRS.some(({ dx, dy }) => {
+        const nx = x + dx;
+        const ny = y + dy;
+        const outside = nx < room.x || nx >= room.x + room.w || ny < room.y || ny >= room.y + room.h;
+        return outside && isOpen(grid[ny]?.[nx]);
+    });
+}
+
+function interiorFloorCells(room, grid, startX, startY, exitX, exitY) {
+    const cells = [];
+    for (let y = room.y; y < room.y + room.h; y++) {
+        for (let x = room.x; x < room.x + room.w; x++) {
+            if (grid[y][x] !== FLOOR) {
+                continue;
+            }
+            if ((x === startX && y === startY) || (x === exitX && y === exitY)) {
+                continue;
+            }
+            cells.push([x, y]);
+        }
+    }
+    return shuffle(cells);
+}
+
+function twoByTwo(origin) {
+    const [x, y] = origin;
+    return [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+}
+
+function placeHazards(grid, rooms, startX, startY, exitX, exitY) {
+    for (const room of rooms) {
+        const kind = room.kind || '';
+        const cells = interiorFloorCells(room, grid, startX, startY, exitX, exitY)
+            .filter(([x, y]) => !isDoorwayCell(room, x, y, grid));
+        if (!cells.length) {
+            continue;
+        }
+        if (WATER_KINDS.has(kind)) {
+            let placed = false;
+            if (room.w * room.h >= 16) {
+                for (const origin of cells) {
+                    const block = twoByTwo(origin);
+                    if (block.every(([x, y]) => x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h)
+                        && stampCells(grid, block, WATER, startX, startY, exitX, exitY)) {
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if (!placed) {
+                const againstWall = cells.find(([x, y]) => DIRS.some(({ dx, dy }) => {
+                    const cell = grid[y + dy]?.[x + dx];
+                    return cell === WALL || cell === HALF || cell === BROKEN || cell === HOLE
+                        || cell === FENCE || cell === WINDOW || cell === BREACH;
+                }));
+                stampCells(grid, [againstWall || cells[0]], WATER, startX, startY, exitX, exitY);
+            }
+            continue;
+        }
+        if (SPIKE_KINDS.has(kind)) {
+            stampCells(grid, [cells[0]], SPIKES, startX, startY, exitX, exitY);
+            if (cells[1] && room.w * room.h >= 12) {
+                stampCells(grid, [cells[1]], SPIKES, startX, startY, exitX, exitY);
+            }
         }
     }
 }
@@ -533,6 +739,7 @@ function buildFloor(floor) {
         grid[exit.y][exit.x] = EXIT;
         styleInteriorWalls(grid, rooms);
         placeRoomFurniture(grid, rooms, startX, startY, exit.x, exit.y);
+        placeHazards(grid, rooms, startX, startY, exit.x, exit.y);
         last = mazePayload(size, grid, startX, startY, exit, rooms, floor);
         const dist = distFrom(grid, startX, startY)[exit.y][exit.x];
         if (dist >= targetPath) {

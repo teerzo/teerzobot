@@ -31,6 +31,8 @@ const CANVAS_STEPS = [
     { width: 640, height: 480 },
     { width: 854, height: 480 },
     { width: 960, height: 540 },
+    { width: 1280, height: 720 },
+    { width: 1600, height: 900 },
     { width: 1920, height: 1080 },
 ];
 const ANCHORS = {

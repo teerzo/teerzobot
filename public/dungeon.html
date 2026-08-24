@@ -1345,11 +1345,30 @@
             return theme.wall;
         }
 
+        function isCaveLook(x, z, rooms, paletteId) {
+            if (paletteId === 'cave') {
+                return true;
+            }
+            return roomContaining(rooms, x, z)?.kind === 'cave' || roomBeside(rooms, x, z)?.kind === 'cave';
+        }
+
+        function cellHash01(x, z, n = 0) {
+            return (Math.abs(x * 13 + z * 17 + n * 31 + x * z * 7) % 1000) / 1000;
+        }
+
+        function caveFloorBump(x, z) {
+            return 0.042 + cellHash01(x, z, 2) * 0.1;
+        }
+
+        function propLiftAt(x, z, rooms, paletteId) {
+            return isCaveLook(x, z, rooms, paletteId) ? caveFloorBump(x, z) : PROP_LIFT;
+        }
+
         function pickFloorKind(x, z, rooms, paletteId) {
             const room = roomContaining(rooms, x, z);
             const hash = Math.abs(x * 11 + z * 29);
             const theme = ROOM_THEMES[room?.kind];
-            if (room?.kind === 'cave') {
+            if (paletteId === 'cave' || room?.kind === 'cave') {
                 return ['gravel', 'gravel', 'dirt', 'dark', 'moss'][hash % 5];
             }
             if (theme) {
@@ -1876,6 +1895,7 @@
         const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
         const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
         const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
+        const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1888,6 +1908,7 @@
         let brokenWallMesh = null;
         let woodWallMesh = null;
         let metalWallMesh = null;
+        let caveWallMeshes = [];
         let extraWallRoot = null;
         let doorHinges = [];
         let hazardRoot = null;
@@ -1960,7 +1981,7 @@
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
             goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo, bloodStainGeo,
-            hangCurtainGeo, cobwebHangGeo,
+            hangCurtainGeo, cobwebHangGeo, caveBlockGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -3071,7 +3092,7 @@
                 const ox = dir.dx * 0.3 + ((cell.hash % 5) - 2) * 0.03;
                 const oz = dir.dz * 0.3 + ((cell.hash % 3) - 1) * 0.03;
                 const cluster = makeMushroom(cell.hash, blueBias);
-                cluster.position.set(cell.x + ox, PROP_LIFT, cell.z + oz);
+                cluster.position.set(cell.x + ox, propLiftAt(cell.x, cell.z, rooms, paletteId), cell.z + oz);
                 cluster.rotation.y = (cell.hash % 6) * 0.7;
                 propRoot.add(cluster);
                 if (mushroomLights.length < 4) {
@@ -3618,7 +3639,7 @@
             return 0;
         }
 
-        function placeLargeFurniture(grid, width, height, rooms) {
+        function placeLargeFurniture(grid, width, height, rooms, paletteId) {
             for (const group of furnitureGroups(grid, width, height)) {
                 const n = group.cells.length;
                 const cx = (group.minx + group.maxx) / 2;
@@ -3692,7 +3713,7 @@
                     prop = makeCrate();
                     prop.scale.set(1.7, 1.7, 1.7);
                 }
-                prop.position.set(cx, PROP_LIFT, cz);
+                prop.position.set(cx, propLiftAt(cx, cz, rooms, paletteId), cz);
                 if (kind === 'study' || kind === 'library' || kind === 'closet' || n === 1) {
                     prop.rotation.y = facingFromWalls(grid, group.cells);
                 } else {
@@ -3702,7 +3723,7 @@
             }
         }
 
-        const WALL_PROP_MAKERS = [makeHole, makeWeapons, makeBanner];
+        const WALL_PROP_MAKERS = [makeWeapons, makeBanner];
         const FLOOR_PROP_MAKERS = [makePlant, makeBarrel, makeCrate, makeChair];
         const DETAIL_PROP_MAKERS = [makePit, makeRug];
 
@@ -4022,7 +4043,7 @@
                     maker = cell.hash % 2 === 0 ? makeStalagmite : makeBoulder;
                 }
                 const prop = maker(cell.hash);
-                prop.position.set(cell.x + dir.dx * 0.32, PROP_LIFT, cell.z + dir.dz * 0.32);
+                prop.position.set(cell.x + dir.dx * 0.32, propLiftAt(cell.x, cell.z, rooms, paletteId), cell.z + dir.dz * 0.32);
                 prop.rotation.y = Math.atan2(-dir.dx, -dir.dz);
                 propRoot.add(prop);
             }
@@ -4043,7 +4064,7 @@
                 const prop = room?.kind === 'cave' ? makeBoulder(cell.hash) : maker(cell.hash);
                 const ox = ((cell.hash % 5) - 2) * 0.06;
                 const oz = ((cell.hash % 3) - 1) * 0.06;
-                prop.position.set(cell.x + ox, PROP_LIFT, cell.z + oz);
+                prop.position.set(cell.x + ox, propLiftAt(cell.x, cell.z, rooms, paletteId), cell.z + oz);
                 prop.rotation.y = (cell.hash % 4) * (Math.PI / 2);
                 propRoot.add(prop);
             }
@@ -4053,7 +4074,7 @@
             placeSplatters(grid, width, height, rooms, paletteId, floor, openFaces);
             placeMushrooms(grid, floorCells, taken, paletteId, rooms);
 
-            placeLargeFurniture(grid, width, height, rooms);
+            placeLargeFurniture(grid, width, height, rooms, paletteId);
             placeHallHangings(grid, width, height, rooms, player, exit, new Set([...usedCells, ...taken]), paletteId, floor);
             scene.add(propRoot);
         }
@@ -4077,6 +4098,10 @@
             disposeMesh(brokenWallMesh);
             disposeMesh(woodWallMesh);
             disposeMesh(metalWallMesh);
+            for (const mesh of caveWallMeshes) {
+                disposeMesh(mesh);
+            }
+            caveWallMeshes = [];
             clearExtraWalls();
             clearHazards();
             clearEnemies();
@@ -4161,6 +4186,85 @@
                 }
             }
 
+            function splitCaveWalls(positions) {
+                const cave = [];
+                const rest = [];
+                for (let i = 0; i < positions.length; i += 2) {
+                    if (isCaveLook(positions[i], positions[i + 1], state.rooms, paletteId)) {
+                        cave.push(positions[i], positions[i + 1]);
+                    } else {
+                        rest.push(positions[i], positions[i + 1]);
+                    }
+                }
+                return [cave, rest];
+            }
+
+            function buildBlockyWalls(positions, material, maxH = WALL_H) {
+                if (!positions.length) {
+                    return;
+                }
+                const chunks = [];
+                const chunkColors = [];
+                const dummy = new THREE.Object3D();
+                const color = new THREE.Color();
+                for (let i = 0; i < positions.length; i += 2) {
+                    const x = positions[i];
+                    const z = positions[i + 1];
+                    const room = roomBeside(state.rooms, x, z);
+                    let y = 0;
+                    const layers = 3 + (Math.abs(x + z * 3) % 2);
+                    for (let layer = 0; layer < layers && y < maxH - 0.06; layer++) {
+                        const h = Math.min(maxH - y, 0.24 + cellHash01(x, z, layer) * 0.36);
+                        const w = 0.74 + cellHash01(x, z, layer + 3) * 0.32;
+                        const d = 0.74 + cellHash01(x, z, layer + 6) * 0.32;
+                        chunks.push(
+                            x + (cellHash01(x, z, layer + 9) - 0.5) * 0.16,
+                            y + h / 2,
+                            z + (cellHash01(x, z, layer + 12) - 0.5) * 0.16,
+                            w,
+                            h,
+                            d,
+                            (cellHash01(x, z, layer + 15) - 0.5) * 0.2,
+                        );
+                        accentColor(color, room, 0.8 + cellHash01(x, z, layer + 18) * 0.22);
+                        chunkColors.push(color.r, color.g, color.b);
+                        y += h * 0.88;
+                    }
+                    if (cellHash01(x, z, 21) > 0.32) {
+                        const h = 0.16 + cellHash01(x, z, 22) * 0.24;
+                        chunks.push(
+                            x + (cellHash01(x, z, 23) - 0.5) * 0.24,
+                            0.18 + cellHash01(x, z, 24) * Math.max(0.2, maxH - 0.4),
+                            z + (cellHash01(x, z, 25) - 0.5) * 0.24,
+                            0.32 + cellHash01(x, z, 26) * 0.3,
+                            h,
+                            0.32 + cellHash01(x, z, 27) * 0.3,
+                            (cellHash01(x, z, 28) - 0.5) * 0.45,
+                        );
+                        accentColor(color, room, 0.68 + cellHash01(x, z, 29) * 0.28);
+                        chunkColors.push(color.r, color.g, color.b);
+                    }
+                }
+                const mesh = new THREE.InstancedMesh(caveBlockGeo, material, chunks.length / 7);
+                mesh.castShadow = false;
+                mesh.receiveShadow = false;
+                for (let i = 0, index = 0; i < chunks.length; i += 7, index += 1) {
+                    dummy.position.set(chunks[i], chunks[i + 1], chunks[i + 2]);
+                    dummy.rotation.set(0, chunks[i + 6], 0);
+                    dummy.scale.set(chunks[i + 3], chunks[i + 4], chunks[i + 5]);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(index, dummy.matrix);
+                    color.setRGB(chunkColors[index * 3], chunkColors[index * 3 + 1], chunkColors[index * 3 + 2]);
+                    mesh.setColorAt(index, color);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+                if (mesh.instanceColor) {
+                    mesh.instanceColor.needsUpdate = true;
+                }
+                scene.add(mesh);
+                caveWallMeshes.push(mesh);
+            }
+
             function buildWalls(positions, material, height, widthX = 1.02, widthZ = 1.02) {
                 const count = positions.length / 2 || 1;
                 const mesh = new THREE.InstancedMesh(makeWallBoxGeo(widthX, height, widthZ), material, count);
@@ -4186,32 +4290,44 @@
                 return mesh;
             }
 
-            wallMesh = stoneWalls.length ? buildWalls(stoneWalls, wallMat, WALL_H) : null;
-            vineWallMesh = vineWalls.length ? buildWalls(vineWalls, vineWallMat, WALL_H) : null;
-            crackedWallMesh = crackedWalls.length ? buildWalls(crackedWalls, crackedWallMat, WALL_H) : null;
-            woodWallMesh = woodWalls.length ? buildWalls(woodWalls, woodWallMat, WALL_H) : null;
-            metalWallMesh = metalWalls.length ? buildWalls(metalWalls, metalWallMat, WALL_H) : null;
-            halfWallMesh = halfWalls.length ? buildWalls(halfWalls, wallMat, HALF_H) : null;
-            brokenWallMesh = brokenWalls.length ? buildWalls(brokenWalls, crackedWallMat, BROKEN_H, 0.94, 0.88) : null;
+            const [caveStone, restStone] = splitCaveWalls(stoneWalls);
+            const [caveVine, restVine] = splitCaveWalls(vineWalls);
+            const [caveCracked, restCracked] = splitCaveWalls(crackedWalls);
+            const [caveWood, restWood] = splitCaveWalls(woodWalls);
+            const [caveMetal, restMetal] = splitCaveWalls(metalWalls);
+            const [caveHalf, restHalf] = splitCaveWalls(halfWalls);
+            const [caveBroken, restBroken] = splitCaveWalls(brokenWalls);
+
+            wallMesh = restStone.length ? buildWalls(restStone, wallMat, WALL_H) : null;
+            vineWallMesh = restVine.length ? buildWalls(restVine, vineWallMat, WALL_H) : null;
+            crackedWallMesh = restCracked.length ? buildWalls(restCracked, crackedWallMat, WALL_H) : null;
+            woodWallMesh = restWood.length ? buildWalls(restWood, woodWallMat, WALL_H) : null;
+            metalWallMesh = restMetal.length ? buildWalls(restMetal, metalWallMat, WALL_H) : null;
+            halfWallMesh = restHalf.length ? buildWalls(restHalf, wallMat, HALF_H) : null;
+            brokenWallMesh = restBroken.length ? buildWalls(restBroken, crackedWallMat, BROKEN_H, 0.94, 0.88) : null;
+            buildBlockyWalls(caveStone, wallMat, WALL_H);
+            buildBlockyWalls(caveVine, vineWallMat, WALL_H);
+            buildBlockyWalls(caveCracked, crackedWallMat, WALL_H);
+            buildBlockyWalls(caveWood, woodWallMat, WALL_H);
+            buildBlockyWalls(caveMetal, metalWallMat, WALL_H);
+            buildBlockyWalls(caveHalf, wallMat, HALF_H);
+            buildBlockyWalls(caveBroken, crackedWallMat, BROKEN_H);
 
             extraWallRoot = new THREE.Group();
+            const windowTiles = [];
             for (let i = 0; i < holeWalls.length; i += 2) {
-                const hole = makeHoleWall();
-                hole.position.set(holeWalls[i], 0, holeWalls[i + 1]);
-                extraWallRoot.add(hole);
-            }
-            for (let i = 0; i < fenceWalls.length; i += 2) {
-                const fence = makeFenceWall();
-                fence.position.set(fenceWalls[i], 0, fenceWalls[i + 1]);
-                fence.rotation.y = facingOpen(state.grid, fenceWalls[i], fenceWalls[i + 1]);
-                extraWallRoot.add(fence);
+                windowTiles.push(holeWalls[i], holeWalls[i + 1]);
             }
             for (let i = 0; i < windowWalls.length; i += 2) {
-                const wx = windowWalls[i];
-                const wz = windowWalls[i + 1];
+                windowTiles.push(windowWalls[i], windowWalls[i + 1]);
+            }
+            for (let i = 0; i < windowTiles.length; i += 2) {
+                const wx = windowTiles[i];
+                const wz = windowTiles[i + 1];
                 const room = roomBeside(state.rooms, wx, wz);
                 const stained = STAINED_WINDOW_ROOMS.has(room?.kind)
-                    || (!NIGHT_WINDOW_ROOMS.has(room?.kind) && ((wx * 7 + wz * 13) & 1) === 0);
+                    || (!NIGHT_WINDOW_ROOMS.has(room?.kind) && room?.kind !== 'cave'
+                        && ((wx * 7 + wz * 13) & 1) === 0);
                 const win = makeWindowWall(stained, wx + wz * 3);
                 win.position.set(wx, 0, wz);
                 win.rotation.y = facingOpen(state.grid, wx, wz);
@@ -4222,6 +4338,12 @@
                     win.remove(win.userData.light);
                     win.userData.light = null;
                 }
+            }
+            for (let i = 0; i < fenceWalls.length; i += 2) {
+                const fence = makeFenceWall();
+                fence.position.set(fenceWalls[i], 0, fenceWalls[i + 1]);
+                fence.rotation.y = facingOpen(state.grid, fenceWalls[i], fenceWalls[i + 1]);
+                extraWallRoot.add(fence);
             }
             for (let i = 0; i < breachWalls.length; i += 2) {
                 const breach = makeBreachWall();
@@ -4321,25 +4443,70 @@
                 if (!positions.length) {
                     continue;
                 }
-                const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], positions.length / 3);
-                mesh.receiveShadow = true;
+                const flat = [];
+                const cave = [];
                 for (let i = 0; i < positions.length; i += 3) {
-                    const index = i / 3;
-                    dummy.position.set(positions[i], 0.002, positions[i + 1]);
-                    dummy.rotation.y = positions[i + 2] * (Math.PI / 2);
-                    dummy.updateMatrix();
-                    mesh.setMatrixAt(index, dummy.matrix);
-                    const shade = 0.9 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;
-                    const room = roomContaining(state.rooms, positions[i], positions[i + 1]);
-                    accentColor(color, room, shade);
-                    mesh.setColorAt(index, color);
+                    if (isCaveLook(positions[i], positions[i + 1], state.rooms, paletteId)) {
+                        cave.push(positions[i], positions[i + 1], positions[i + 2]);
+                    } else {
+                        flat.push(positions[i], positions[i + 1], positions[i + 2]);
+                    }
                 }
-                mesh.instanceMatrix.needsUpdate = true;
-                if (mesh.instanceColor) {
-                    mesh.instanceColor.needsUpdate = true;
+                if (flat.length) {
+                    const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], flat.length / 3);
+                    mesh.receiveShadow = true;
+                    for (let i = 0; i < flat.length; i += 3) {
+                        const index = i / 3;
+                        dummy.position.set(flat[i], 0.002, flat[i + 1]);
+                        dummy.rotation.set(0, flat[i + 2] * (Math.PI / 2), 0);
+                        dummy.scale.set(1, 1, 1);
+                        dummy.updateMatrix();
+                        mesh.setMatrixAt(index, dummy.matrix);
+                        const shade = 0.9 + ((flat[i] * 5 + flat[i + 1] * 11) % 6) * 0.02;
+                        const room = roomContaining(state.rooms, flat[i], flat[i + 1]);
+                        accentColor(color, room, shade);
+                        mesh.setColorAt(index, color);
+                    }
+                    mesh.instanceMatrix.needsUpdate = true;
+                    if (mesh.instanceColor) {
+                        mesh.instanceColor.needsUpdate = true;
+                    }
+                    scene.add(mesh);
+                    floorMeshes.push(mesh);
                 }
-                scene.add(mesh);
-                floorMeshes.push(mesh);
+                if (cave.length) {
+                    const mesh = new THREE.InstancedMesh(caveBlockGeo, floorMats[k], cave.length / 3);
+                    mesh.receiveShadow = true;
+                    for (let i = 0; i < cave.length; i += 3) {
+                        const index = i / 3;
+                        const x = cave[i];
+                        const z = cave[i + 1];
+                        const bump = caveFloorBump(x, z);
+                        dummy.position.set(x, bump / 2, z);
+                        dummy.rotation.set(
+                            (cellHash01(x, z, 4) - 0.5) * 0.1,
+                            cave[i + 2] * (Math.PI / 2),
+                            (cellHash01(x, z, 5) - 0.5) * 0.1,
+                        );
+                        dummy.scale.set(
+                            0.88 + cellHash01(x, z, 6) * 0.14,
+                            bump,
+                            0.88 + cellHash01(x, z, 7) * 0.14,
+                        );
+                        dummy.updateMatrix();
+                        mesh.setMatrixAt(index, dummy.matrix);
+                        const shade = 0.84 + cellHash01(x, z, 8) * 0.18;
+                        const room = roomContaining(state.rooms, x, z);
+                        accentColor(color, room, shade);
+                        mesh.setColorAt(index, color);
+                    }
+                    mesh.instanceMatrix.needsUpdate = true;
+                    if (mesh.instanceColor) {
+                        mesh.instanceColor.needsUpdate = true;
+                    }
+                    scene.add(mesh);
+                    floorMeshes.push(mesh);
+                }
             }
             tileGeo.dispose();
 

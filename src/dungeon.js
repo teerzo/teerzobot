@@ -387,7 +387,7 @@ function pickExit(grid, startX, startY, minDist) {
 
 function paletteForFloor(floor) {
     const n = PALETTE_IDS.length;
-    const i = (((Number(floor) * 3) % n) + n) % n;
+    const i = (((Number(floor) * 4) % n) + n) % n;
     return PALETTE_IDS[i];
 }
 

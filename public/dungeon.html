@@ -318,6 +318,8 @@
         const PROP_LIFT = 0.028;
         const WALL_PUSH = 0.62;
         const WALL_DECAL = 0.57;
+        const MOVE_LERP = 6.5;
+        const SNAP_LERP = 9;
         const YAWS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
 
         const floorEl = document.querySelector('#floor strong');
@@ -1713,6 +1715,7 @@
         const goblinEyeGeo = new THREE.BoxGeometry(0.025, 0.025, 0.02);
         const ghostBodyGeo = new THREE.ConeGeometry(0.16, 0.72, 8);
         const ghostHeadGeo = new THREE.SphereGeometry(0.13, 8, 6);
+        const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1730,6 +1733,7 @@
         let hazardRoot = null;
         let enemyRoot = null;
         const enemyActors = new Map();
+        let stainRoot = null;
         let lastHurtKey = '';
         let waterMeshes = [];
         let windowLights = [];
@@ -1795,7 +1799,7 @@
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
-            goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo,
+            goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo, bloodStainGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -1896,6 +1900,57 @@
             });
         }
 
+        function spawnGhostBurst(pos) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+            scene.add(group);
+
+            const coreMat = makeFireMat(0xf2f8ff, 0.95);
+            coreMat.userData.fx = true;
+            const core = new THREE.Mesh(boomGeo, coreMat);
+            group.add(core);
+
+            const glowMat = makeFireMat(0x8ec8ff, 0.78);
+            glowMat.userData.fx = true;
+            const glow = new THREE.Mesh(boltGlowGeo, glowMat);
+            glow.scale.setScalar(2.4);
+            group.add(glow);
+
+            const light = new THREE.PointLight(0xb8dcff, 10, 5.2, 2);
+            group.add(light);
+
+            const sparks = [];
+            for (let i = 0; i < 24; i += 1) {
+                const tone = i % 3 === 0 ? 0xffffff : i % 2 ? 0xb8e0ff : 0x6aa8ff;
+                const sparkMat = makeFireMat(tone, 1);
+                sparkMat.userData.fx = true;
+                const spark = new THREE.Mesh(i % 4 === 0 ? ghostHeadGeo : sparkGeo, sparkMat);
+                spark.position.set((Math.random() - 0.5) * 0.1, (Math.random() - 0.3) * 0.14, (Math.random() - 0.5) * 0.1);
+                spark.scale.setScalar(i % 4 === 0 ? 0.35 + Math.random() * 0.45 : 0.7 + Math.random() * 1.3);
+                group.add(spark);
+                const dir = new THREE.Vector3(
+                    Math.random() - 0.5,
+                    0.15 + Math.random() * 0.85,
+                    Math.random() - 0.5,
+                ).normalize();
+                sparks.push({
+                    mesh: spark,
+                    vel: dir.multiplyScalar(1.1 + Math.random() * 2.1),
+                });
+            }
+
+            fxItems.push({
+                kind: 'ghost',
+                group,
+                core,
+                glow,
+                light,
+                sparks,
+                t: 0,
+                duration: 0.7,
+            });
+        }
+
         function spawnFireBolt(shot) {
             const along = fireAlong(shot.dir);
             const impact = new THREE.Vector3(shot.hit.x * CELL, 0.52, shot.hit.y * CELL);
@@ -1976,16 +2031,32 @@
 
                 fx.t += dt;
                 const u = Math.min(1, fx.t / fx.duration);
-                fx.core.scale.setScalar(1 + u * 5.5);
-                fx.glow.scale.setScalar(1.6 + u * 6);
-                fx.core.material.opacity = 0.95 * (1 - u);
-                fx.glow.material.opacity = 0.7 * (1 - u);
-                fx.light.intensity = 12 * (1 - u) * (1 - u);
-                for (const spark of fx.sparks) {
-                    spark.vel.y -= 4.2 * dt;
-                    spark.mesh.position.addScaledVector(spark.vel, dt);
-                    spark.mesh.material.opacity = 1 - u;
-                    spark.mesh.scale.setScalar(1 - u * 0.6);
+                if (fx.kind === 'ghost') {
+                    const fade = 1 - u;
+                    fx.core.scale.setScalar(1 + u * 8.5);
+                    fx.glow.scale.setScalar(2.4 + u * 9);
+                    fx.core.material.opacity = 0.95 * fade * fade;
+                    fx.glow.material.opacity = 0.78 * fade;
+                    fx.light.intensity = 10 * fade * fade;
+                    for (const spark of fx.sparks) {
+                        spark.vel.y += 1.1 * dt;
+                        spark.vel.multiplyScalar(Math.exp(-dt * 1.8));
+                        spark.mesh.position.addScaledVector(spark.vel, dt);
+                        spark.mesh.material.opacity = fade;
+                        spark.mesh.scale.multiplyScalar(Math.exp(-dt * 1.4));
+                    }
+                } else {
+                    fx.core.scale.setScalar(1 + u * 5.5);
+                    fx.glow.scale.setScalar(1.6 + u * 6);
+                    fx.core.material.opacity = 0.95 * (1 - u);
+                    fx.glow.material.opacity = 0.7 * (1 - u);
+                    fx.light.intensity = 12 * (1 - u) * (1 - u);
+                    for (const spark of fx.sparks) {
+                        spark.vel.y -= 4.2 * dt;
+                        spark.mesh.position.addScaledVector(spark.vel, dt);
+                        spark.mesh.material.opacity = 1 - u;
+                        spark.mesh.scale.setScalar(1 - u * 0.6);
+                    }
                 }
                 if (u >= 1) {
                     disposeObject(fx.group);
@@ -2431,6 +2502,38 @@
             enemyActors.clear();
         }
 
+        function clearStains() {
+            disposeObject(stainRoot);
+            stainRoot = null;
+        }
+
+        function dropBloodStain(x, z) {
+            if (!stainRoot) {
+                stainRoot = new THREE.Group();
+                scene.add(stainRoot);
+            }
+            const patch = new THREE.Mesh(bloodStainGeo, bloodSplatterMat);
+            patch.rotation.x = -Math.PI / 2;
+            patch.rotation.z = Math.random() * Math.PI * 2;
+            patch.position.set(
+                x + (Math.random() - 0.5) * 0.14,
+                0.058,
+                z + (Math.random() - 0.5) * 0.14,
+            );
+            patch.scale.setScalar(0.88 + Math.random() * 0.38);
+            stainRoot.add(patch);
+            const drip = new THREE.Mesh(bloodStainGeo, bloodSplatterMat);
+            drip.rotation.x = -Math.PI / 2;
+            drip.rotation.z = Math.random() * Math.PI * 2;
+            drip.position.set(
+                x + (Math.random() - 0.5) * 0.32,
+                0.056,
+                z + (Math.random() - 0.5) * 0.32,
+            );
+            drip.scale.setScalar(0.32 + Math.random() * 0.28);
+            stainRoot.add(drip);
+        }
+
         function makeGoblin() {
             const group = new THREE.Group();
             const body = new THREE.Mesh(goblinBodyGeo, goblinMat);
@@ -2518,6 +2621,15 @@
                 if (!live.has(id) && !actor.dying) {
                     actor.dying = true;
                     actor.dieAt = clock.elapsedTime;
+                    if (actor.kind === 'ghost') {
+                        spawnGhostBurst(new THREE.Vector3(
+                            actor.group.position.x,
+                            actor.group.position.y + 0.48,
+                            actor.group.position.z,
+                        ));
+                    } else if (actor.kind === 'goblin') {
+                        dropBloodStain(actor.group.position.x, actor.group.position.z);
+                    }
                 }
             }
         }
@@ -2534,7 +2646,8 @@
                     actor.group.rotateY(Math.PI);
                 }
                 if (actor.dying) {
-                    const fade = Math.max(0, 1 - (now - actor.dieAt) / 0.22);
+                    const pop = actor.kind === 'ghost' ? 0.12 : 0.22;
+                    const fade = Math.max(0, 1 - (now - actor.dieAt) / pop);
                     actor.group.scale.setScalar(Math.max(0.05, fade));
                     if (fade <= 0) {
                         enemyRoot.remove(actor.group);
@@ -3711,6 +3824,7 @@
             clearExtraWalls();
             clearHazards();
             clearEnemies();
+            clearStains();
             clearTorches();
             clearProps();
 
@@ -4252,15 +4366,16 @@
                 fpsFrames = 0;
                 fpsElapsed = 0;
             }
-            const t = 1 - Math.exp(-dt * 9);
-            camPos.lerp(targetPos, t);
-            camYaw = lerpAngle(camYaw, targetYaw, t);
-            bump *= Math.exp(-dt * 9);
-            updateEnemies(dt, t);
+            const moveT = 1 - Math.exp(-dt * MOVE_LERP);
+            const snapT = 1 - Math.exp(-dt * SNAP_LERP);
+            camPos.lerp(targetPos, moveT);
+            camYaw = lerpAngle(camYaw, targetYaw, moveT);
+            bump *= Math.exp(-dt * SNAP_LERP);
+            updateEnemies(dt, moveT);
             for (const door of doorHinges) {
                 const nearby = Math.max(Math.abs(door.x - targetPos.x), Math.abs(door.z - targetPos.z)) <= 1.01;
                 const want = nearby ? DOOR_OPEN : DOOR_CLOSED;
-                door.hinge.rotation.y += (want - door.hinge.rotation.y) * t;
+                door.hinge.rotation.y += (want - door.hinge.rotation.y) * snapT;
             }
 
             const bob = Math.sin(clock.elapsedTime * 2.1) * 0.018;

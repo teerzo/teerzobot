@@ -56,7 +56,7 @@ Or paste your public install redirect (Railway):
 https://<your-app>.up.railway.app/discord/install
 ```
 
-Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands`, guild install (`integration_type=0`), and asks for View Channel + Send Messages so it can post in `#general`. The **Guilds** gateway intent is enough for slash commands (Message Content is not required).
+Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands`, guild install (`integration_type=0`), and asks for View Channel + Send Messages so it can post in `#general` and `#twitch-chat`. Enable **Message Content Intent** on the Bot page so the chat bridge can read Discord messages.
 
 `GET /api/status` includes `discord.installUrl` with the same authorize URL.
 
@@ -70,6 +70,19 @@ https://<your-app>.up.railway.app/discord/callback
 ```
 
 On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping` and `/hello`, and reports connection state on `GET /api/status` as `discord`. When it is added to a server it posts in `#general` if it can send messages there (otherwise the system channel or another text channel). Restarting does not re-post.
+
+### Twitch chat bridge
+
+Twitch chat and Discord `#twitch-chat` are mirrored both ways. Discord channel names cannot contain spaces, so a channel called **twitch chat** is `#twitch-chat`. Override with `DISCORD_BRIDGE_CHANNEL`.
+
+- Twitch → Discord: `[Twitch] displayName: message`
+- Discord → Twitch: `[Discord] displayName: message`
+
+The bot’s own messages are not relayed, so the two sides do not echo each other. In the Developer Portal → **Bot** → **Privileged Gateway Intents**, turn on **Message Content Intent**, then restart.
+
+### Discord dance queue
+
+Images posted in Discord `#stream-dance` (override with `DISCORD_DANCE_CHANNEL`) are downloaded and added to the same approval queue as `!dance`. Accept or reject them at `/manage/dance`. The bot replies in that channel when a GIF is queued.
 
 ## Run locally
 

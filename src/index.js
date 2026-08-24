@@ -37,7 +37,22 @@ const dvd = createDvd();
 const dance = createDance();
 const ttt = createTtt();
 const dungeon = createDungeon();
-const discord = createDiscordClient();
+const discord = createDiscordClient({
+    onBridgeMessage: ({ displayName, text }) => {
+        if (typeof chat.say !== 'function') {
+            return;
+        }
+        const name = String(displayName || 'discord').replace(/[\r\n]/g, ' ').slice(0, 80);
+        const body = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!body) {
+            return;
+        }
+        return chat.say(`[Discord] ${name}: ${body}`.slice(0, 500)).catch((err) => {
+            console.error('Failed to relay Discord chat to Twitch', err);
+        });
+    },
+    onDanceImage: ({ url, user, displayName }) => dance.queueFromUrl({ url, user, displayName }),
+});
 let twitchApi = null;
 let authProviderRef = null;
 
@@ -112,6 +127,15 @@ app.listen(port, '0.0.0.0', async () => {
                     isMod: ctx.isMod,
                     isBroadcaster: ctx.isBroadcaster,
                 });
+                const botName = (process.env.BOT_USERNAME || 'teerzobot').toLowerCase();
+                if (ctx.user.toLowerCase() !== botName) {
+                    discord.relayChat({
+                        displayName: ctx.displayName || ctx.user,
+                        text: ctx.text,
+                    }).catch((err) => {
+                        console.error('Failed to relay Twitch chat to Discord', err);
+                    });
+                }
                 return commands.handleMessage(ctx);
             },
             onBotMessage: (event) => chatFeed.emit(event),

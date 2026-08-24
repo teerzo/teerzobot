@@ -78,6 +78,53 @@ async function registerCommands(token, clientId, guildId) {
     console.log(`Registered Discord slash commands /ping /hello in ${guildId}`);
 }
 
+function normalizeChannelName(name) {
+    return String(name || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-');
+}
+
+function bridgeChannelName() {
+    return normalizeChannelName(process.env.DISCORD_BRIDGE_CHANNEL || 'twitch-chat');
+}
+
+function isBridgeChannelName(name) {
+    return normalizeChannelName(name) === bridgeChannelName();
+}
+
+function danceChannelName() {
+    return normalizeChannelName(process.env.DISCORD_DANCE_CHANNEL || 'stream-dance');
+}
+
+function isDanceChannelName(name) {
+    return normalizeChannelName(name) === danceChannelName();
+}
+
+function isImageAttachment(attachment) {
+    const type = String(attachment.contentType || '').toLowerCase();
+    if (type.startsWith('image/')) {
+        return true;
+    }
+    return /\.(gif|png|jpe?g|webp)(\?|$)/i.test(attachment.name || attachment.url || '');
+}
+
+function imageUrlsFromMessage(message) {
+    const urls = [];
+    for (const attachment of message.attachments.values()) {
+        if (isImageAttachment(attachment) && attachment.url) {
+            urls.push(attachment.url);
+        }
+    }
+    for (const embed of message.embeds) {
+        const url = embed.image?.url || embed.thumbnail?.url;
+        if (url) {
+            urls.push(url);
+        }
+    }
+    return [...new Set(urls)];
+}
+
 function canSend(channel) {
     const me = channel.guild?.members.me;
     return Boolean(
@@ -122,11 +169,13 @@ async function postJoinMessage(guild) {
     }
 }
 
-export function createDiscordClient() {
+export function createDiscordClient({ onBridgeMessage, onDanceImage } = {}) {
     const token = process.env.DISCORD_TOKEN;
     const clientId = process.env.DISCORD_CLIENT_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
     const channel = (process.env.TWITCH_CHANNEL || 'teerzo').replace(/^#/, '');
+    let client = null;
+    let bridgeChannelId = null;
 
     const state = {
         connected: false,
@@ -135,14 +184,77 @@ export function createDiscordClient() {
         guild: null,
     };
 
+    function guildsToSearch() {
+        if (!client) {
+            return [];
+        }
+        if (guildId && client.guilds.cache.has(guildId)) {
+            return [client.guilds.cache.get(guildId)];
+        }
+        return [...client.guilds.cache.values()];
+    }
+
+    async function resolveBridgeChannel() {
+        if (!client?.isReady()) {
+            return null;
+        }
+        if (bridgeChannelId) {
+            const cached = client.channels.cache.get(bridgeChannelId);
+            if (cached?.isTextBased()) {
+                return cached;
+            }
+            bridgeChannelId = null;
+        }
+
+        for (const guild of guildsToSearch()) {
+            try {
+                await guild.channels.fetch();
+            } catch (err) {
+                console.error(`Failed to fetch channels for ${guild.name}`, err);
+            }
+            const found = guild.channels.cache.find((ch) => (
+                ch.isTextBased()
+                && ch.type === ChannelType.GuildText
+                && isBridgeChannelName(ch.name)
+            ));
+            if (found) {
+                bridgeChannelId = found.id;
+                return found;
+            }
+        }
+        return null;
+    }
+
+    async function relayChat({ displayName, text } = {}) {
+        const target = await resolveBridgeChannel();
+        if (!target) {
+            return;
+        }
+        const name = String(displayName || 'twitch').replace(/[\r\n*_`]/g, '').slice(0, 80);
+        const body = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!body) {
+            return;
+        }
+        const line = `[Twitch] ${name}: ${body}`.slice(0, 2000);
+        try {
+            await target.send(line);
+        } catch (err) {
+            console.error('Failed to relay Twitch chat to Discord', err);
+        }
+    }
+
     async function connect() {
         if (!token) {
             console.log('DISCORD_TOKEN not set; skipping Discord');
             return;
         }
 
-        const client = new Client({
-            intents: [GatewayIntentBits.Guilds],
+        client = new Client({
+            intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMessages,
+                GatewayIntentBits.MessageContent,
+            ],
         });
 
         client.once(Events.ClientReady, async (readyClient) => {
@@ -163,6 +275,14 @@ export function createDiscordClient() {
             });
 
             console.log(`Discord connected as ${readyClient.user.tag}${state.guild ? ` in ${state.guild}` : ''}`);
+
+            const bridge = await resolveBridgeChannel();
+            if (bridge) {
+                console.log(`Discord Twitch chat bridge: #${bridge.name}`);
+            } else {
+                console.log(`Discord Twitch chat bridge: no #${bridgeChannelName()} channel found`);
+            }
+            console.log(`Discord dance queue channel: #${danceChannelName()}`);
 
             if (!clientId) {
                 console.log('DISCORD_CLIENT_ID missing; skipping slash command registration');
@@ -195,6 +315,89 @@ export function createDiscordClient() {
             }
 
             await postJoinMessage(guild);
+            const bridge = await resolveBridgeChannel();
+            if (bridge) {
+                console.log(`Discord Twitch chat bridge: #${bridge.name}`);
+            }
+        });
+
+        client.on(Events.ChannelCreate, (created) => {
+            if (created.isTextBased() && created.type === ChannelType.GuildText && isBridgeChannelName(created.name)) {
+                bridgeChannelId = created.id;
+                console.log(`Discord Twitch chat bridge: #${created.name}`);
+            }
+        });
+
+        client.on(Events.MessageCreate, async (message) => {
+            if (message.author.bot || message.system) {
+                return;
+            }
+
+            const displayName = message.member?.displayName || message.author.globalName || message.author.username;
+            const user = message.author.username;
+
+            if (isDanceChannelName(message.channel?.name)) {
+                const urls = imageUrlsFromMessage(message);
+                if (!urls.length) {
+                    return;
+                }
+                if (!onDanceImage) {
+                    console.log('Discord dance image ignored; dance queue is not wired up');
+                    return;
+                }
+
+                const queued = [];
+                const errors = [];
+                for (const url of urls) {
+                    try {
+                        await onDanceImage({ url, user, displayName });
+                        queued.push(url);
+                    } catch (err) {
+                        console.error('Failed to queue Discord dance image', err);
+                        errors.push(err.message || 'Could not queue that image');
+                    }
+                }
+
+                const parts = [];
+                if (queued.length) {
+                    parts.push(queued.length === 1
+                        ? 'Queued for dance approval at /manage/dance.'
+                        : `Queued ${queued.length} images for dance approval at /manage/dance.`);
+                }
+                if (errors.length) {
+                    parts.push(errors[0]);
+                }
+                if (parts.length) {
+                    try {
+                        await message.reply(parts.join(' '));
+                    } catch (err) {
+                        console.error('Failed to reply in #stream-dance', err);
+                    }
+                }
+                return;
+            }
+
+            const inBridge = message.channelId === bridgeChannelId
+                || isBridgeChannelName(message.channel?.name);
+            if (!inBridge) {
+                return;
+            }
+            if (!bridgeChannelId && message.channelId) {
+                bridgeChannelId = message.channelId;
+            }
+
+            const attachments = [...message.attachments.values()].map((file) => file.url);
+            const text = [message.content, ...attachments].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+            if (!text) {
+                console.log('Discord bridge skipped an empty message (enable Message Content Intent in the Developer Portal)');
+                return;
+            }
+
+            try {
+                await onBridgeMessage?.({ displayName, text });
+            } catch (err) {
+                console.error('Failed to relay Discord chat to Twitch', err);
+            }
         });
 
         client.on(Events.InteractionCreate, async (interaction) => {
@@ -225,6 +428,15 @@ export function createDiscordClient() {
 
     return {
         connect,
-        getStatus: () => ({ ...state, installUrl: buildDiscordInstallUrl() }),
+        relayChat,
+        getStatus: () => ({
+            ...state,
+            installUrl: buildDiscordInstallUrl(),
+            bridge: {
+                channel: bridgeChannelName(),
+                ready: Boolean(bridgeChannelId),
+            },
+            danceChannel: danceChannelName(),
+        }),
     };
 }

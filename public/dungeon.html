@@ -709,6 +709,14 @@
         const torchTipGeo = new THREE.BoxGeometry(0.03, 0.08, 0.03);
 
         const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.86, metalness: 0.04 });
+        const frameMats = [0xc4a24a, 0x8a3a28, 0x3a4a6b, 0x2e6b48, 0x6b2d5a].map((color) =>
+            new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.18 }),
+        );
+        const artworkEmptyMat = new THREE.MeshStandardMaterial({
+            color: 0xc41818,
+            roughness: 0.85,
+            metalness: 0.02,
+        });
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
         const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
         const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
@@ -896,18 +904,12 @@
 
         function makePainting(hash) {
             const group = new THREE.Group();
-            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.04), woodMat);
-            const fallback = paintMats[hash % paintMats.length];
-            const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.03), fallback);
-            canvas.position.z = 0.025;
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.32, 0.05), frameMats[hash % frameMats.length]);
+            const planeMat = artworkEmptyMat.clone();
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.22), planeMat);
+            plane.position.z = 0.028;
             const url = artworkUrls.length ? artworkUrls[hash % artworkUrls.length] : '';
             if (url) {
-                const artMat = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    roughness: 0.72,
-                    metalness: 0.02,
-                });
-                canvas.material = artMat;
                 textureLoader.load(
                     url,
                     (tex) => {
@@ -915,16 +917,19 @@
                         tex.wrapS = THREE.ClampToEdgeWrapping;
                         tex.wrapT = THREE.ClampToEdgeWrapping;
                         tex.minFilter = THREE.LinearFilter;
-                        artMat.map = tex;
-                        artMat.needsUpdate = true;
+                        planeMat.map = tex;
+                        planeMat.color.set(0xffffff);
+                        planeMat.needsUpdate = true;
                     },
                     undefined,
                     () => {
-                        canvas.material = fallback;
+                        planeMat.map = null;
+                        planeMat.color.set(0xc41818);
+                        planeMat.needsUpdate = true;
                     },
                 );
             }
-            group.add(frame, canvas);
+            group.add(frame, plane);
             return group;
         }
 
@@ -1245,7 +1250,7 @@
             }
         }
 
-        const WALL_PROP_MAKERS = [makeHole, makePainting, makeWeapons, makeBanner];
+        const WALL_PROP_MAKERS = [makeHole, makeWeapons, makeBanner];
         const FLOOR_PROP_MAKERS = [makePlant, makeBarrel, makeCrate, makeChair];
         const DETAIL_PROP_MAKERS = [makePit, makeRug];
 
@@ -1280,14 +1285,32 @@
             clearProps();
             propRoot = new THREE.Group();
             const faces = collectFaces(grid, width, height);
-            const wallSpots = faces
+            const openFaces = faces
                 .filter((face) => !torchFaces.has(faceKey(face.wx, face.wz, face.dx, face.dz)))
-                .filter((face) => !isReservedCell(face.x, face.z, player, exit))
-                .filter((face) => face.propHash % 4 === 0)
+                .filter((face) => !isReservedCell(face.x, face.z, player, exit));
+
+            const paintingSpots = openFaces
+                .filter((face) => face.propHash % 2 === 0)
                 .sort((a, b) => a.propHash - b.propHash)
-                .slice(0, 16);
+                .slice(0, 28);
+            const paintingFaces = new Set(paintingSpots.map((face) => faceKey(face.wx, face.wz, face.dx, face.dz)));
 
             const usedCells = new Set();
+            for (const spot of paintingSpots) {
+                const prop = makePainting(spot.propHash);
+                const px = spot.wx - spot.dx * 0.54;
+                const pz = spot.wz - spot.dz * 0.54;
+                prop.position.set(px, EYE, pz);
+                prop.rotation.y = Math.atan2(-spot.dx, -spot.dz);
+                propRoot.add(prop);
+                usedCells.add(`${spot.x},${spot.z}`);
+            }
+
+            const wallSpots = openFaces
+                .filter((face) => !paintingFaces.has(faceKey(face.wx, face.wz, face.dx, face.dz)))
+                .filter((face) => face.propHash % 5 === 0)
+                .sort((a, b) => a.propHash - b.propHash)
+                .slice(0, 10);
             for (const spot of wallSpots) {
                 const maker = WALL_PROP_MAKERS[spot.propHash % WALL_PROP_MAKERS.length];
                 const prop = maker(spot.propHash);

@@ -24,7 +24,7 @@ function emptyGame() {
     };
 }
 
-function snapshot(game) {
+function snapshot(game, visible) {
     return {
         board: [...game.board],
         turn: game.turn,
@@ -34,6 +34,7 @@ function snapshot(game) {
         draw: game.draw,
         line: game.line ? [...game.line] : null,
         lastMove: game.lastMove,
+        visible,
     };
 }
 
@@ -58,18 +59,32 @@ function winnerOf(board) {
 export function createTtt() {
     const hub = createSseHub({ defaultType: 'ttt' });
     let game = emptyGame();
+    let visible = true;
 
     function emit() {
-        return hub.emit({ type: 'state', ...snapshot(game) });
+        return hub.emit({ type: 'state', ...snapshot(game, visible) });
     }
 
     function start() {
+        visible = true;
         game = emptyGame();
         emit();
-        return snapshot(game);
+        return snapshot(game, visible);
+    }
+
+    function hide() {
+        visible = false;
+        game = emptyGame();
+        emit();
+        return snapshot(game, visible);
     }
 
     function play({ cell, user, displayName }) {
+        if (!visible) {
+            const err = new Error('Tic-tac-toe is hidden. Use !ttt to start.');
+            err.code = 'HIDDEN';
+            throw err;
+        }
         const index = parseCell(cell);
         if (index < 0) {
             const err = new Error('Usage: !ttt 1-9');
@@ -120,18 +135,21 @@ export function createTtt() {
         }
 
         emit();
-        return snapshot(game);
+        return snapshot(game, visible);
     }
 
     return {
         subscribe: hub.subscribe,
         emit,
-        get: () => snapshot(game),
+        get: () => snapshot(game, visible),
         start,
         play,
-        clear() {
-            return start();
-        },
-        getStatus: () => ({ listeners: hub.listenerCount, inGame: Boolean(game.x) }),
+        hide,
+        clear: hide,
+        getStatus: () => ({
+            listeners: hub.listenerCount,
+            inGame: Boolean(game.x),
+            visible,
+        }),
     };
 }

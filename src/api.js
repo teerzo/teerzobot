@@ -108,7 +108,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             alerts: status.alerts ?? { listeners: 0 },
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
-            ttt: status.ttt ?? { listeners: 0 },
+            ttt: status.ttt ?? { listeners: 0, visible: true },
             dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true },
             discord: status.discord ?? { connected: false },
         });
@@ -182,7 +182,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     attachSse(app, '/api/dungeon/events', dungeon);
 
     app.get('/api/ttt', (_req, res) => {
-        res.json(ttt?.get() ?? { board: Array(9).fill('') });
+        res.json(ttt?.get() ?? { board: Array(9).fill(''), visible: true });
     });
 
     app.post('/api/ttt/clear', (_req, res) => {

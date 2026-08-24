@@ -26,9 +26,13 @@
             text-shadow: 0 1px 2px #000;
             transition: opacity 0.4s ease;
         }
-        #wrap.idle {
+        #wrap.idle,
+        #wrap.paused {
             opacity: 0;
             pointer-events: none;
+        }
+        #wrap.paused {
+            display: none;
         }
         #title {
             margin: 0 0 6px;
@@ -127,6 +131,14 @@
         }
 
         function render(state) {
+            if (state.visible === false) {
+                wrapEl.classList.add('paused');
+                wrapEl.classList.remove('idle');
+                clearTimeout(idleTimer);
+                return;
+            }
+            wrapEl.classList.remove('paused');
+
             const xName = nameOf(state.x, 'X');
             const oName = nameOf(state.o, 'O');
             playersEl.innerHTML = `<span class="x">${xName}</span> vs <span class="o">${oName}</span>`;

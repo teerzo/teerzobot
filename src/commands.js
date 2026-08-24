@@ -434,7 +434,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 const cell = String(args[0] ?? '').trim();
                 if (!cell || cell === 'start' || cell === 'new') {
                     ttt.start();
-                    return say(channel, 'Tic-tac-toe started. First player is X, second is O. Play with !ttt 1-9.');
+                    return say(channel, 'Tic-tac-toe overlay is on. First player is X, second is O. Play with !ttt 1-9.');
                 }
                 try {
                     const state = ttt.play({ cell, user, displayName });
@@ -458,7 +458,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'clear',
-            response: 'Clears dance GIFs, DVD logos, tic-tac-toe, and hides the dungeon overlay',
+            response: 'Clears dance GIFs and DVD logos, and hides tic-tac-toe and dungeon overlays',
             builtin: true,
             execute({ say, channel }) {
                 dance?.clear();

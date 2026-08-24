@@ -285,6 +285,9 @@
         const CELL = 1;
         const EYE = 0.52;
         const WALL_H = 1.55;
+        const PROP_LIFT = 0.028;
+        const WALL_PUSH = 0.62;
+        const WALL_DECAL = 0.57;
         const YAWS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
 
         const floorEl = document.querySelector('#floor strong');
@@ -750,6 +753,69 @@
             return canvas;
         }
 
+        function makeStainedGlassCanvas(variant) {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const gems = [
+                ['#8b1e2d', '#1e3a8a', '#c9a227', '#1f6b3a', '#5b21b6', '#9a3412'],
+                ['#be123c', '#1e40af', '#eab308', '#15803d', '#6d28d9', '#c2410c'],
+                ['#7f1d1d', '#172554', '#a16207', '#14532d', '#4c1d95', '#7c2d12'],
+            ][variant % 3];
+            ctx.fillStyle = '#140e0a';
+            ctx.fillRect(0, 0, size, size);
+            const cols = 4;
+            const rows = 5;
+            const lead = 3;
+            const cellW = (size - lead) / cols;
+            const cellH = (size - lead) / rows;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const i = r * cols + c + variant * 5;
+                    const x = Math.round(lead + c * cellW);
+                    const y = Math.round(lead + r * cellH);
+                    const w = Math.round(cellW - lead);
+                    const h = Math.round(cellH - lead);
+                    ctx.fillStyle = gems[i % gems.length];
+                    ctx.fillRect(x, y, w, h);
+                    ctx.fillStyle = gems[(i + 2) % gems.length];
+                    ctx.fillRect(x + 2, y + 2, Math.max(2, w - 5), Math.max(2, h - 5));
+                    ctx.fillStyle = 'rgba(255,255,230,0.28)';
+                    ctx.fillRect(x + 1, y + 1, Math.max(1, (w / 3) | 0), 1);
+                    ctx.fillRect(x + 1, y + 2, 1, Math.max(1, (h / 3) | 0));
+                }
+            }
+            ctx.fillStyle = '#140e0a';
+            ctx.fillRect((size / 2) - 2, 0, 4, size);
+            ctx.fillRect(0, (size / 2) - 2, size, 4);
+            ctx.fillRect(0, 0, size, 3);
+            ctx.fillRect(0, size - 3, size, 3);
+            ctx.fillRect(0, 0, 3, size);
+            ctx.fillRect(size - 3, 0, 3, size);
+            return canvas;
+        }
+
+        function makeGlassSheenCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const g = ctx.createLinearGradient(0, 0, size, size);
+            g.addColorStop(0, 'rgba(220,240,255,0.5)');
+            g.addColorStop(0.38, 'rgba(170,200,230,0.04)');
+            g.addColorStop(0.52, 'rgba(255,255,255,0.22)');
+            g.addColorStop(1, 'rgba(140,180,220,0.1)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.fillRect(2, 2, 8, 1);
+            ctx.fillRect(2, 3, 1, 10);
+            return canvas;
+        }
+
         function makeSplatterCanvas(kind) {
             const size = 64;
             const canvas = document.createElement('canvas');
@@ -979,6 +1045,8 @@
         const BLOOD_ROOMS = new Set(['crypt', 'cell', 'barracks', 'armory']);
         const SLIME_ROOMS = new Set(['sewer', 'garden', 'well']);
         const CLEAN_ROOMS = new Set(['chapel', 'bedroom']);
+        const STAINED_WINDOW_ROOMS = new Set(['chapel', 'shrine', 'library']);
+        const NIGHT_WINDOW_ROOMS = new Set(['bedroom', 'garden']);
         const WOOD_THEME = { wall: 'wood', floor: 'plank', ceil: 'wood' };
         const ROOM_THEMES = {
             cell: { wall: 'cracked', floor: 'dark', ceil: 'dark' },
@@ -1231,6 +1299,18 @@
             roughness: 0.42,
             metalness: 0.72,
         });
+        const doorWoodMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeWoodCanvas(), 1, 2),
+            color: 0xc4a07a,
+            roughness: 0.86,
+            metalness: 0.04,
+        });
+        const doorIronMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeMetalCanvas(), 1, 2),
+            color: 0x8a9098,
+            roughness: 0.38,
+            metalness: 0.78,
+        });
         const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine'];
         const ceilMats = [
             new THREE.MeshStandardMaterial({
@@ -1261,9 +1341,29 @@
             }),
         ];
         const nightSkyMat = new THREE.MeshBasicMaterial({
-            map: canvasToTexture(makeNightSkyCanvas()),
+            map: canvasToTexture(makeNightSkyCanvas(), 1, 1),
             fog: false,
             depthWrite: true,
+        });
+        const stainedGlassMats = [0, 1, 2].map((variant) => {
+            const map = canvasToTexture(makeStainedGlassCanvas(variant), 1, 1);
+            return new THREE.MeshStandardMaterial({
+                map,
+                emissive: 0xffffff,
+                emissiveMap: map,
+                emissiveIntensity: 0.7,
+                roughness: 0.32,
+                metalness: 0.08,
+                fog: false,
+            });
+        });
+        const windowGlassMat = new THREE.MeshBasicMaterial({
+            map: canvasToTexture(makeGlassSheenCanvas(), 1, 1),
+            color: 0xd8ecff,
+            transparent: true,
+            opacity: 0.32,
+            depthWrite: false,
+            fog: false,
         });
         const bloodSplatterMat = new THREE.MeshBasicMaterial({
             map: canvasToTexture(makeSplatterCanvas('blood')),
@@ -1271,7 +1371,8 @@
             opacity: 0.82,
             depthWrite: false,
             polygonOffset: true,
-            polygonOffsetFactor: -2,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
         });
         const slimeSplatterMat = new THREE.MeshStandardMaterial({
             map: canvasToTexture(makeSplatterCanvas('slime')),
@@ -1279,7 +1380,8 @@
             opacity: 0.72,
             depthWrite: false,
             polygonOffset: true,
-            polygonOffsetFactor: -2,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
             color: 0xb8ff88,
             emissive: 0x3a6a18,
             emissiveIntensity: 0.45,
@@ -1541,6 +1643,12 @@
         }
         const fencePostGeo = new THREE.BoxGeometry(0.08, 0.72, 0.08);
         const fenceRailGeo = new THREE.BoxGeometry(0.94, 0.045, 0.045);
+        const windowPaneGeo = new THREE.PlaneGeometry(0.56, 0.78);
+        const windowMullionVGeo = new THREE.BoxGeometry(0.035, 0.78, 0.045);
+        const windowMullionHGeo = new THREE.BoxGeometry(0.56, 0.035, 0.045);
+        const doorJambGeo = new THREE.BoxGeometry(0.12, WALL_H, 0.16);
+        const doorLintelGeo = new THREE.BoxGeometry(1.02, 0.16, 0.18);
+        const doorLeafGeo = new THREE.BoxGeometry(0.72, WALL_H * 0.78, 0.05);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1617,14 +1725,18 @@
             emberGeo, sporeGeo,
             boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo,
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
+            windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
+            doorJambGeo, doorLintelGeo, doorLeafGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
-            nightSkyMat, bloodSplatterMat, slimeSplatterMat, waterMat, spikeMat, pitMat,
+            doorWoodMat, doorIronMat,
+            nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat,
             ...floorMats, ...ceilMats, ...frameMats, ...mushCapMats, ...paintMats, ...clothMats,
+            ...stainedGlassMats,
         ]);
 
         function releaseGpu(root) {
@@ -2332,7 +2444,7 @@
             const group = new THREE.Group();
             const lip = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.38, 0.05), ironMat);
             const hole = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.28, 0.1), voidMat);
-            hole.position.z = 0.02;
+            hole.position.z = 0.04;
             group.add(lip, hole);
             return group;
         }
@@ -2342,7 +2454,7 @@
             const frame = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.05), frameMats[hash % frameMats.length]);
             const planeMat = artworkEmptyMat.clone();
             const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), planeMat);
-            plane.position.z = 0.028;
+            plane.position.z = 0.045;
             sizePainting(frame, plane, 4 / 3, hash);
             const url = artworkUrls.length ? artworkUrls[hash % artworkUrls.length] : '';
             if (url) {
@@ -2376,7 +2488,7 @@
             const rod = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.03), woodMat);
             rod.position.y = 0.2;
             const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.4, 0.02), clothMats[hash % clothMats.length]);
-            cloth.position.set(0, -0.02, 0.01);
+            cloth.position.set(0, -0.02, 0.03);
             group.add(rod, cloth);
             return group;
         }
@@ -2468,7 +2580,7 @@
                 const ox = dir.dx * 0.3 + ((cell.hash % 5) - 2) * 0.03;
                 const oz = dir.dz * 0.3 + ((cell.hash % 3) - 1) * 0.03;
                 const cluster = makeMushroom(cell.hash, blueBias);
-                cluster.position.set(cell.x + ox, 0, cell.z + oz);
+                cluster.position.set(cell.x + ox, PROP_LIFT, cell.z + oz);
                 cluster.rotation.y = (cell.hash % 6) * 0.7;
                 propRoot.add(cluster);
                 if (mushroomLights.length < 4) {
@@ -2536,9 +2648,9 @@
         function makePit() {
             const group = new THREE.Group();
             const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 12), ironMat);
-            ring.position.y = 0.014;
+            ring.position.y = 0.036;
             const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.03, 12), voidMat);
-            hole.position.y = 0.008;
+            hole.position.y = 0.03;
             group.add(ring, hole);
             return group;
         }
@@ -2546,7 +2658,7 @@
         function makeRug(hash) {
             const group = new THREE.Group();
             const rug = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.018, 0.34), clothMats[hash % clothMats.length]);
-            rug.position.y = 0.012;
+            rug.position.y = 0.032;
             group.add(rug);
             return group;
         }
@@ -2698,38 +2810,61 @@
             return facingOpen(grid, x, z);
         }
 
+        function doorFrameMat(kind) {
+            const wall = ROOM_THEMES[kind]?.wall;
+            if (wall === 'wood') {
+                return woodWallMat;
+            }
+            if (wall === 'metal') {
+                return metalWallMat;
+            }
+            if (wall === 'vine') {
+                return vineWallMat;
+            }
+            if (wall === 'cracked') {
+                return crackedWallMat;
+            }
+            return wallMat;
+        }
+
+        function doorLeafMat(kind) {
+            if (kind === 'cell' || kind === 'armory' || kind === 'barracks'
+                || kind === 'forge' || kind === 'crypt') {
+                return doorIronMat;
+            }
+            return doorWoodMat;
+        }
+
         function makeDoorway(kind) {
             const group = new THREE.Group();
-            const iron = kind === 'cell' || kind === 'armory' || kind === 'barracks';
-            const wood = ROOM_THEMES[kind]?.wall === 'wood';
-            const mat = iron ? ironMat : wood ? woodMat : wallMat;
-            const jamb = 0.12;
-            const left = new THREE.Mesh(new THREE.BoxGeometry(jamb, WALL_H, 0.16), mat);
+            const frameMat = doorFrameMat(kind);
+            const frame = new THREE.Group();
+            const left = new THREE.Mesh(doorJambGeo, frameMat);
             left.position.set(-0.44, WALL_H / 2, 0);
-            const right = new THREE.Mesh(new THREE.BoxGeometry(jamb, WALL_H, 0.16), mat);
+            const right = new THREE.Mesh(doorJambGeo, frameMat);
             right.position.set(0.44, WALL_H / 2, 0);
-            const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.16, 0.18), mat);
+            const lintel = new THREE.Mesh(doorLintelGeo, frameMat);
             lintel.position.set(0, WALL_H - 0.08, 0);
-            group.add(left, right, lintel);
-            if (iron) {
-                for (const x of [-0.32, 0.32]) {
-                    const rod = new THREE.Mesh(new THREE.BoxGeometry(0.04, WALL_H * 0.85, 0.04), ironMat);
-                    rod.position.set(x, WALL_H * 0.45, 0);
-                    group.add(rod);
-                }
-            } else {
-                const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.32, WALL_H * 0.72, 0.04), wood ? woodMat : mat);
-                leaf.position.set(-0.22, WALL_H * 0.38, 0.08);
-                leaf.rotation.y = 0.45;
-                group.add(leaf);
-            }
-            for (const part of group.children) {
+            frame.add(left, right, lintel);
+
+            const hinge = new THREE.Group();
+            hinge.position.set(-0.38, 0, 0);
+            hinge.rotation.y = -0.48;
+            const door = new THREE.Mesh(doorLeafGeo, doorLeafMat(kind));
+            door.position.set(0.36, WALL_H * 0.42, 0);
+            hinge.add(door);
+
+            group.add(frame, hinge);
+            group.userData.frame = frame;
+            group.userData.door = door;
+            for (const part of frame.children) {
                 part.castShadow = true;
             }
+            door.castShadow = true;
             return group;
         }
 
-        function makeWindowWall() {
+        function makeWindowWall(stained, variant) {
             const group = new THREE.Group();
             const left = new THREE.Mesh(new THREE.BoxGeometry(0.22, WALL_H, 1.02), wallMat);
             left.position.set(-0.4, WALL_H / 2, 0);
@@ -2739,12 +2874,31 @@
             sill.position.set(0, 0.42, 0);
             const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 1.02), wallMat);
             lintel.position.set(0, WALL_H - 0.12, 0);
-            const sky = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.72), nightSkyMat);
-            sky.position.set(0, 0.88, -0.54);
-            group.add(left, right, sill, lintel, sky);
-            const light = new THREE.PointLight(0xa8c8ff, 0.55, 3.4, 2);
+            const paneMat = stained
+                ? stainedGlassMats[Math.abs(variant) % stainedGlassMats.length]
+                : nightSkyMat;
+            const pane = new THREE.Mesh(windowPaneGeo, paneMat);
+            pane.position.set(0, 0.91, -0.48);
+            const glass = new THREE.Mesh(windowPaneGeo, windowGlassMat);
+            glass.position.set(0, 0.91, -0.42);
+            const mullionV = new THREE.Mesh(windowMullionVGeo, ironMat);
+            mullionV.position.set(0, 0.91, -0.45);
+            const mullionH = new THREE.Mesh(windowMullionHGeo, ironMat);
+            mullionH.position.set(0, 0.91, -0.45);
+            group.add(left, right, sill, lintel, pane, mullionV, mullionH, glass);
+            if (stained) {
+                const mullionV2 = new THREE.Mesh(windowMullionVGeo, ironMat);
+                mullionV2.position.set(-0.14, 0.91, -0.45);
+                const mullionV3 = mullionV2.clone();
+                mullionV3.position.x = 0.14;
+                group.add(mullionV2, mullionV3);
+            }
+            const lightColor = stained
+                ? [0xff8860, 0x88a0ff, 0xffd070][Math.abs(variant) % 3]
+                : 0xa8c8ff;
+            const light = new THREE.PointLight(lightColor, stained ? 0.7 : 0.55, 3.4, 2);
             light.position.set(0, 0.88, 0.12);
-            light.userData.base = 0.5;
+            light.userData.base = stained ? 0.62 : 0.5;
             group.add(light);
             group.userData.light = light;
             return group;
@@ -2778,11 +2932,11 @@
             const east = west.clone();
             east.position.x = PIT_INNER / 2;
             const rimN = new THREE.Mesh(pitRimNsGeo, wallMat);
-            rimN.position.set(0, 0.012, -0.45);
+            rimN.position.set(0, 0.034, -0.45);
             const rimS = rimN.clone();
             rimS.position.z = 0.45;
             const rimW = new THREE.Mesh(pitRimEwGeo, wallMat);
-            rimW.position.set(-0.45, 0.012, 0);
+            rimW.position.set(-0.45, 0.034, 0);
             const rimE = rimW.clone();
             rimE.position.x = 0.45;
             group.add(bottom, north, south, west, east, rimN, rimS, rimW, rimE);
@@ -2820,12 +2974,12 @@
             const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0 });
             if (paletteId === 'gilt') {
                 const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.016, d + 0.1), goldMat);
-                trim.position.y = 0.01;
+                trim.position.y = 0.03;
                 trim.receiveShadow = true;
                 group.add(trim);
             }
             const rug = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), mat);
-            rug.position.y = 0.014;
+            rug.position.y = 0.034;
             rug.receiveShadow = true;
             group.add(rug);
             return group;
@@ -3039,7 +3193,7 @@
                     prop = makeCrate();
                     prop.scale.set(1.7, 1.7, 1.7);
                 }
-                prop.position.set(cx, 0, cz);
+                prop.position.set(cx, PROP_LIFT, cz);
                 if (kind === 'study' || kind === 'library' || kind === 'closet' || n === 1) {
                     prop.rotation.y = facingFromWalls(grid, group.cells);
                 } else {
@@ -3061,8 +3215,8 @@
             torchRoot = new THREE.Group();
             for (const spot of spots) {
                 used.add(faceKey(spot.wx, spot.wz, spot.dx, spot.dz));
-                const px = spot.wx - spot.dx * 0.54;
-                const pz = spot.wz - spot.dz * 0.54;
+                const px = spot.wx - spot.dx * WALL_PUSH;
+                const pz = spot.wz - spot.dz * WALL_PUSH;
                 const py = 0.5;
                 const torch = makeTorch();
                 torch.position.set(px, py, pz);
@@ -3124,7 +3278,7 @@
                     continue;
                 }
                 const carpet = makeCarpet(room, hash, paletteId);
-                carpet.position.set(room.x + (room.w - 1) / 2, 0, room.y + (room.h - 1) / 2);
+                carpet.position.set(room.x + (room.w - 1) / 2, PROP_LIFT, room.y + (room.h - 1) / 2);
                 propRoot.add(carpet);
             }
         }
@@ -3156,7 +3310,7 @@
                     ? bloodSplatterMat
                     : slimeSplatterMat;
                 const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.48), mat);
-                decal.position.set(face.wx - face.dx * 0.51, 0.55, face.wz - face.dz * 0.51);
+                decal.position.set(face.wx - face.dx * WALL_DECAL, 0.55, face.wz - face.dz * WALL_DECAL);
                 decal.rotation.y = Math.atan2(-face.dx, -face.dz);
                 propRoot.add(decal);
                 n += 1;
@@ -3185,7 +3339,7 @@
                     const mat = wantBlood && hash % 2 === 0 ? bloodSplatterMat : slimeSplatterMat;
                     const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), mat);
                     decal.rotation.x = -Math.PI / 2;
-                    decal.position.set(x, 0.03, z);
+                    decal.position.set(x, 0.055, z);
                     propRoot.add(decal);
                     n += 1;
                 }
@@ -3209,8 +3363,8 @@
             const usedCells = new Set();
             for (const spot of paintingSpots) {
                 const prop = makePainting(spot.propHash);
-                const px = spot.wx - spot.dx * 0.54;
-                const pz = spot.wz - spot.dz * 0.54;
+                const px = spot.wx - spot.dx * WALL_PUSH;
+                const pz = spot.wz - spot.dz * WALL_PUSH;
                 prop.position.set(px, EYE, pz);
                 prop.rotation.y = Math.atan2(-spot.dx, -spot.dz);
                 propRoot.add(prop);
@@ -3231,8 +3385,8 @@
                     maker = makeBanner;
                 }
                 const prop = maker(spot.propHash);
-                const px = spot.wx - spot.dx * 0.54;
-                const pz = spot.wz - spot.dz * 0.54;
+                const px = spot.wx - spot.dx * WALL_PUSH;
+                const pz = spot.wz - spot.dz * WALL_PUSH;
                 const heights = [0.72, 0.92, 0.78, 0.95];
                 prop.position.set(px, heights[spot.propHash % heights.length], pz);
                 prop.rotation.y = Math.atan2(-spot.dx, -spot.dz);
@@ -3269,7 +3423,7 @@
                     maker = makeBarrel;
                 }
                 const prop = maker(cell.hash);
-                prop.position.set(cell.x + dir.dx * 0.32, 0, cell.z + dir.dz * 0.32);
+                prop.position.set(cell.x + dir.dx * 0.32, PROP_LIFT, cell.z + dir.dz * 0.32);
                 prop.rotation.y = Math.atan2(-dir.dx, -dir.dz);
                 propRoot.add(prop);
             }
@@ -3287,7 +3441,7 @@
                 const prop = maker(cell.hash);
                 const ox = ((cell.hash % 5) - 2) * 0.06;
                 const oz = ((cell.hash % 3) - 1) * 0.06;
-                prop.position.set(cell.x + ox, 0, cell.z + oz);
+                prop.position.set(cell.x + ox, PROP_LIFT, cell.z + oz);
                 prop.rotation.y = (cell.hash % 4) * (Math.PI / 2);
                 propRoot.add(prop);
             }
@@ -3447,9 +3601,14 @@
                 extraWallRoot.add(fence);
             }
             for (let i = 0; i < windowWalls.length; i += 2) {
-                const win = makeWindowWall();
-                win.position.set(windowWalls[i], 0, windowWalls[i + 1]);
-                win.rotation.y = facingOpen(state.grid, windowWalls[i], windowWalls[i + 1]);
+                const wx = windowWalls[i];
+                const wz = windowWalls[i + 1];
+                const room = roomBeside(state.rooms, wx, wz);
+                const stained = STAINED_WINDOW_ROOMS.has(room?.kind)
+                    || (!NIGHT_WINDOW_ROOMS.has(room?.kind) && ((wx * 7 + wz * 13) & 1) === 0);
+                const win = makeWindowWall(stained, wx + wz * 3);
+                win.position.set(wx, 0, wz);
+                win.rotation.y = facingOpen(state.grid, wx, wz);
                 extraWallRoot.add(win);
                 if (win.userData.light && windowLights.length < 3) {
                     windowLights.push(win.userData.light);

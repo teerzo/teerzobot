@@ -1585,16 +1585,53 @@
             });
         }
 
+        const SHARED_GEOS = new Set([
+            torchBracketGeo, torchBowlGeo, torchFlameGeo, torchTipGeo,
+            mushStemGeo, mushCapGeo, mushGlowGeo,
+            fencePostGeo, fenceRailGeo,
+            emberGeo, sporeGeo,
+            boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo,
+        ]);
+        const SHARED_MATS = new Set([
+            floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
+            nightSkyMat, bloodSplatterMat, slimeSplatterMat, waterMat, spikeMat, pitMat,
+            torchBracketMat, torchFlameMat, emberMat, sporeMat,
+            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, mushStemMat, mushGlowMat, voidMat,
+            goldMat, pillarMat,
+            ...floorMats, ...ceilMats, ...frameMats, ...mushCapMats, ...paintMats, ...clothMats,
+        ]);
+
+        function releaseGpu(root) {
+            if (!root) {
+                return;
+            }
+            const seenGeo = new Set();
+            const seenMat = new Set();
+            root.traverse((obj) => {
+                if (obj.isInstancedMesh && typeof obj.dispose === 'function') {
+                    obj.dispose();
+                }
+                if (obj.geometry && !SHARED_GEOS.has(obj.geometry) && !seenGeo.has(obj.geometry)) {
+                    seenGeo.add(obj.geometry);
+                    obj.geometry.dispose();
+                }
+                const mats = obj.material ? (Array.isArray(obj.material) ? obj.material : [obj.material]) : [];
+                for (const mat of mats) {
+                    if (!mat || SHARED_MATS.has(mat) || seenMat.has(mat)) {
+                        continue;
+                    }
+                    seenMat.add(mat);
+                    mat.dispose();
+                }
+            });
+        }
+
         function disposeObject(root) {
             if (!root) {
                 return;
             }
             scene.remove(root);
-            root.traverse((obj) => {
-                if (obj.material && obj.material.userData?.fx) {
-                    obj.material.dispose();
-                }
-            });
+            releaseGpu(root);
         }
 
         function clearFx() {
@@ -1762,14 +1799,12 @@
                 return;
             }
             scene.remove(mesh);
-            mesh.geometry.dispose();
+            releaseGpu(mesh);
         }
 
         function clearTorches() {
-            if (torchRoot) {
-                scene.remove(torchRoot);
-                torchRoot = null;
-            }
+            disposeObject(torchRoot);
+            torchRoot = null;
             for (const light of torchLights) {
                 scene.remove(light);
             }
@@ -1938,14 +1973,12 @@
         }
 
         function clearProps() {
-            if (propRoot) {
-                scene.remove(propRoot);
-                propRoot = null;
-            }
+            clearArtworkClips();
+            disposeObject(propRoot);
+            propRoot = null;
             mushroomLights = [];
             mushroomEmitters.length = 0;
             resetMushroomSpores();
-            clearArtworkClips();
         }
 
         function clearArtworkClips() {
@@ -2173,18 +2206,14 @@
         }
 
         function clearExtraWalls() {
-            if (extraWallRoot) {
-                scene.remove(extraWallRoot);
-                extraWallRoot = null;
-            }
+            disposeObject(extraWallRoot);
+            extraWallRoot = null;
             windowLights = [];
         }
 
         function clearHazards() {
-            if (hazardRoot) {
-                scene.remove(hazardRoot);
-                hazardRoot = null;
-            }
+            disposeObject(hazardRoot);
+            hazardRoot = null;
             waterMeshes = [];
         }
 

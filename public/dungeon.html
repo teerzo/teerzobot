@@ -969,20 +969,21 @@
 
         function sizePainting(frame, plane, aspect, hash) {
             const ar = aspect > 0.05 && Number.isFinite(aspect) ? aspect : 4 / 3;
-            const maxEdge = 0.34;
+            const border = 0.04;
+            const maxW = CELL * 0.8 - border * 2;
+            const maxH = WALL_H * 0.8 - border * 2;
             let width;
             let height;
-            if (ar >= 1) {
-                width = maxEdge;
-                height = maxEdge / ar;
+            if (ar >= maxW / maxH) {
+                width = maxW;
+                height = maxW / ar;
             } else {
-                height = maxEdge;
-                width = maxEdge * ar;
+                height = maxH;
+                width = maxH * ar;
             }
-            const scale = 0.62 + (Math.abs(hash) % 11) * 0.07;
+            const scale = 0.5 + (Math.abs(hash) % 11) * (0.5 / 10);
             width *= scale;
             height *= scale;
-            const border = 0.034;
             plane.scale.set(width, height, 1);
             frame.scale.set(width + border * 2, height + border * 2, 1);
         }

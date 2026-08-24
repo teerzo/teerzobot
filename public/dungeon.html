@@ -1679,12 +1679,8 @@
             return (Math.abs(x * 13 + z * 17 + n * 31 + x * z * 7) % 1000) / 1000;
         }
 
-        function caveFloorBump(x, z) {
-            return 0.042 + cellHash01(x, z, 2) * 0.1;
-        }
-
         function propLiftAt(x, z, rooms, paletteId) {
-            return isCaveLook(x, z, rooms, paletteId) ? caveFloorBump(x, z) : PROP_LIFT;
+            return PROP_LIFT;
         }
 
         function pickFloorKind(x, z, rooms, paletteId) {
@@ -2296,15 +2292,28 @@
         const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1816, roughness: 0.95, metalness: 0.05 });
         const tinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4a8, roughness: 0.35, metalness: 0.55 });
         const goblinMat = new THREE.MeshStandardMaterial({ color: 0x3a8a28, roughness: 0.72, metalness: 0.04 });
+        const goblinDarkMat = new THREE.MeshStandardMaterial({ color: 0x245c18, roughness: 0.8, metalness: 0.04 });
         const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
+        const goblinEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffee55 });
         const ghostMat = new THREE.MeshBasicMaterial({
-            color: 0xd8e8ff,
+            color: 0xa8c8ff,
             transparent: true,
-            opacity: 0.52,
+            opacity: 0.28,
             depthWrite: false,
             fog: false,
             blending: THREE.AdditiveBlending,
         });
+        const ghostSheetMat = new THREE.MeshStandardMaterial({
+            color: 0xd4e4f8,
+            transparent: true,
+            opacity: 0.62,
+            roughness: 0.35,
+            metalness: 0,
+            emissive: 0x3a5a88,
+            emissiveIntensity: 0.55,
+            depthWrite: false,
+        });
+        const ghostHoleMat = new THREE.MeshBasicMaterial({ color: 0x081018 });
         const mushStemMat = new THREE.MeshStandardMaterial({ color: 0xc8c2a8, roughness: 0.88, metalness: 0.02 });
         const mushCapMats = [
             new THREE.MeshStandardMaterial({ color: 0x5ee87a, emissive: 0x1f8a38, emissiveIntensity: 1.05, roughness: 0.48, metalness: 0.04 }),
@@ -2348,7 +2357,7 @@
         const DOOR_TILE = 12;
         const ANGLE_WALL = 13;
         const CURVE_WALL = 14;
-        const HALF_H = WALL_H * 0.36;
+        const HALF_H = WALL_H * 0.22;
         const BROKEN_H = WALL_H * 0.32;
 
         function makeWallBoxGeo(widthX, height, widthZ) {
@@ -2377,12 +2386,28 @@
         const doorJambGeo = new THREE.BoxGeometry(0.12, WALL_H, 0.16);
         const doorLintelGeo = new THREE.BoxGeometry(1.02, 0.16, 0.18);
         const doorLeafGeo = new THREE.BoxGeometry(0.72, WALL_H * 0.78, 0.05);
-        const goblinBodyGeo = new THREE.CylinderGeometry(0.11, 0.15, 0.32, 6);
-        const goblinHeadGeo = new THREE.SphereGeometry(0.1, 8, 6);
-        const goblinEarGeo = new THREE.ConeGeometry(0.035, 0.12, 5);
-        const goblinEyeGeo = new THREE.BoxGeometry(0.025, 0.025, 0.02);
-        const ghostBodyGeo = new THREE.ConeGeometry(0.16, 0.72, 8);
-        const ghostHeadGeo = new THREE.SphereGeometry(0.13, 8, 6);
+        const goblinBodyGeo = new THREE.BoxGeometry(0.18, 0.2, 0.13);
+        const goblinBellyGeo = new THREE.SphereGeometry(0.09, 7, 5);
+        const goblinHeadGeo = new THREE.SphereGeometry(0.095, 8, 6);
+        const goblinEarGeo = new THREE.ConeGeometry(0.032, 0.13, 5);
+        const goblinNoseGeo = new THREE.ConeGeometry(0.028, 0.07, 5);
+        const goblinEyeGeo = new THREE.BoxGeometry(0.028, 0.022, 0.018);
+        const goblinPupilGeo = new THREE.BoxGeometry(0.012, 0.012, 0.012);
+        const goblinTuskGeo = new THREE.ConeGeometry(0.012, 0.04, 4);
+        const goblinArmGeo = new THREE.BoxGeometry(0.045, 0.18, 0.045);
+        const goblinHandGeo = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+        const goblinLegGeo = new THREE.BoxGeometry(0.055, 0.14, 0.055);
+        const goblinFootGeo = new THREE.BoxGeometry(0.06, 0.03, 0.09);
+        const goblinClothGeo = new THREE.BoxGeometry(0.16, 0.08, 0.04);
+        const goblinBladeGeo = new THREE.BoxGeometry(0.02, 0.16, 0.035);
+        const goblinBrowGeo = new THREE.BoxGeometry(0.12, 0.018, 0.03);
+        const ghostBodyGeo = new THREE.ConeGeometry(0.2, 0.58, 8);
+        const ghostHeadGeo = new THREE.SphereGeometry(0.14, 8, 6);
+        const ghostArmGeo = new THREE.ConeGeometry(0.045, 0.22, 6);
+        const ghostHemGeo = new THREE.ConeGeometry(0.05, 0.12, 5);
+        const ghostEyeGeo = new THREE.SphereGeometry(0.028, 6, 5);
+        const ghostMouthGeo = new THREE.BoxGeometry(0.06, 0.035, 0.02);
+        const ghostCoreGeo = new THREE.SphereGeometry(0.2, 8, 6);
         const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
         const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
         const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
@@ -2473,7 +2498,9 @@
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
-            goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo, bloodStainGeo,
+            goblinBodyGeo, goblinBellyGeo, goblinHeadGeo, goblinEarGeo, goblinNoseGeo, goblinEyeGeo, goblinPupilGeo,
+            goblinTuskGeo, goblinArmGeo, goblinHandGeo, goblinLegGeo, goblinFootGeo, goblinClothGeo, goblinBladeGeo, goblinBrowGeo,
+            ghostBodyGeo, ghostHeadGeo, ghostArmGeo, ghostHemGeo, ghostEyeGeo, ghostMouthGeo, ghostCoreGeo, bloodStainGeo,
             hangCurtainGeo, cobwebHangGeo, caveBlockGeo, curveQuarterGeo, curveHalfGeo,
         ]);
         const SHARED_MATS = new Set([
@@ -2481,7 +2508,8 @@
             doorWoodMat, doorIronMat,
             nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
-            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinEyeMat, ghostMat, mushStemMat, mushGlowMat, voidMat,
+            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
+            ghostMat, ghostSheetMat, ghostHoleMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat, strawMat, sackclothMat, linenMat, boneMat, rustMat, waxMat, crystalMat, slimeClutterMat,
             goldTrimMat, scrollMat, hamMat, inkMat, coalMat, tinMat,
             ...floorMats, ...ceilMats, ...frameMats, ...mushCapMats, ...paintMats, ...clothMats,
@@ -3213,32 +3241,108 @@
         function makeGoblin() {
             const group = new THREE.Group();
             const body = new THREE.Mesh(goblinBodyGeo, goblinMat);
-            body.position.y = 0.2;
+            body.position.set(0, 0.28, 0.01);
+            body.rotation.x = 0.18;
+            const belly = new THREE.Mesh(goblinBellyGeo, goblinDarkMat);
+            belly.position.set(0, 0.22, 0.05);
+            const cloth = new THREE.Mesh(goblinClothGeo, sackclothMat);
+            cloth.position.set(0, 0.18, 0.07);
             const head = new THREE.Mesh(goblinHeadGeo, goblinMat);
-            head.position.y = 0.4;
+            head.position.set(0, 0.44, 0.05);
+            const brow = new THREE.Mesh(goblinBrowGeo, goblinDarkMat);
+            brow.position.set(0, 0.49, 0.12);
+            const nose = new THREE.Mesh(goblinNoseGeo, goblinDarkMat);
+            nose.position.set(0, 0.42, 0.14);
+            nose.rotation.x = Math.PI / 2;
             const earL = new THREE.Mesh(goblinEarGeo, goblinMat);
-            earL.position.set(-0.07, 0.48, 0);
-            earL.rotation.z = 0.55;
+            earL.position.set(-0.09, 0.5, 0.02);
+            earL.rotation.z = 0.7;
             const earR = new THREE.Mesh(goblinEarGeo, goblinMat);
-            earR.position.set(0.07, 0.48, 0);
-            earR.rotation.z = -0.55;
-            const eyeL = new THREE.Mesh(goblinEyeGeo, goblinEyeMat);
-            eyeL.position.set(-0.03, 0.42, 0.08);
-            const eyeR = new THREE.Mesh(goblinEyeGeo, goblinEyeMat);
-            eyeR.position.set(0.03, 0.42, 0.08);
-            group.add(body, head, earL, earR, eyeL, eyeR);
+            earR.position.set(0.09, 0.5, 0.02);
+            earR.rotation.z = -0.7;
+            const eyeL = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
+            eyeL.position.set(-0.035, 0.455, 0.13);
+            const eyeR = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
+            eyeR.position.set(0.035, 0.455, 0.13);
+            const pupilL = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilL.position.set(-0.035, 0.455, 0.14);
+            const pupilR = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilR.position.set(0.035, 0.455, 0.14);
+            const tuskL = new THREE.Mesh(goblinTuskGeo, boneMat);
+            tuskL.position.set(-0.03, 0.38, 0.12);
+            tuskL.rotation.x = 2.4;
+            const tuskR = new THREE.Mesh(goblinTuskGeo, boneMat);
+            tuskR.position.set(0.03, 0.38, 0.12);
+            tuskR.rotation.x = 2.4;
+            const armL = new THREE.Mesh(goblinArmGeo, goblinMat);
+            armL.position.set(-0.13, 0.24, 0.02);
+            armL.rotation.z = 0.45;
+            const armR = new THREE.Mesh(goblinArmGeo, goblinMat);
+            armR.position.set(0.14, 0.26, 0.04);
+            armR.rotation.z = -0.85;
+            armR.rotation.x = -0.4;
+            const handL = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
+            handL.position.set(-0.16, 0.14, 0.02);
+            const handR = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
+            handR.position.set(0.2, 0.16, 0.1);
+            const blade = new THREE.Mesh(goblinBladeGeo, rustMat);
+            blade.position.set(0.2, 0.24, 0.12);
+            blade.rotation.z = -0.3;
+            const hilt = new THREE.Mesh(goblinHandGeo, woodMat);
+            hilt.position.set(0.2, 0.16, 0.1);
+            hilt.scale.set(0.6, 1.2, 0.6);
+            const legL = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
+            legL.position.set(-0.05, 0.1, 0);
+            const legR = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
+            legR.position.set(0.05, 0.1, 0.02);
+            const footL = new THREE.Mesh(goblinFootGeo, sackclothMat);
+            footL.position.set(-0.05, 0.02, 0.02);
+            const footR = new THREE.Mesh(goblinFootGeo, sackclothMat);
+            footR.position.set(0.05, 0.02, 0.04);
+            group.add(
+                body, belly, cloth, head, brow, nose, earL, earR,
+                eyeL, eyeR, pupilL, pupilR, tuskL, tuskR,
+                armL, armR, handL, handR, blade, hilt, legL, legR, footL, footR,
+            );
             group.rotation.y = Math.PI;
             return group;
         }
 
         function makeGhost() {
             const group = new THREE.Group();
-            const sheet = new THREE.Mesh(ghostBodyGeo, ghostMat);
-            sheet.position.y = 0.4;
-            const head = new THREE.Mesh(ghostHeadGeo, ghostMat);
-            head.position.y = 0.72;
-            group.add(sheet, head);
+            const glow = new THREE.Mesh(ghostCoreGeo, ghostMat);
+            glow.position.y = 0.46;
+            glow.scale.set(1.15, 1.45, 1.15);
+            const sheet = new THREE.Mesh(ghostBodyGeo, ghostSheetMat);
+            sheet.position.y = 0.38;
+            const head = new THREE.Mesh(ghostHeadGeo, ghostSheetMat);
+            head.position.y = 0.68;
+            const eyeL = new THREE.Mesh(ghostEyeGeo, ghostHoleMat);
+            eyeL.position.set(-0.045, 0.7, 0.11);
+            const eyeR = new THREE.Mesh(ghostEyeGeo, ghostHoleMat);
+            eyeR.position.set(0.045, 0.7, 0.11);
+            const mouth = new THREE.Mesh(ghostMouthGeo, ghostHoleMat);
+            mouth.position.set(0, 0.62, 0.12);
+            const armL = new THREE.Mesh(ghostArmGeo, ghostSheetMat);
+            armL.position.set(-0.16, 0.48, 0.02);
+            armL.rotation.z = 1.15;
+            armL.rotation.x = 0.35;
+            const armR = new THREE.Mesh(ghostArmGeo, ghostSheetMat);
+            armR.position.set(0.16, 0.48, 0.02);
+            armR.rotation.z = -1.15;
+            armR.rotation.x = 0.35;
+            group.add(glow, sheet, head, eyeL, eyeR, mouth, armL, armR);
+            for (let i = 0; i < 5; i++) {
+                const hem = new THREE.Mesh(ghostHemGeo, ghostSheetMat);
+                const a = (i / 5) * Math.PI * 2;
+                hem.position.set(Math.sin(a) * 0.1, 0.08, Math.cos(a) * 0.08);
+                hem.rotation.x = Math.PI + 0.25;
+                hem.rotation.z = Math.sin(a) * 0.2;
+                group.add(hem);
+            }
             group.userData.bob = Math.random() * Math.PI * 2;
+            group.userData.armL = armL;
+            group.userData.armR = armR;
             return group;
         }
 
@@ -3317,6 +3421,13 @@
                 actor.group.position.z += (actor.tz - actor.group.position.z) * t;
                 if (actor.kind === 'ghost') {
                     actor.group.position.y = PROP_LIFT + 0.08 + Math.sin(now * 2.4 + (actor.group.userData.bob || 0)) * 0.05;
+                    const sway = Math.sin(now * 1.8 + (actor.group.userData.bob || 0)) * 0.18;
+                    if (actor.group.userData.armL) {
+                        actor.group.userData.armL.rotation.x = 0.35 + sway;
+                    }
+                    if (actor.group.userData.armR) {
+                        actor.group.userData.armR.rotation.x = 0.35 - sway;
+                    }
                 } else {
                     actor.group.lookAt(targetPos.x, actor.group.position.y, targetPos.z);
                     actor.group.rotateY(Math.PI);
@@ -6048,70 +6159,26 @@
                 if (!positions.length) {
                     continue;
                 }
-                const flat = [];
-                const cave = [];
+                const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], positions.length / 3);
+                mesh.receiveShadow = true;
                 for (let i = 0; i < positions.length; i += 3) {
-                    if (isCaveLook(positions[i], positions[i + 1], state.rooms, paletteId)) {
-                        cave.push(positions[i], positions[i + 1], positions[i + 2]);
-                    } else {
-                        flat.push(positions[i], positions[i + 1], positions[i + 2]);
-                    }
+                    const index = i / 3;
+                    dummy.position.set(positions[i], 0.002, positions[i + 1]);
+                    dummy.rotation.set(0, positions[i + 2] * (Math.PI / 2), 0);
+                    dummy.scale.set(1, 1, 1);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(index, dummy.matrix);
+                    const shade = 0.9 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;
+                    const room = roomContaining(state.rooms, positions[i], positions[i + 1]);
+                    accentColor(color, room, shade);
+                    mesh.setColorAt(index, color);
                 }
-                if (flat.length) {
-                    const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], flat.length / 3);
-                    mesh.receiveShadow = true;
-                    for (let i = 0; i < flat.length; i += 3) {
-                        const index = i / 3;
-                        dummy.position.set(flat[i], 0.002, flat[i + 1]);
-                        dummy.rotation.set(0, flat[i + 2] * (Math.PI / 2), 0);
-                        dummy.scale.set(1, 1, 1);
-                        dummy.updateMatrix();
-                        mesh.setMatrixAt(index, dummy.matrix);
-                        const shade = 0.9 + ((flat[i] * 5 + flat[i + 1] * 11) % 6) * 0.02;
-                        const room = roomContaining(state.rooms, flat[i], flat[i + 1]);
-                        accentColor(color, room, shade);
-                        mesh.setColorAt(index, color);
-                    }
-                    mesh.instanceMatrix.needsUpdate = true;
-                    if (mesh.instanceColor) {
-                        mesh.instanceColor.needsUpdate = true;
-                    }
-                    scene.add(mesh);
-                    floorMeshes.push(mesh);
+                mesh.instanceMatrix.needsUpdate = true;
+                if (mesh.instanceColor) {
+                    mesh.instanceColor.needsUpdate = true;
                 }
-                if (cave.length) {
-                    const mesh = new THREE.InstancedMesh(caveBlockGeo, floorMats[k], cave.length / 3);
-                    mesh.receiveShadow = true;
-                    for (let i = 0; i < cave.length; i += 3) {
-                        const index = i / 3;
-                        const x = cave[i];
-                        const z = cave[i + 1];
-                        const bump = caveFloorBump(x, z);
-                        dummy.position.set(x, bump / 2, z);
-                        dummy.rotation.set(
-                            (cellHash01(x, z, 4) - 0.5) * 0.1,
-                            cave[i + 2] * (Math.PI / 2),
-                            (cellHash01(x, z, 5) - 0.5) * 0.1,
-                        );
-                        dummy.scale.set(
-                            0.88 + cellHash01(x, z, 6) * 0.14,
-                            bump,
-                            0.88 + cellHash01(x, z, 7) * 0.14,
-                        );
-                        dummy.updateMatrix();
-                        mesh.setMatrixAt(index, dummy.matrix);
-                        const shade = 0.84 + cellHash01(x, z, 8) * 0.18;
-                        const room = roomContaining(state.rooms, x, z);
-                        accentColor(color, room, shade);
-                        mesh.setColorAt(index, color);
-                    }
-                    mesh.instanceMatrix.needsUpdate = true;
-                    if (mesh.instanceColor) {
-                        mesh.instanceColor.needsUpdate = true;
-                    }
-                    scene.add(mesh);
-                    floorMeshes.push(mesh);
-                }
+                scene.add(mesh);
+                floorMeshes.push(mesh);
             }
             tileGeo.dispose();
 

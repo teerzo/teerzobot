@@ -61,9 +61,23 @@
             align-items: flex-start;
             gap: 0.5em;
         }
-        #floor, #mode, #last, #votes {
+        #top-left {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.35em;
+        }
+        #floor, #mode, #last, #votes, #fps {
             background: rgba(0, 0, 0, 0.62);
             border-radius: 0.5em;
+        }
+        #fps {
+            padding: 0.25em 0.55em;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-variant-numeric: tabular-nums;
         }
         #floor {
             display: flex;
@@ -236,7 +250,10 @@
     <div id="hud">
         <div id="vignette"></div>
         <div id="top">
-            <div id="floor">Floor <strong>0</strong></div>
+            <div id="top-left">
+                <div id="floor">Floor <strong>0</strong></div>
+                <div id="fps">-- fps</div>
+            </div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
         <div id="help">!up !down !left !right !fire</div>
@@ -274,6 +291,7 @@
         const YAWS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
 
         const floorEl = document.querySelector('#floor strong');
+        const fpsEl = document.getElementById('fps');
         const hudEl = document.getElementById('hud');
         const stageEl = document.getElementById('stage');
         const modeEl = document.getElementById('mode');
@@ -763,23 +781,71 @@
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
+            const seam = String(kind).match(/^(dirt|plank|stone)-(stone|dirt|plank)-(edge|corner|end)$/);
+            const paintKind = seam ? (seam[1] === 'stone' ? 'flag' : seam[1]) : kind;
 
             function px(x, y, color) {
                 ctx.fillStyle = color;
                 ctx.fillRect(((x % size) + size) % size, ((y % size) + size) % size, 1, 1);
             }
 
-            if (kind === 'dirt') {
+            function paintFamily(ix, iy, family) {
+                if (family === 'dirt') {
+                    const dirt = ['#3a2a1c', '#4a3624', '#2e2218', '#5a4030', '#241810'];
+                    px(ix, iy, dirt[(ix * 11 + iy * 17) % dirt.length]);
+                    return;
+                }
+                if (family === 'plank') {
+                    const boards = [[86, 62, 38], [102, 74, 46], [74, 54, 34], [94, 68, 42]];
+                    const pal = boards[Math.floor(iy / 8) % boards.length];
+                    const shade = 0.88 + (Math.floor(iy / 8) % 4) * 0.04;
+                    ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
+                    ctx.fillRect(ix, iy, 1, 1);
+                    return;
+                }
+                const pal = [[92, 82, 70], [108, 96, 82], [80, 72, 62], [118, 104, 88]];
+                const onGrout = ix % 16 === 0 || iy % 16 === 0 || ix % 16 === 15 || iy % 16 === 15;
+                if (onGrout) {
+                    px(ix, iy, '#1a1613');
+                    return;
+                }
+                const p = pal[(ix + iy * 3) % pal.length];
+                const shade = 0.86 + ((ix * 9 + iy * 5) % 7) * 0.03;
+                px(ix, iy, `rgb(${(p[0] * shade) | 0},${(p[1] * shade) | 0},${(p[2] * shade) | 0})`);
+            }
+
+            function blendEdge(side, family) {
+                for (let i = 0; i < size; i++) {
+                    const depth = 4 + ((i * 13 + side * 7) % 6);
+                    for (let d = 0; d < depth; d++) {
+                        if (d > 2 && ((i * 9 + d * 5 + side) % 4) === 0) {
+                            continue;
+                        }
+                        let ix = i;
+                        let iy = d;
+                        if (side === 1) {
+                            ix = size - 1 - d;
+                            iy = i;
+                        } else if (side === 2) {
+                            ix = i;
+                            iy = size - 1 - d;
+                        } else if (side === 3) {
+                            ix = d;
+                            iy = i;
+                        }
+                        paintFamily(ix, iy, family);
+                    }
+                }
+            }
+
+            if (paintKind === 'dirt') {
                 ctx.fillStyle = '#2a2016';
                 ctx.fillRect(0, 0, size, size);
                 const dirt = ['#3a2a1c', '#4a3624', '#2e2218', '#5a4030', '#241810'];
                 for (let n = 0; n < 220; n++) {
                     px((n * 11 + 3) % size, (n * 17 + 7) % size, dirt[n % dirt.length]);
                 }
-                return canvas;
-            }
-
-            if (kind === 'plank') {
+            } else if (paintKind === 'plank') {
                 ctx.fillStyle = '#1a120c';
                 ctx.fillRect(0, 0, size, size);
                 const boards = [
@@ -796,73 +862,78 @@
                     ctx.fillStyle = 'rgba(255,255,255,0.06)';
                     ctx.fillRect(0, y + 1, size, 1);
                 }
-                return canvas;
-            }
+            } else {
+                const grout = paintKind === 'moss' ? '#1c2a18' : '#1a1613';
+                ctx.fillStyle = grout;
+                ctx.fillRect(0, 0, size, size);
 
-            const grout = kind === 'moss' ? '#1c2a18' : '#1a1613';
-            ctx.fillStyle = grout;
-            ctx.fillRect(0, 0, size, size);
+                const palettes = {
+                    flag: [[92, 82, 70], [108, 96, 82], [80, 72, 62], [118, 104, 88]],
+                    worn: [[86, 76, 64], [100, 88, 74], [72, 64, 54], [94, 84, 70]],
+                    moss: [[78, 80, 62], [90, 86, 68], [70, 76, 58], [102, 94, 72]],
+                    dark: [[58, 52, 46], [70, 62, 54], [48, 44, 40], [64, 58, 50]],
+                    gravel: [[84, 74, 62], [96, 86, 72], [74, 66, 56], [108, 96, 80]],
+                }[paintKind] || [[92, 82, 70], [108, 96, 82], [80, 72, 62], [118, 104, 88]];
 
-            const palettes = {
-                flag: [[92, 82, 70], [108, 96, 82], [80, 72, 62], [118, 104, 88]],
-                worn: [[86, 76, 64], [100, 88, 74], [72, 64, 54], [94, 84, 70]],
-                moss: [[78, 80, 62], [90, 86, 68], [70, 76, 58], [102, 94, 72]],
-                dark: [[58, 52, 46], [70, 62, 54], [48, 44, 40], [64, 58, 50]],
-                gravel: [[84, 74, 62], [96, 86, 72], [74, 66, 56], [108, 96, 80]],
-            }[kind];
-
-            const tile = kind === 'gravel' ? 8 : 16;
-            const gap = 1;
-            let i = 0;
-            for (let y = 0; y < size; y += tile) {
-                for (let x = 0; x < size; x += tile) {
-                    const pal = palettes[(x / tile + (y / tile) * 3 + i) % palettes.length];
-                    const shade = 0.86 + ((x * 9 + y * 5 + i * 13) % 7) * 0.03;
-                    ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
-                    ctx.fillRect(x + gap, y + gap, tile - gap, tile - gap);
-                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-                    ctx.fillRect(x + gap, y + gap, tile - gap, 1);
-                    ctx.fillStyle = 'rgba(0,0,0,0.16)';
-                    ctx.fillRect(x + gap, y + tile - 1, tile - gap, 1);
-                    i += 1;
+                const tile = paintKind === 'gravel' ? 8 : 16;
+                const gap = 1;
+                let i = 0;
+                for (let y = 0; y < size; y += tile) {
+                    for (let x = 0; x < size; x += tile) {
+                        const pal = palettes[(x / tile + (y / tile) * 3 + i) % palettes.length];
+                        const shade = 0.86 + ((x * 9 + y * 5 + i * 13) % 7) * 0.03;
+                        ctx.fillStyle = `rgb(${(pal[0] * shade) | 0},${(pal[1] * shade) | 0},${(pal[2] * shade) | 0})`;
+                        ctx.fillRect(x + gap, y + gap, tile - gap, tile - gap);
+                        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                        ctx.fillRect(x + gap, y + gap, tile - gap, 1);
+                        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+                        ctx.fillRect(x + gap, y + tile - 1, tile - gap, 1);
+                        i += 1;
+                    }
                 }
-            }
 
-            function px(x, y, color) {
-                ctx.fillStyle = color;
-                ctx.fillRect(((x % size) + size) % size, ((y % size) + size) % size, 1, 1);
-            }
-
-            if (kind === 'worn') {
-                const cracks = [
-                    [4, 6, 1, 1], [5, 7, 1, 1], [6, 8, 1, 1], [7, 9, 1, 1], [8, 11, 1, 1],
-                    [18, 3, 1, 1], [19, 4, 1, 1], [20, 6, 1, 1], [21, 8, 1, 1],
-                    [10, 20, 1, 1], [11, 21, 1, 1], [12, 22, 1, 1], [13, 24, 1, 1], [14, 25, 1, 1],
-                ];
-                for (const [x, y] of cracks) {
-                    px(x, y, '#151210');
-                    px(x + 1, y, '#2a241e');
+                if (paintKind === 'worn') {
+                    const cracks = [
+                        [4, 6], [5, 7], [6, 8], [7, 9], [8, 11],
+                        [18, 3], [19, 4], [20, 6], [21, 8],
+                        [10, 20], [11, 21], [12, 22], [13, 24], [14, 25],
+                    ];
+                    for (const [x, y] of cracks) {
+                        px(x, y, '#151210');
+                        px(x + 1, y, '#2a241e');
+                    }
                 }
-            }
 
-            if (kind === 'moss') {
-                const moss = ['#2a5c24', '#3d7a32', '#4a8f38', '#1e4a1c'];
-                for (let n = 0; n < 70; n++) {
-                    const x = (n * 11 + 3) % size;
-                    const y = (n * 17 + 5) % size;
-                    const onGrout = x % 16 === 0 || y % 16 === 0 || x % 16 === 15 || y % 16 === 15;
-                    if (onGrout || n % 4 === 0) {
-                        px(x, y, moss[n % moss.length]);
-                        if (n % 3 === 0) {
-                            px(x + 1, y, moss[(n + 1) % moss.length]);
+                if (paintKind === 'moss') {
+                    const moss = ['#2a5c24', '#3d7a32', '#4a8f38', '#1e4a1c'];
+                    for (let n = 0; n < 70; n++) {
+                        const x = (n * 11 + 3) % size;
+                        const y = (n * 17 + 5) % size;
+                        const onGrout = x % 16 === 0 || y % 16 === 0 || x % 16 === 15 || y % 16 === 15;
+                        if (onGrout || n % 4 === 0) {
+                            px(x, y, moss[n % moss.length]);
+                            if (n % 3 === 0) {
+                                px(x + 1, y, moss[(n + 1) % moss.length]);
+                            }
                         }
+                    }
+                }
+
+                if (paintKind === 'gravel') {
+                    for (let n = 0; n < 40; n++) {
+                        px((n * 7) % size, (n * 13) % size, n % 2 ? '#5a4e42' : '#3a322c');
                     }
                 }
             }
 
-            if (kind === 'gravel') {
-                for (let n = 0; n < 40; n++) {
-                    px((n * 7) % size, (n * 13) % size, n % 2 ? '#5a4e42' : '#3a322c');
+            if (seam) {
+                const other = seam[2];
+                const shape = seam[3];
+                blendEdge(0, other);
+                if (shape === 'corner') {
+                    blendEdge(1, other);
+                } else if (shape === 'end') {
+                    blendEdge(2, other);
                 }
             }
 
@@ -1047,6 +1118,69 @@
             return ROOM_THEMES[room?.kind]?.ceil || 'dark';
         }
 
+        function floorFamily(kind) {
+            if (kind === 'dirt') {
+                return 'dirt';
+            }
+            if (kind === 'plank') {
+                return 'plank';
+            }
+            return 'stone';
+        }
+
+        function seamOther(me, families) {
+            if (me === 'stone') {
+                if (families.has('dirt')) {
+                    return 'dirt';
+                }
+                if (families.has('plank')) {
+                    return 'plank';
+                }
+            } else if (families.has('stone')) {
+                return 'stone';
+            } else if (me === 'dirt' && families.has('plank')) {
+                return 'plank';
+            } else if (me === 'plank' && families.has('dirt')) {
+                return 'dirt';
+            }
+            return null;
+        }
+
+        function resolveFloorSeam(kind, bits, other, x, z) {
+            const rotFallback = (x + z) % 4;
+            if (!bits || !other || other === floorFamily(kind)) {
+                return { kind, rot: rotFallback };
+            }
+            const prefix = `${floorFamily(kind)}-${other}`;
+            const singles = { 1: 0, 2: 3, 4: 2, 8: 1 };
+            if (singles[bits] != null) {
+                return { kind: `${prefix}-edge`, rot: singles[bits] };
+            }
+            const corners = { 3: 0, 6: 3, 12: 2, 9: 1 };
+            if (corners[bits] != null) {
+                return { kind: `${prefix}-corner`, rot: corners[bits] };
+            }
+            if (bits === 5) {
+                return { kind: `${prefix}-end`, rot: 0 };
+            }
+            if (bits === 10) {
+                return { kind: `${prefix}-end`, rot: 1 };
+            }
+            if ((bits & 3) === 3) {
+                return { kind: `${prefix}-corner`, rot: 0 };
+            }
+            if ((bits & 6) === 6) {
+                return { kind: `${prefix}-corner`, rot: 3 };
+            }
+            if ((bits & 12) === 12) {
+                return { kind: `${prefix}-corner`, rot: 2 };
+            }
+            if ((bits & 9) === 9) {
+                return { kind: `${prefix}-corner`, rot: 1 };
+            }
+            return { kind, rot: rotFallback };
+        }
+
         function accentColor(color, room, shade) {
             color.setRGB(shade, shade, shade);
             if (room && ROOM_ACCENTS[room.kind]) {
@@ -1056,10 +1190,18 @@
         }
 
         function isDirtFloor(x, z, rooms, paletteId) {
-            return pickFloorKind(x, z, rooms, paletteId) === 'dirt';
+            return floorFamily(pickFloorKind(x, z, rooms, paletteId)) === 'dirt';
         }
 
-        const FLOOR_KINDS = ['flag', 'worn', 'moss', 'dark', 'gravel', 'plank', 'dirt'];
+        const FLOOR_KINDS = [
+            'flag', 'worn', 'moss', 'dark', 'gravel', 'plank', 'dirt',
+            'dirt-stone-edge', 'dirt-stone-corner', 'dirt-stone-end',
+            'plank-stone-edge', 'plank-stone-corner', 'plank-stone-end',
+            'stone-dirt-edge', 'stone-dirt-corner', 'stone-dirt-end',
+            'stone-plank-edge', 'stone-plank-corner', 'stone-plank-end',
+            'dirt-plank-edge', 'dirt-plank-corner', 'dirt-plank-end',
+            'plank-dirt-edge', 'plank-dirt-corner', 'plank-dirt-end',
+        ];
         const floorMats = FLOOR_KINDS.map((kind) => new THREE.MeshStandardMaterial({
             map: canvasToTexture(makeFloorCanvas(kind), 1, 1),
             roughness: 0.96,
@@ -1416,6 +1558,8 @@
         let voteEndsAt = 0;
         let overlayOn = true;
         let rafId = 0;
+        let fpsFrames = 0;
+        let fpsElapsed = 0;
         let canvasW = 0;
         let canvasH = 0;
         const clock = new THREE.Clock();
@@ -3277,15 +3421,52 @@
             }
             scene.add(hazardRoot);
 
-            const floorBuckets = FLOOR_KINDS.map(() => []);
+            const floorMap = Array.from({ length: h }, () => Array(w).fill(null));
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
                     if (!isFloorTile(state.grid[y][x])) {
                         continue;
                     }
-                    const kindName = pickFloorKind(x, y, state.rooms, paletteId);
-                    const kind = Math.max(0, FLOOR_KINDS.indexOf(kindName));
-                    floorBuckets[kind].push(x, y);
+                    floorMap[y][x] = pickFloorKind(x, y, state.rooms, paletteId);
+                }
+            }
+            const floorBuckets = FLOOR_KINDS.map(() => []);
+            const seamDirs = [
+                { dx: 0, dy: -1, bit: 1 },
+                { dx: 1, dy: 0, bit: 2 },
+                { dx: 0, dy: 1, bit: 4 },
+                { dx: -1, dy: 0, bit: 8 },
+            ];
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const base = floorMap[y][x];
+                    if (!base) {
+                        continue;
+                    }
+                    const me = floorFamily(base);
+                    let bits = 0;
+                    const others = new Set();
+                    for (const { dx, dy, bit } of seamDirs) {
+                        const nKind = floorMap[y + dy]?.[x + dx];
+                        if (!nKind) {
+                            continue;
+                        }
+                        const fam = floorFamily(nKind);
+                        if (fam === me) {
+                            continue;
+                        }
+                        bits |= bit;
+                        others.add(fam);
+                    }
+                    const resolved = resolveFloorSeam(base, bits, seamOther(me, others), x, y);
+                    let kind = FLOOR_KINDS.indexOf(resolved.kind);
+                    if (kind < 0) {
+                        kind = FLOOR_KINDS.indexOf(base);
+                    }
+                    if (kind < 0) {
+                        kind = 0;
+                    }
+                    floorBuckets[kind].push(x, y, resolved.rot);
                 }
             }
 
@@ -3298,12 +3479,12 @@
                 if (!positions.length) {
                     continue;
                 }
-                const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], positions.length / 2);
+                const mesh = new THREE.InstancedMesh(tileGeo.clone(), floorMats[k], positions.length / 3);
                 mesh.receiveShadow = true;
-                for (let i = 0; i < positions.length; i += 2) {
-                    const index = i / 2;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const index = i / 3;
                     dummy.position.set(positions[i], 0.002, positions[i + 1]);
-                    dummy.rotation.y = ((positions[i] + positions[i + 1]) % 4) * (Math.PI / 2);
+                    dummy.rotation.y = positions[i + 2] * (Math.PI / 2);
                     dummy.updateMatrix();
                     mesh.setMatrixAt(index, dummy.matrix);
                     const shade = 0.9 + ((positions[i] * 5 + positions[i + 1] * 11) % 6) * 0.02;
@@ -3579,6 +3760,13 @@
             }
             rafId = requestAnimationFrame(tick);
             const dt = clock.getDelta();
+            fpsFrames += 1;
+            fpsElapsed += dt;
+            if (fpsElapsed >= 0.5) {
+                fpsEl.textContent = `${Math.round(fpsFrames / fpsElapsed)} fps`;
+                fpsFrames = 0;
+                fpsElapsed = 0;
+            }
             const t = 1 - Math.exp(-dt * 9);
             camPos.lerp(targetPos, t);
             camYaw = lerpAngle(camYaw, targetYaw, t);

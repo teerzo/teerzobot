@@ -625,6 +625,140 @@
             }
         }
 
+        function makeCobwebCanvas() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            function px(x, y, a = 0.78) {
+                if (x < 0 || y < 0 || x >= size || y >= size) {
+                    return;
+                }
+                ctx.fillStyle = `rgba(236,232,222,${a})`;
+                ctx.fillRect(x | 0, y | 0, 1, 1);
+            }
+
+            function spoke(x0, y0, x1, y1, a) {
+                const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+                for (let i = 0; i <= n; i++) {
+                    const t = i / Math.max(1, n);
+                    const jag = i % 6 === 2 ? 1 : i % 6 === 5 ? -1 : 0;
+                    px(x0 + (x1 - x0) * t + jag, y0 + (y1 - y0) * t, a);
+                }
+            }
+
+            for (let i = 0; i < 9; i++) {
+                spoke(1, 1, 6 + i * 7, 62, 0.62 + (i % 3) * 0.1);
+            }
+            for (let r = 7; r < 72; r += 8) {
+                for (let a = 0; a <= 22; a++) {
+                    const ang = (a / 22) * 1.48;
+                    px(1 + Math.cos(ang) * r, 1 + Math.sin(ang) * r, 0.52);
+                    if (a % 2 === 0) {
+                        px(2 + Math.cos(ang) * r, 2 + Math.sin(ang) * r, 0.28);
+                    }
+                }
+            }
+            for (let i = 0; i < 7; i++) {
+                spoke(62, 1, 4 + i * 8, 48, 0.48);
+            }
+            for (let i = 0; i < 14; i++) {
+                px(5 + (i * 13) % 54, 6 + (i * 17) % 42, 0.95);
+            }
+            return canvas;
+        }
+
+        function makeHangingVineCanvas() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            drawVines(ctx, size);
+            const extra = [
+                { x: 36, lean: -1, len: 52 },
+                { x: 44, lean: 1, len: 46 },
+                { x: 52, lean: -1, len: 58 },
+                { x: 60, lean: 1, len: 40 },
+            ];
+            const stems = ['#1d4a1a', '#245820', '#2f6b28'];
+            const leaves = ['#2e6e28', '#3d8a32', '#52a83e', '#6cbc4a'];
+            function px(x, y, color) {
+                if (x < 0 || y < 0 || x >= size || y >= size) {
+                    return;
+                }
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, 1, 1);
+            }
+            for (const vine of extra) {
+                let x = vine.x;
+                for (let y = 0; y < vine.len; y++) {
+                    px(x, y, stems[(x + y) % stems.length]);
+                    if ((y + vine.x) % 3 === 0) {
+                        px(x + vine.lean, y, leaves[y % leaves.length]);
+                        px(x + vine.lean * 2, y + 1, leaves[(y + 2) % leaves.length]);
+                    }
+                    if (y > 2 && (y * 3 + vine.x) % 5 === 0) {
+                        x += vine.lean;
+                    }
+                }
+            }
+            return canvas;
+        }
+
+        function makeHangingPlantCanvas() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const stems = ['#3a2a14', '#4a3620', '#2a4a18'];
+            const leaves = ['#245820', '#2f7a32', '#3d8a32', '#6cbc4a', '#1d4a1a'];
+
+            function px(x, y, color) {
+                if (x < 0 || y < 0 || x >= size || y >= size) {
+                    return;
+                }
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, 1, 1);
+            }
+
+            function tuft(cx, cy, r, seed) {
+                for (let i = 0; i < 18; i++) {
+                    const a = (seed * 0.7 + i * 0.7) % 6.28;
+                    const len = r * (0.45 + (i % 4) * 0.16);
+                    for (let t = 0; t < len; t++) {
+                        px(cx + Math.cos(a) * t, cy + Math.sin(a) * t * 1.15, leaves[(seed + i + t) % leaves.length]);
+                    }
+                }
+            }
+
+            for (let i = 0; i < 7; i++) {
+                const x = 6 + i * 8;
+                for (let y = 0; y < 18 + (i % 5) * 6; y++) {
+                    px(x + ((y % 6 === 0) ? 1 : 0), y, stems[(x + y) % stems.length]);
+                }
+                tuft(x, 14 + (i % 3) * 8, 7 + (i % 4), i * 11);
+            }
+            tuft(20, 40, 10, 4);
+            tuft(42, 36, 9, 9);
+            tuft(32, 52, 8, 2);
+            return canvas;
+        }
+
+        function canvasToDecalTexture(canvas) {
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.needsUpdate = true;
+            return tex;
+        }
+
         function canvasToTexture(canvas, repeatX = 1, repeatY = 2) {
             const tex = new THREE.CanvasTexture(canvas);
             tex.magFilter = THREE.NearestFilter;
@@ -1438,6 +1572,30 @@
             roughness: 1,
             metalness: 0,
         });
+        const cobwebHangMat = new THREE.MeshBasicMaterial({
+            map: canvasToDecalTexture(makeCobwebCanvas()),
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+            alphaTest: 0.12,
+            side: THREE.DoubleSide,
+        });
+        const vineHangMat = new THREE.MeshBasicMaterial({
+            map: canvasToDecalTexture(makeHangingVineCanvas()),
+            transparent: true,
+            opacity: 0.94,
+            depthWrite: false,
+            alphaTest: 0.14,
+            side: THREE.DoubleSide,
+        });
+        const plantHangMat = new THREE.MeshBasicMaterial({
+            map: canvasToDecalTexture(makeHangingPlantCanvas()),
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            alphaTest: 0.16,
+            side: THREE.DoubleSide,
+        });
         const waterMat = new THREE.MeshStandardMaterial({
             color: 0x1a4858,
             emissive: 0x0a2838,
@@ -1716,6 +1874,8 @@
         const ghostBodyGeo = new THREE.ConeGeometry(0.16, 0.72, 8);
         const ghostHeadGeo = new THREE.SphereGeometry(0.13, 8, 6);
         const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
+        const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
+        const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
 
         let floorBase = null;
         let floorMeshes = [];
@@ -1800,11 +1960,12 @@
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
             goblinBodyGeo, goblinHeadGeo, goblinEarGeo, goblinEyeGeo, ghostBodyGeo, ghostHeadGeo, bloodStainGeo,
+            hangCurtainGeo, cobwebHangGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
             doorWoodMat, doorIronMat,
-            nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, waterMat, spikeMat, pitMat,
+            nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinEyeMat, ghostMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat,
@@ -3684,6 +3845,100 @@
             }
         }
 
+        function hallWalkAxis(grid, x, z) {
+            const n = isWallLike(grid[z - 1]?.[x]);
+            const s = isWallLike(grid[z + 1]?.[x]);
+            const e = isWallLike(grid[z]?.[x + 1]);
+            const w = isWallLike(grid[z]?.[x - 1]);
+            const ns = n && s;
+            const ew = e && w;
+            if (ns && !ew) {
+                return 'x';
+            }
+            if (ew && !ns) {
+                return 'z';
+            }
+            return null;
+        }
+
+        function pickHangKind(hash, paletteId) {
+            const mossy = paletteId === 'moss' || paletteId === 'sewer' || paletteId === 'cave';
+            const dusty = paletteId === 'crypt' || paletteId === 'blood' || paletteId === 'iron';
+            const roll = hash % 6;
+            if (paletteId === 'gilt') {
+                return 'cobweb';
+            }
+            if (dusty) {
+                return roll < 4 ? 'cobweb' : roll === 4 ? 'vine' : 'plant';
+            }
+            if (mossy) {
+                return roll < 2 ? 'cobweb' : roll < 4 ? 'vine' : 'plant';
+            }
+            return roll < 2 ? 'cobweb' : roll < 4 ? 'vine' : 'plant';
+        }
+
+        function placeHallHangings(grid, width, height, rooms, player, exit, blocked, paletteId, floor) {
+            const hung = new Set();
+            const cap = floor <= 0 ? 2 : Math.min(18, 6 + Math.floor((width * height) / 36));
+            const step = paletteId === 'gilt' ? 5 : 3;
+            let n = 0;
+            const spots = [];
+            for (let z = 1; z < height - 1; z++) {
+                for (let x = 1; x < width - 1; x++) {
+                    if (grid[z][x] !== 0) {
+                        continue;
+                    }
+                    if (isReservedCell(x, z, player, exit) || blocked.has(`${x},${z}`)) {
+                        continue;
+                    }
+                    if (roomContaining(rooms, x, z)) {
+                        continue;
+                    }
+                    const axis = hallWalkAxis(grid, x, z);
+                    if (!axis) {
+                        continue;
+                    }
+                    if (grid[z]?.[x - 1] === DOOR_TILE || grid[z]?.[x + 1] === DOOR_TILE
+                        || grid[z - 1]?.[x] === DOOR_TILE || grid[z + 1]?.[x] === DOOR_TILE) {
+                        continue;
+                    }
+                    const hash = Math.abs(x * 41 + z * 73 + (floor || 0) * 17);
+                    if (hash % step !== 0) {
+                        continue;
+                    }
+                    spots.push({ x, z, axis, hash });
+                }
+            }
+            spots.sort((a, b) => a.hash - b.hash);
+            for (const spot of spots) {
+                if (n >= cap) {
+                    break;
+                }
+                const near = [`${spot.x},${spot.z}`, `${spot.x + 1},${spot.z}`, `${spot.x - 1},${spot.z}`, `${spot.x},${spot.z + 1}`, `${spot.x},${spot.z - 1}`];
+                if (near.some((key) => hung.has(key))) {
+                    continue;
+                }
+                const kind = pickHangKind(spot.hash, paletteId);
+                const cobweb = kind === 'cobweb';
+                const mesh = new THREE.Mesh(
+                    cobweb ? cobwebHangGeo : hangCurtainGeo,
+                    cobweb ? cobwebHangMat : kind === 'vine' ? vineHangMat : plantHangMat,
+                );
+                mesh.rotation.y = spot.axis === 'x' ? Math.PI / 2 : 0;
+                const along = ((spot.hash % 5) - 2) * 0.06;
+                const side = spot.hash % 3 === 0 ? 0 : ((spot.hash % 2) * 2 - 1) * 0.18;
+                const y = cobweb ? WALL_H - 0.44 : WALL_H * 0.48;
+                if (spot.axis === 'x') {
+                    mesh.position.set(spot.x + along, y, spot.z + (cobweb ? 0 : side));
+                } else {
+                    mesh.position.set(spot.x + (cobweb ? 0 : side), y, spot.z + along);
+                }
+                propRoot.add(mesh);
+                hung.add(`${spot.x},${spot.z}`);
+                n += 1;
+            }
+        }
+
         function placeProps(grid, width, height, player, exit, torchFaces, rooms, paletteId, floor) {
             clearProps();
             propRoot = new THREE.Group();
@@ -3799,6 +4054,7 @@
             placeMushrooms(grid, floorCells, taken, paletteId, rooms);
 
             placeLargeFurniture(grid, width, height, rooms);
+            placeHallHangings(grid, width, height, rooms, player, exit, new Set([...usedCells, ...taken]), paletteId, floor);
             scene.add(propRoot);
         }
 

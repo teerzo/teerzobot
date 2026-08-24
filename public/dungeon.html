@@ -909,6 +909,7 @@
             clip.prevDisposal = 0;
             clip.prevDims = null;
             clip.backup = null;
+            clip.aspect = width / Math.max(1, height);
             paintGifFrame(clip, 0);
             finishClip(clip, makeCanvasTexture(clip.canvas));
         }
@@ -927,6 +928,7 @@
                 clip.canvas.height = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
                 clip.ctx = clip.canvas.getContext('2d');
                 clip.ctx.drawImage(img, 0, 0, clip.canvas.width, clip.canvas.height);
+                clip.aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
                 clip.animated = false;
                 finishClip(clip, makeCanvasTexture(clip.canvas));
             });
@@ -965,15 +967,37 @@
             return clip;
         }
 
-        function bindArtwork(planeMat, url) {
+        function sizePainting(frame, plane, aspect, hash) {
+            const ar = aspect > 0.05 && Number.isFinite(aspect) ? aspect : 4 / 3;
+            const maxEdge = 0.34;
+            let width;
+            let height;
+            if (ar >= 1) {
+                width = maxEdge;
+                height = maxEdge / ar;
+            } else {
+                height = maxEdge;
+                width = maxEdge * ar;
+            }
+            const scale = 0.62 + (Math.abs(hash) % 11) * 0.07;
+            width *= scale;
+            height *= scale;
+            const border = 0.034;
+            plane.scale.set(width, height, 1);
+            frame.scale.set(width + border * 2, height + border * 2, 1);
+        }
+
+        function bindArtwork(planeMat, url, frame, plane, hash) {
             const clip = artworkClip(url);
             const apply = (tex) => {
                 if (!tex) {
                     planeMat.map = null;
                     planeMat.color.set(0xc41818);
+                    sizePainting(frame, plane, 4 / 3, hash);
                 } else {
                     planeMat.map = tex;
                     planeMat.color.set(0xffffff);
+                    sizePainting(frame, plane, clip.aspect, hash);
                 }
                 planeMat.needsUpdate = true;
             };
@@ -1106,13 +1130,14 @@
 
         function makePainting(hash) {
             const group = new THREE.Group();
-            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.32, 0.05), frameMats[hash % frameMats.length]);
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.05), frameMats[hash % frameMats.length]);
             const planeMat = artworkEmptyMat.clone();
-            const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.22), planeMat);
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), planeMat);
             plane.position.z = 0.028;
+            sizePainting(frame, plane, 4 / 3, hash);
             const url = artworkUrls.length ? artworkUrls[hash % artworkUrls.length] : '';
             if (url) {
-                bindArtwork(planeMat, url);
+                bindArtwork(planeMat, url, frame, plane, hash);
             }
             group.add(frame, plane);
             return group;

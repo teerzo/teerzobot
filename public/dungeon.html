@@ -290,7 +290,7 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(90, 640 / 480, 0.05, 80);
+        const camera = new THREE.PerspectiveCamera(120, 640 / 480, 0.05, 80);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         renderer.setSize(640, 480);
@@ -1966,6 +1966,10 @@
         const source = new EventSource('/api/dungeon/events');
         source.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            if (data.type === 'reload') {
+                location.reload();
+                return;
+            }
             if (data.type === 'state' || data.grid) {
                 applyState(data, false);
             }

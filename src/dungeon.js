@@ -808,6 +808,7 @@ export function createDungeon() {
             scheduleIdle();
         }
         emit();
+        hub.emit({ type: 'reload' });
         return { ...snapshot(), changed: wasHidden };
     }
 

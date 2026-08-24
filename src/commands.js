@@ -414,7 +414,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return say(channel, 'Dungeon overlay is not available.');
                 }
                 dungeon.reset();
-                return say(channel, 'Dungeon overlay is on. Reset to floor 0. Move with !up !down !left !right.');
+                return say(channel, 'Dungeon overlay is on. Reset to floor 0 and refreshing the overlay.');
             },
         },
         {
@@ -428,7 +428,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 const sub = String(args[0] ?? '').trim().toLowerCase();
                 if (!sub || sub === 'reset' || sub === 'show' || sub === 'start') {
                     dungeon.reset();
-                    return say(channel, 'Dungeon overlay is on. Reset to floor 0. Move with !up !down !left !right.');
+                    return say(channel, 'Dungeon overlay is on. Reset to floor 0 and refreshing the overlay.');
                 }
                 if (!isMod && !isBroadcaster) {
                     return;

@@ -47,7 +47,7 @@ DISCORD_GUILD_ID=
 In the [Discord Developer Portal](https://discord.com/developers/applications) → **Installation** → **Install Link**, choose **Custom URL** and paste the Discord authorize URL (replace `YOUR_APP_ID` with `DISCORD_CLIENT_ID`):
 
 ```
-https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=0&integration_type=0&scope=bot+applications.commands
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=3072&integration_type=0&scope=bot+applications.commands
 ```
 
 Or paste your public install redirect (Railway):
@@ -56,7 +56,7 @@ Or paste your public install redirect (Railway):
 https://<your-app>.up.railway.app/discord/install
 ```
 
-Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands` and guild install (`integration_type=0`). The **Guilds** gateway intent is enough for `/ping` (Message Content is not required).
+Local testing: `http://localhost:3000/discord/install` (same as `/discord/invite`). That uses scopes `bot` and `applications.commands`, guild install (`integration_type=0`), and asks for View Channel + Send Messages so it can post in `#general`. The **Guilds** gateway intent is enough for slash commands (Message Content is not required).
 
 `GET /api/status` includes `discord.installUrl` with the same authorize URL.
 
@@ -69,7 +69,7 @@ http://localhost:3000/discord/callback
 https://<your-app>.up.railway.app/discord/callback
 ```
 
-On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping`, and reports connection state on `GET /api/status` as `discord`.
+On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping` and `/hello`, and reports connection state on `GET /api/status` as `discord`. When it is added to a server it posts in `#general` if it can send messages there (otherwise the system channel or another text channel). Restarting does not re-post.
 
 ## Run locally
 

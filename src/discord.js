@@ -1,17 +1,28 @@
 import {
     ActivityType,
+    ChannelType,
     Client,
     Events,
     GatewayIntentBits,
+    PermissionFlagsBits,
     REST,
     Routes,
     SlashCommandBuilder,
 } from 'discord.js';
 
-const pingCommand = new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Replies with Pong!')
-    .toJSON();
+const DEFAULT_BOT_PERMISSIONS = String(
+    PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages,
+);
+
+const slashCommands = [
+    new SlashCommandBuilder().setName('ping').setDescription('Replies with Pong!').toJSON(),
+    new SlashCommandBuilder().setName('hello').setDescription('Says hello from teerzobot').toJSON(),
+];
+
+const slashReplies = {
+    ping: 'Pong!',
+    hello: 'Hello! teerzobot is online.',
+};
 
 function htmlPage(title, body) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
@@ -28,7 +39,7 @@ export function buildDiscordInstallUrl() {
     const url = new URL('https://discord.com/oauth2/authorize');
     url.searchParams.set('client_id', clientId);
     url.searchParams.set('scope', 'bot applications.commands');
-    url.searchParams.set('permissions', process.env.DISCORD_BOT_PERMISSIONS || '0');
+    url.searchParams.set('permissions', process.env.DISCORD_BOT_PERMISSIONS || DEFAULT_BOT_PERMISSIONS);
     url.searchParams.set('integration_type', '0');
     return url.toString();
 }
@@ -62,9 +73,53 @@ export function attachDiscordRoutes(app) {
 async function registerCommands(token, clientId, guildId) {
     const rest = new REST({ version: '10' }).setToken(token);
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
-        body: [pingCommand],
+        body: slashCommands,
     });
-    console.log('Registered Discord slash command /ping');
+    console.log(`Registered Discord slash commands /ping /hello in ${guildId}`);
+}
+
+function canSend(channel) {
+    const me = channel.guild?.members.me;
+    return Boolean(
+        channel?.isTextBased()
+        && channel.type === ChannelType.GuildText
+        && me
+        && channel.permissionsFor(me)?.has(PermissionFlagsBits.SendMessages),
+    );
+}
+
+function findGeneralChannel(guild) {
+    const textChannels = guild.channels.cache.filter(canSend);
+    return textChannels.find((channel) => channel.name.toLowerCase() === 'general')
+        ?? textChannels.find((channel) => channel.name.toLowerCase().includes('general'))
+        ?? (canSend(guild.systemChannel) ? guild.systemChannel : null)
+        ?? textChannels.first()
+        ?? null;
+}
+
+async function postJoinMessage(guild) {
+    if (Date.now() - (guild.joinedTimestamp ?? 0) > 60_000) {
+        return;
+    }
+
+    try {
+        await guild.channels.fetch();
+    } catch (err) {
+        console.error(`Failed to fetch channels for ${guild.name}`, err);
+    }
+
+    const channel = findGeneralChannel(guild);
+    if (!channel) {
+        console.log(`Joined ${guild.name} but could not find a channel to post in`);
+        return;
+    }
+
+    try {
+        await channel.send('Hey! teerzobot just joined. Try `/ping` or `/hello`.');
+        console.log(`Posted join message in #${channel.name} (${guild.name})`);
+    } catch (err) {
+        console.error(`Failed to post join message in ${guild.name}`, err);
+    }
 }
 
 export function createDiscordClient() {
@@ -109,26 +164,51 @@ export function createDiscordClient() {
 
             console.log(`Discord connected as ${readyClient.user.tag}${state.guild ? ` in ${state.guild}` : ''}`);
 
-            if (!clientId || !guildId) {
-                console.log('DISCORD_CLIENT_ID or DISCORD_GUILD_ID missing; skipping slash command registration');
+            if (!clientId) {
+                console.log('DISCORD_CLIENT_ID missing; skipping slash command registration');
                 return;
             }
 
-            try {
-                await registerCommands(token, clientId, guildId);
-            } catch (err) {
-                console.error('Failed to register Discord slash commands', err);
+            const guildIds = guildId
+                ? [guildId]
+                : [...readyClient.guilds.cache.keys()];
+
+            for (const id of guildIds) {
+                try {
+                    await registerCommands(token, clientId, id);
+                } catch (err) {
+                    console.error('Failed to register Discord slash commands', err);
+                }
             }
         });
 
+        client.on(Events.GuildCreate, async (guild) => {
+            state.guildId = state.guildId || guild.id;
+            state.guild = state.guild || guild.name;
+
+            if (clientId) {
+                try {
+                    await registerCommands(token, clientId, guild.id);
+                } catch (err) {
+                    console.error('Failed to register Discord slash commands', err);
+                }
+            }
+
+            await postJoinMessage(guild);
+        });
+
         client.on(Events.InteractionCreate, async (interaction) => {
-            if (!interaction.isChatInputCommand() || interaction.commandName !== 'ping') {
+            if (!interaction.isChatInputCommand()) {
+                return;
+            }
+            const reply = slashReplies[interaction.commandName];
+            if (!reply) {
                 return;
             }
             try {
-                await interaction.reply('Pong!');
+                await interaction.reply(reply);
             } catch (err) {
-                console.error('Discord /ping failed', err);
+                console.error(`Discord /${interaction.commandName} failed`, err);
             }
         });
 

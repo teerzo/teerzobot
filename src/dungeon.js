@@ -12,6 +12,7 @@ const WINDOW = 8;
 const BREACH = 9;
 const WATER = 10;
 const SPIKES = 11;
+const DOOR = 12;
 
 const DIRS = [
     { dx: 0, dy: -1 },
@@ -92,7 +93,7 @@ export function normalizeDungeonCommand(value) {
 }
 
 function isOpen(cell) {
-    return cell === FLOOR || cell === EXIT;
+    return cell === FLOOR || cell === EXIT || cell === DOOR;
 }
 
 function castFire(maze) {
@@ -450,6 +451,74 @@ function styleInteriorWalls(grid, rooms) {
     }
 }
 
+function openingSide(room, x, y) {
+    if (y === room.y) {
+        return 'n';
+    }
+    if (y === room.y + room.h - 1) {
+        return 's';
+    }
+    if (x === room.x) {
+        return 'w';
+    }
+    if (x === room.x + room.w - 1) {
+        return 'e';
+    }
+    return null;
+}
+
+function roomOpenings(room, grid, startX, startY, exitX, exitY) {
+    const bySide = { n: [], s: [], e: [], w: [] };
+    for (let y = room.y; y < room.y + room.h; y++) {
+        for (let x = room.x; x < room.x + room.w; x++) {
+            if (grid[y][x] !== FLOOR) {
+                continue;
+            }
+            if ((x === startX && y === startY) || (x === exitX && y === exitY)) {
+                continue;
+            }
+            if (!isDoorwayCell(room, x, y, grid)) {
+                continue;
+            }
+            const side = openingSide(room, x, y);
+            if (!side) {
+                continue;
+            }
+            bySide[side].push([x, y]);
+        }
+    }
+    for (const side of Object.keys(bySide)) {
+        bySide[side].sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    }
+    return bySide;
+}
+
+function placeDoorways(grid, rooms, startX, startY, exitX, exitY) {
+    for (const room of rooms) {
+        const bySide = roomOpenings(room, grid, startX, startY, exitX, exitY);
+        const keepCount = room.w * room.h > 30 ? 2 : 1;
+        for (const openings of Object.values(bySide)) {
+            if (!openings.length) {
+                continue;
+            }
+            const keep = openings.slice(0, keepCount);
+            const extras = openings.slice(keepCount);
+            for (const [x, y] of extras) {
+                grid[y][x] = WALL;
+                if (!pathExists(grid, startX, startY, exitX, exitY)) {
+                    grid[y][x] = FLOOR;
+                    keep.push([x, y]);
+                }
+            }
+            for (const [x, y] of keep) {
+                if (grid[y][x] === FLOOR) {
+                    grid[y][x] = DOOR;
+                }
+            }
+        }
+    }
+}
+
 function pathExists(grid, ax, ay, bx, by) {
     return (distFrom(grid, ax, ay)[by]?.[bx] ?? -1) >= 0;
 }
@@ -738,6 +807,7 @@ function buildFloor(floor) {
         }
         grid[exit.y][exit.x] = EXIT;
         styleInteriorWalls(grid, rooms);
+        placeDoorways(grid, rooms, startX, startY, exit.x, exit.y);
         placeRoomFurniture(grid, rooms, startX, startY, exit.x, exit.y);
         placeHazards(grid, rooms, startX, startY, exit.x, exit.y);
         last = mazePayload(size, grid, startX, startY, exit, rooms, floor);
@@ -848,7 +918,7 @@ export function createDungeon() {
             const nx = player.x + DIRS[facing].dx;
             const ny = player.y + DIRS[facing].dy;
             const cell = maze.grid[ny]?.[nx];
-            if (cell === FLOOR || cell === EXIT) {
+            if (isOpen(cell)) {
                 player.x = nx;
                 player.y = ny;
             } else {

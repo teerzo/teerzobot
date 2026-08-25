@@ -11,7 +11,7 @@
     <div class="page">
         <h1>Overlays</h1>
         <p class="muted">Copy a URL into an OBS Browser Source. Previews are live.</p>
-        <p><button type="button" class="danger" id="clear-all">Clear dance, DVD, tic-tac-toe &amp; dungeon</button></p>
+        <p><button type="button" class="danger" id="clear-all">Clear dance, DVD, chat, tic-tac-toe &amp; dungeon</button></p>
         <div class="grid" id="grid"></div>
     </div>
     <script src="/manage.js"></script>
@@ -22,7 +22,9 @@
             {
                 name: 'Chat',
                 path: '/chat',
-                note: 'Display-only Browser Source.',
+                commands: ['!chat', '!clear'],
+                note: '!clear empties and hides it; !chat toggles visibility.',
+                clearPath: '/api/chat/clear',
             },
             {
                 name: 'Follow alerts',
@@ -168,6 +170,7 @@
                 await Promise.all([
                     fetch('/api/dance/clear', { method: 'POST' }),
                     fetch('/api/dvd/clear', { method: 'POST' }),
+                    fetch('/api/chat/clear', { method: 'POST' }),
                     fetch('/api/ttt/clear', { method: 'POST' }),
                     fetch('/api/dungeon/clear', { method: 'POST' }),
                 ]);

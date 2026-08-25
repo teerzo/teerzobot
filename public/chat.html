@@ -7,7 +7,7 @@
         html, body {
             margin: 0;
             height: 100%;
-            background: rgba(0, 0, 0, 0.45);
+            background: transparent;
             overflow: hidden;
         }
         #wrap {
@@ -19,6 +19,12 @@
             font: 18px/1.35 sans-serif;
             color: #fff;
             overflow: hidden;
+            background: rgba(0, 0, 0, 0.45);
+            transition: opacity 0.4s ease;
+        }
+        #wrap.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
         #status {
             flex-shrink: 0;
@@ -141,6 +147,15 @@
             listEl.replaceChildren();
         }
 
+        function setVisible(visible) {
+            document.getElementById('wrap').classList.toggle('hidden', visible === false);
+        }
+
+        fetch('/api/chat')
+            .then((res) => res.json())
+            .then((state) => setVisible(state.visible !== false))
+            .catch(() => {});
+
         const source = new EventSource('/api/chat/events');
         source.onopen = () => {
             statusEl.textContent = 'teerzobot chat — connected';
@@ -161,6 +176,10 @@
             }
             if (data.type === 'chat-clear') {
                 clearMessages();
+                return;
+            }
+            if (data.type === 'chat-visibility') {
+                setVisible(data.visible !== false);
             }
         };
         source.onerror = () => {

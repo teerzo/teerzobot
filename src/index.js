@@ -72,6 +72,7 @@ const commands = createCommandHandler(store, {
     dance,
     ttt,
     dungeon,
+    chatFeed,
 });
 
 let chat = {

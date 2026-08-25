@@ -105,8 +105,9 @@
         #hp.low .bar i {
             background: #e06a5a;
         }
-        #vignette.hurt {
-            background: radial-gradient(ellipse at center, transparent 28%, rgba(140, 12, 8, 0.62) 100%);
+        #vignette.hurt::after {
+            opacity: 1;
+            transition-duration: 0.05s;
         }
         #floor {
             display: flex;
@@ -223,6 +224,15 @@
             inset: 0;
             background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.55) 100%);
         }
+        #vignette::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 52%, rgba(150, 16, 10, 0.14) 100%);
+            opacity: 0;
+            transition: opacity 0.28s ease-out;
+        }
         #help {
             position: absolute;
             top: clamp(0.35em, 3.2cqh, 1.1em);
@@ -286,7 +296,7 @@
             </div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
-        <div id="help">!up !down !left !right !fire</div>
+        <div id="help">!up !down !left !right !fire !attack !block</div>
         <div id="last"><span>Waiting for chat</span></div>
         <div id="votes">
             <h2 id="vote-title">Democracy</h2>
@@ -343,7 +353,7 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 18);
+        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 24);
         const renderer = new THREE.WebGLRenderer({
             antialias: false,
             powerPreference: 'high-performance',
@@ -410,6 +420,36 @@
         const staffBaseRot = staff.rotation.clone();
         camera.add(staff);
 
+        const blade = new THREE.Group();
+        const sword = new THREE.Group();
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.42, 0.012), staffIronMat);
+        swordBlade.position.y = 0.22;
+        const swordGuard = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.028), staffIronMat);
+        swordGuard.position.y = 0.02;
+        const swordHilt = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.12, 6), staffWoodMat);
+        swordHilt.position.y = -0.05;
+        const swordPommel = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 5), staffIronMat);
+        swordPommel.position.y = -0.12;
+        sword.add(swordBlade, swordGuard, swordHilt, swordPommel);
+        sword.position.set(0.3, -0.32, -0.44);
+        sword.rotation.set(1.05, 0.18, -0.72);
+        const shield = new THREE.Group();
+        const shieldDisk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 8), staffWoodMat);
+        shieldDisk.rotation.x = Math.PI / 2;
+        const shieldBoss = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), staffIronMat);
+        shieldBoss.position.z = 0.03;
+        const shieldRim = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.012, 6, 10), staffIronMat);
+        shield.add(shieldDisk, shieldBoss, shieldRim);
+        shield.position.set(-0.26, -0.24, -0.42);
+        shield.rotation.set(0.18, 0.55, 0.12);
+        blade.add(sword, shield);
+        const swordBasePos = sword.position.clone();
+        const swordBaseRot = sword.rotation.clone();
+        const shieldBasePos = shield.position.clone();
+        const shieldBaseRot = shield.rotation.clone();
+        blade.visible = false;
+        camera.add(blade);
+
         const pillarMat = new THREE.MeshStandardMaterial({
             color: 0x9a9084,
             roughness: 0.72,
@@ -464,11 +504,11 @@
         scene.add(exitSpot);
         scene.add(exitTarget);
 
-        function makeSpotBeam(topR, bottomR, height, opacity) {
+        function makeSpotBeam(topR, bottomR, height, opacity, hex = 0xffe19a) {
             const geo = new THREE.CylinderGeometry(topR, bottomR, height, 24, 8, true);
             const pos = geo.attributes.position;
             const colors = new Float32Array(pos.count * 3);
-            const tint = new THREE.Color(0xffe19a);
+            const tint = new THREE.Color(hex);
             for (let i = 0; i < pos.count; i++) {
                 const y = pos.getY(i);
                 const fade = Math.max(0, (y / height + 0.5) ** 1.6);
@@ -1498,16 +1538,18 @@
             sewer: 0x8a9a70,
             chapel: 0xe8d8b0,
             garden: 0x78a868,
+            yard: 0x90b878,
             cave: 0xb8a890,
         };
         const CARPET_ROOMS = new Set(['bedroom', 'chapel', 'dining', 'library', 'shrine']);
         const CARPET_SOMETIMES = new Set(['study', 'closet']);
         const MUSHROOM_PALETTES = new Set(['moss', 'iron', 'sewer', 'stone', 'cave']);
         const BLOOD_ROOMS = new Set(['crypt', 'cell', 'barracks', 'armory']);
-        const SLIME_ROOMS = new Set(['sewer', 'garden', 'well', 'cave']);
+        const SLIME_ROOMS = new Set(['sewer', 'garden', 'well', 'cave', 'yard']);
         const CLEAN_ROOMS = new Set(['chapel', 'bedroom']);
         const STAINED_WINDOW_ROOMS = new Set(['chapel', 'shrine', 'library']);
-        const NIGHT_WINDOW_ROOMS = new Set(['bedroom', 'garden']);
+        const NIGHT_WINDOW_ROOMS = new Set(['bedroom', 'garden', 'yard']);
+        const OUTDOOR_ROOMS = new Set(['yard', 'garden']);
         const WOOD_THEME = { wall: 'wood', floor: 'plank', ceil: 'wood' };
         const ROOM_THEMES = {
             cell: { wall: 'cracked', floor: 'dark', ceil: 'dark' },
@@ -1527,6 +1569,7 @@
             barracks: { wall: 'stone', floor: 'worn', ceil: 'stone' },
             chapel: { wall: 'stone', floor: 'flag', ceil: 'dark' },
             garden: { wall: 'vine', floor: 'dirt', ceil: 'vine' },
+            yard: { wall: 'stone', floor: 'flag', ceil: 'dark' },
             cave: { wall: 'cracked', floor: 'gravel', ceil: 'stone' },
         };
 
@@ -1616,6 +1659,14 @@
                 x >= room.x - 1 && x < room.x + room.w + 1 && z >= room.y - 1 && z < room.y + room.h + 1);
         }
 
+        function isOutdoorRoom(room) {
+            return OUTDOOR_ROOMS.has(room?.kind);
+        }
+
+        function isOutdoorAt(x, z, rooms) {
+            return isOutdoorRoom(roomContaining(rooms, x, z));
+        }
+
         function pickHallWall(paletteId, roll) {
             if (paletteId === 'cave') {
                 return roll === 1 ? 'stone' : 'cracked';
@@ -1690,6 +1741,9 @@
             if (paletteId === 'cave' || room?.kind === 'cave') {
                 return ['gravel', 'gravel', 'dirt', 'dark', 'moss'][hash % 5];
             }
+            if (room?.kind === 'yard') {
+                return ['flag', 'flag', 'gravel', 'dirt', 'worn'][hash % 5];
+            }
             if (theme) {
                 if (theme.floor !== 'dirt' && MUSHROOM_PALETTES.has(paletteId) && hash % 11 === 2) {
                     return 'dirt';
@@ -1761,7 +1815,7 @@
 
         function pickCeilHeight(x, z, rooms) {
             const room = roomContaining(rooms, x, z);
-            if (!room) {
+            if (!room || isOutdoorRoom(room)) {
                 return WALL_H;
             }
             if (room.kind === 'cave') {
@@ -1786,6 +1840,9 @@
         function maxRoomCeil(rooms) {
             let h = WALL_H;
             for (const room of rooms || []) {
+                if (isOutdoorRoom(room)) {
+                    continue;
+                }
                 h = Math.max(h, room.kind === 'cave' ? 2.16 : (ROOM_CEIL_H[room.kind] || WALL_H));
             }
             return h;
@@ -2295,6 +2352,9 @@
         const goblinDarkMat = new THREE.MeshStandardMaterial({ color: 0x245c18, roughness: 0.8, metalness: 0.04 });
         const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
         const goblinEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffee55 });
+        const frogMat = new THREE.MeshStandardMaterial({ color: 0x3cb84a, roughness: 0.55, metalness: 0.04 });
+        const frogDarkMat = new THREE.MeshStandardMaterial({ color: 0x1e7a32, roughness: 0.7, metalness: 0.04 });
+        const frogBellyMat = new THREE.MeshStandardMaterial({ color: 0xc8e878, roughness: 0.65, metalness: 0 });
         const ghostMat = new THREE.MeshBasicMaterial({
             color: 0xa8c8ff,
             transparent: true,
@@ -2408,10 +2468,17 @@
         const ghostEyeGeo = new THREE.SphereGeometry(0.028, 6, 5);
         const ghostMouthGeo = new THREE.BoxGeometry(0.06, 0.035, 0.02);
         const ghostCoreGeo = new THREE.SphereGeometry(0.2, 8, 6);
+        const frogBodyGeo = new THREE.SphereGeometry(0.07, 8, 6);
+        const frogHeadGeo = new THREE.SphereGeometry(0.05, 7, 5);
+        const frogEyeGeo = new THREE.SphereGeometry(0.016, 6, 5);
+        const frogLegGeo = new THREE.BoxGeometry(0.028, 0.035, 0.05);
+        const frogFootGeo = new THREE.BoxGeometry(0.04, 0.016, 0.055);
         const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
         const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
         const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
         const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+        const outdoorSkyGeo = new THREE.PlaneGeometry(1, 1);
+        outdoorSkyGeo.rotateX(Math.PI / 2);
         const curveQuarterGeo = new THREE.CylinderGeometry(0.98, 0.98, 1, 16, 1, false, 0, Math.PI / 2);
         const curveHalfGeo = new THREE.CylinderGeometry(0.7, 0.7, 1, 14, 1, false, 0, Math.PI);
 
@@ -2428,10 +2495,15 @@
         let metalWallMesh = null;
         let caveWallMeshes = [];
         let extraWallRoot = null;
+        let outdoorSkyRoot = null;
+        let skylightRoot = null;
+        const skylightBeams = [];
         let doorHinges = [];
         let hazardRoot = null;
         let enemyRoot = null;
         const enemyActors = new Map();
+        let frogRoot = null;
+        const frogActors = new Map();
         let stainRoot = null;
         let lastHurtKey = '';
         let waterMeshes = [];
@@ -2459,6 +2531,10 @@
         let lastAt = '';
         let lastShotId = 0;
         let staffKick = 0;
+        let swordKick = 0;
+        let shieldGuard = 0;
+        let heldWeapon = 'staff';
+        let isBlocking = false;
         let voteEndsAt = 0;
         let overlayOn = true;
         let rafId = 0;
@@ -2472,7 +2548,7 @@
         const boltGlowGeo = new THREE.SphereGeometry(0.09, 10, 8);
         const streakGeo = new THREE.ConeGeometry(0.032, 0.22, 6);
         const sparkGeo = new THREE.SphereGeometry(0.028, 6, 6);
-        const boomGeo = new THREE.SphereGeometry(0.08, 12, 10);
+        const slashGeo = new THREE.BoxGeometry(0.46, 0.045, 0.09);
 
         function fireAlong(dir) {
             const yaw = YAWS[dir] ?? 0;
@@ -2494,14 +2570,15 @@
             mushStemGeo, mushCapGeo, mushGlowGeo,
             fencePostGeo, fenceRailGeo,
             emberGeo, sporeGeo,
-            boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo,
+            boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo, slashGeo,
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
             goblinBodyGeo, goblinBellyGeo, goblinHeadGeo, goblinEarGeo, goblinNoseGeo, goblinEyeGeo, goblinPupilGeo,
             goblinTuskGeo, goblinArmGeo, goblinHandGeo, goblinLegGeo, goblinFootGeo, goblinClothGeo, goblinBladeGeo, goblinBrowGeo,
-            ghostBodyGeo, ghostHeadGeo, ghostArmGeo, ghostHemGeo, ghostEyeGeo, ghostMouthGeo, ghostCoreGeo, bloodStainGeo,
-            hangCurtainGeo, cobwebHangGeo, caveBlockGeo, curveQuarterGeo, curveHalfGeo,
+            ghostBodyGeo, ghostHeadGeo, ghostArmGeo, ghostHemGeo, ghostEyeGeo, ghostMouthGeo, ghostCoreGeo,
+            frogBodyGeo, frogHeadGeo, frogEyeGeo, frogLegGeo, frogFootGeo, bloodStainGeo,
+            hangCurtainGeo, cobwebHangGeo, caveBlockGeo, outdoorSkyGeo, curveQuarterGeo, curveHalfGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -2509,6 +2586,7 @@
             nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
+            frogMat, frogDarkMat, frogBellyMat,
             ghostMat, ghostSheetMat, ghostHoleMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat, strawMat, sackclothMat, linenMat, boneMat, rustMat, waxMat, crystalMat, slimeClutterMat,
             goldTrimMat, scrollMat, hamMat, inkMat, coalMat, tinMat,
@@ -2715,6 +2793,32 @@
             staffKick = 1;
         }
 
+        function spawnSlash(shot) {
+            swordKick = 1;
+            const along = fireAlong(shot.dir);
+            const mid = new THREE.Vector3(
+                (shot.from.x + shot.hit.x) * 0.5 * CELL,
+                0.42,
+                (shot.from.y + shot.hit.y) * 0.5 * CELL,
+            );
+            const group = new THREE.Group();
+            group.position.copy(mid);
+            scene.add(group);
+            const mat = makeFireMat(0xe8f0ff, 0.9);
+            mat.userData.fx = true;
+            const arc = new THREE.Mesh(slashGeo, mat);
+            arc.rotation.z = 0.45;
+            group.add(arc);
+            group.lookAt(mid.clone().add(along));
+            fxItems.push({
+                kind: 'slash',
+                group,
+                arc,
+                t: 0,
+                duration: 0.22,
+            });
+        }
+
         function updateFx(dt) {
             for (let i = fxItems.length - 1; i >= 0; i -= 1) {
                 const fx = fxItems[i];
@@ -2729,6 +2833,19 @@
                         fx.group.position.lerpVectors(fx.start, fx.end, fx.t);
                         fx.group.lookAt(fx.end);
                         fx.light.intensity = 3.2 + Math.sin(clock.elapsedTime * 40) * 0.5;
+                    }
+                    continue;
+                }
+
+                if (fx.kind === 'slash') {
+                    fx.t += dt;
+                    const u = Math.min(1, fx.t / fx.duration);
+                    fx.arc.rotation.z = 0.45 - u * 1.4;
+                    fx.arc.material.opacity = 0.9 * (1 - u);
+                    fx.arc.scale.set(1 + u * 0.4, 1, 1);
+                    if (u >= 1) {
+                        disposeObject(fx.group);
+                        fxItems.splice(i, 1);
                     }
                     continue;
                 }
@@ -3190,6 +3307,11 @@
         function clearExtraWalls() {
             disposeObject(extraWallRoot);
             extraWallRoot = null;
+            disposeObject(outdoorSkyRoot);
+            outdoorSkyRoot = null;
+            disposeObject(skylightRoot);
+            skylightRoot = null;
+            skylightBeams.length = 0;
             windowLights = [];
             doorHinges = [];
         }
@@ -3204,6 +3326,9 @@
             disposeObject(enemyRoot);
             enemyRoot = null;
             enemyActors.clear();
+            disposeObject(frogRoot);
+            frogRoot = null;
+            frogActors.clear();
         }
 
         function clearStains() {
@@ -3346,12 +3471,43 @@
             return group;
         }
 
+        function makeFrog() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(frogBodyGeo, frogMat);
+            body.position.y = 0.07;
+            body.scale.set(1.15, 0.85, 1.05);
+            const belly = new THREE.Mesh(frogBodyGeo, frogBellyMat);
+            belly.position.set(0, 0.055, 0.03);
+            belly.scale.set(0.85, 0.55, 0.7);
+            const head = new THREE.Mesh(frogHeadGeo, frogMat);
+            head.position.set(0, 0.11, 0.055);
+            const eyeL = new THREE.Mesh(frogEyeGeo, goblinEyeGlowMat);
+            eyeL.position.set(-0.028, 0.14, 0.075);
+            const eyeR = new THREE.Mesh(frogEyeGeo, goblinEyeGlowMat);
+            eyeR.position.set(0.028, 0.14, 0.075);
+            const pupilL = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilL.position.set(-0.028, 0.14, 0.088);
+            pupilL.scale.set(0.7, 0.7, 0.7);
+            const pupilR = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilR.position.set(0.028, 0.14, 0.088);
+            pupilR.scale.set(0.7, 0.7, 0.7);
+            for (const [x, z] of [[-0.045, 0.03], [0.045, 0.03], [-0.04, -0.035], [0.04, -0.035]]) {
+                const leg = new THREE.Mesh(frogLegGeo, frogDarkMat);
+                leg.position.set(x, 0.03, z);
+                const foot = new THREE.Mesh(frogFootGeo, frogDarkMat);
+                foot.position.set(x, 0.01, z + 0.02);
+                group.add(leg, foot);
+            }
+            group.add(body, belly, head, eyeL, eyeR, pupilL, pupilR);
+            return group;
+        }
+
         function updateHpBar(state) {
-            const maxHp = Math.max(1, Number(state.maxHp) || 3);
+            const maxHp = Math.max(1, Number(state.maxHp) || 5);
             const hp = Math.max(0, Math.min(maxHp, Number(state.hp ?? maxHp)));
             hpFillEl.style.width = `${(hp / maxHp) * 100}%`;
-            hpEl.classList.toggle('mid', hp === 2);
-            hpEl.classList.toggle('low', hp <= 1);
+            hpEl.classList.toggle('mid', hp / maxHp <= 0.6 && hp / maxHp > 0.35);
+            hpEl.classList.toggle('low', hp / maxHp <= 0.35);
         }
 
         function flashHurt(state) {
@@ -3442,6 +3598,57 @@
                         enemyActors.delete(id);
                     }
                 }
+            }
+        }
+
+        function syncFrogs(state, snap) {
+            if (!frogRoot) {
+                frogRoot = new THREE.Group();
+                scene.add(frogRoot);
+            }
+            const live = new Set();
+            for (const frog of state.frogs || []) {
+                live.add(frog.id);
+                let actor = frogActors.get(frog.id);
+                if (!actor) {
+                    const group = makeFrog();
+                    group.position.set(frog.x * CELL, PROP_LIFT, frog.y * CELL);
+                    frogRoot.add(group);
+                    actor = {
+                        group,
+                        tx: frog.x * CELL,
+                        tz: frog.y * CELL,
+                    };
+                    frogActors.set(frog.id, actor);
+                }
+                actor.tx = frog.x * CELL;
+                actor.tz = frog.y * CELL;
+                if (snap) {
+                    actor.group.position.x = actor.tx;
+                    actor.group.position.z = actor.tz;
+                }
+            }
+            for (const [id, actor] of frogActors) {
+                if (live.has(id)) {
+                    continue;
+                }
+                frogRoot.remove(actor.group);
+                disposeObject(actor.group);
+                frogActors.delete(id);
+            }
+        }
+
+        function updateFrogs(dt, t) {
+            for (const actor of frogActors.values()) {
+                const remain = Math.hypot(actor.tx - actor.group.position.x, actor.tz - actor.group.position.z);
+                if (remain > 0.02) {
+                    actor.group.lookAt(actor.tx, actor.group.position.y, actor.tz);
+                    actor.group.rotateY(Math.PI);
+                }
+                actor.group.position.x += (actor.tx - actor.group.position.x) * t;
+                actor.group.position.z += (actor.tz - actor.group.position.z) * t;
+                const hop = remain > 0.02 ? Math.sin((1 - Math.min(1, remain / CELL)) * Math.PI) * 0.14 : 0;
+                actor.group.position.y = PROP_LIFT + hop;
             }
         }
 
@@ -5261,7 +5468,7 @@
                     prop = makeWeaponRack();
                 } else if (kind === 'crypt') {
                     prop = makeSarcophagus();
-                } else if (kind === 'garden') {
+                } else if (kind === 'garden' || kind === 'yard') {
                     prop = makePlanter();
                 } else if (kind === 'well') {
                     prop = makeWell();
@@ -5350,6 +5557,7 @@
             sewer: [makeGrateCover, makeSlimeBucket, makeMossTuft],
             well: [makeGrateCover, makeSlimeBucket, makeMossTuft, makeBucket],
             garden: [makePlanter, makeWateringCan, makeFlowerCrate, makeBirdBath, makePlant],
+            yard: [makePlanter, makeBirdBath, makeFlowerCrate, makeMossTuft, makePebbleCluster, makePlant],
             cave: [makeStalagmite, makeBoulder, makeBone, makeCrystalShard, makeNest, makePebbleCluster],
         };
         const ROOM_WALL_MAKERS = {
@@ -5364,6 +5572,8 @@
             barracks: [makeWeapons],
             forge: [makeWeapons],
             cave: [],
+            garden: [],
+            yard: [],
         };
         const ROOM_DETAIL_MAKERS = {
             chapel: [makeRug, makeOfferingBowl],
@@ -5374,6 +5584,7 @@
             cell: [makeStrawPile, makeTinCup],
             dining: [makePlaceSetting, makeGoblet],
             garden: [makeMossTuft, makeWateringCan],
+            yard: [makeMossTuft, makePebbleCluster, makePlant],
         };
 
         function pickClutterMaker(list, hash) {
@@ -5656,7 +5867,10 @@
 
             const paintingSpots = openFaces
                 .filter((face) => face.propHash % 2 === 0)
-                .filter((face) => roomContaining(rooms, face.x, face.z)?.kind !== 'cave')
+                .filter((face) => {
+                    const kind = roomContaining(rooms, face.x, face.z)?.kind;
+                    return kind !== 'cave' && !OUTDOOR_ROOMS.has(kind);
+                })
                 .sort((a, b) => a.propHash - b.propHash)
                 .slice(0, 12);
             const paintingFaces = new Set(paintingSpots.map((face) => faceKey(face.wx, face.wz, face.dx, face.dz)));
@@ -5764,6 +5978,73 @@
             scene.add(propRoot);
         }
 
+        const SKYLIGHT_ROOMS = new Set(['chapel', 'library', 'dining', 'bedroom', 'study', 'shrine', 'barracks', 'armory']);
+
+        function pickSkylightCells(grid, width, height, rooms, player, exit) {
+            const spots = [];
+            for (let z = 1; z < height - 1; z++) {
+                for (let x = 1; x < width - 1; x++) {
+                    if (grid[z][x] !== 0) {
+                        continue;
+                    }
+                    if (isReservedCell(x, z, player, exit) || isOutdoorAt(x, z, rooms)) {
+                        continue;
+                    }
+                    const room = roomContaining(rooms, x, z);
+                    if (!room || isOutdoorRoom(room) || room.kind === 'cave') {
+                        continue;
+                    }
+                    if (room.w < 3 || room.h < 3) {
+                        continue;
+                    }
+                    if (x === room.x || x === room.x + room.w - 1 || z === room.y || z === room.y + room.h - 1) {
+                        continue;
+                    }
+                    const hash = Math.abs(x * 47 + z * 89 + room.w * 13);
+                    const step = SKYLIGHT_ROOMS.has(room.kind) ? 6 : 11;
+                    if (hash % step !== 0) {
+                        continue;
+                    }
+                    spots.push({ x, z, hash, h: pickCeilHeight(x, z, rooms) });
+                }
+            }
+            spots.sort((a, b) => a.hash - b.hash);
+            return spots.slice(0, 5);
+        }
+
+        function makeSkylight(x, z, ceilH) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            const rim = 0.06;
+            const len = 1.04;
+            const y = ceilH;
+            const north = new THREE.Mesh(new THREE.BoxGeometry(len, rim, rim), woodMat);
+            north.position.set(0, y, -0.49);
+            const south = new THREE.Mesh(new THREE.BoxGeometry(len, rim, rim), woodMat);
+            south.position.set(0, y, 0.49);
+            const west = new THREE.Mesh(new THREE.BoxGeometry(rim, rim, len), woodMat);
+            west.position.set(-0.49, y, 0);
+            const east = new THREE.Mesh(new THREE.BoxGeometry(rim, rim, len), woodMat);
+            east.position.set(0.49, y, 0);
+            const sky = new THREE.Mesh(outdoorSkyGeo, nightSkyMat);
+            sky.position.y = y + 0.05;
+            sky.scale.set(0.9, 1, 0.9);
+            const height = Math.max(0.4, y - 0.05);
+            const beam = makeSpotBeam(0.045, 0.26, height, 0.17, 0xb4d4f4);
+            beam.position.y = 0.05 + height / 2;
+            const core = makeSpotBeam(0.016, 0.11, height, 0.28, 0xdceeff);
+            core.position.y = beam.position.y;
+            const light = new THREE.PointLight(0xa8c8e8, 0.9, 4.6, 1.7);
+            light.position.y = y - 0.18;
+            light.userData.base = 0.9;
+            group.add(north, south, west, east, sky, beam, core, light);
+            group.userData.beam = beam;
+            group.userData.core = core;
+            group.userData.light = light;
+            group.userData.phase = (x * 1.7 + z * 2.3) % (Math.PI * 2);
+            return group;
+        }
+
         function rebuildMaze(state) {
             clearFx();
             disposeMesh(floorBase);
@@ -5810,11 +6091,7 @@
             floorBase.receiveShadow = true;
             scene.add(floorBase);
 
-            const ceilGeo = new THREE.PlaneGeometry(w * CELL, h * CELL);
-            ceilGeo.rotateX(Math.PI / 2);
-            ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
-            ceilMesh.position.set((w - 1) / 2, maxRoomCeil(state.rooms), (h - 1) / 2);
-            scene.add(ceilMesh);
+            ceilMesh = null;
 
             const stoneWalls = [];
             const vineWalls = [];
@@ -6182,10 +6459,16 @@
             }
             tileGeo.dispose();
 
+            const skylightSpots = pickSkylightCells(state.grid, w, h, state.rooms, state.player, state.exit);
+            const skylightKeys = new Set(skylightSpots.map((spot) => `${spot.x},${spot.z}`));
+
             const ceilBuckets = CEIL_KINDS.map(() => []);
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
-                    if (!isCeilTile(state.grid[y][x])) {
+                    if (!isCeilTile(state.grid[y][x]) || isOutdoorAt(x, y, state.rooms)) {
+                        continue;
+                    }
+                    if (skylightKeys.has(`${x},${y}`)) {
                         continue;
                     }
                     const kindName = pickCeilKind(x, y, state.rooms, paletteId);
@@ -6221,6 +6504,42 @@
                 ceilMeshes.push(mesh);
             }
             ceilTileGeo.dispose();
+
+            skylightRoot = new THREE.Group();
+            for (const spot of skylightSpots) {
+                const hatch = makeSkylight(spot.x, spot.z, spot.h);
+                skylightRoot.add(hatch);
+                skylightBeams.push({
+                    beam: hatch.userData.beam,
+                    core: hatch.userData.core,
+                    light: hatch.userData.light,
+                    phase: hatch.userData.phase,
+                    base: 0.17,
+                    coreBase: 0.28,
+                    lightBase: hatch.userData.light.userData.base,
+                });
+            }
+            scene.add(skylightRoot);
+
+            outdoorSkyRoot = new THREE.Group();
+            for (const room of state.rooms || []) {
+                if (!isOutdoorRoom(room)) {
+                    continue;
+                }
+                const sky = new THREE.Mesh(outdoorSkyGeo, nightSkyMat);
+                sky.position.set(room.x + (room.w - 1) / 2, 9.2, room.y + (room.h - 1) / 2);
+                sky.scale.set(room.w + 10, 1, room.h + 10);
+                outdoorSkyRoot.add(sky);
+                const moon = new THREE.PointLight(
+                    0x9bb8d8,
+                    1.1,
+                    Math.max(room.w, room.h) + 6,
+                    1.55,
+                );
+                moon.position.set(room.x + (room.w - 1) / 2, 2.55, room.y + (room.h - 1) / 2);
+                outdoorSkyRoot.add(moon);
+            }
+            scene.add(outdoorSkyRoot);
 
             const torchFaces = placeTorches(state.grid, w, h);
             for (const light of torchLights) {
@@ -6393,26 +6712,42 @@
             updateHpBar(state);
             flashHurt(state);
             syncEnemies(state, snap);
+            syncFrogs(state, snap);
+            heldWeapon = state.weapon === 'blade' ? 'blade' : 'staff';
+            isBlocking = Boolean(state.blocking);
+            staff.visible = heldWeapon !== 'blade';
+            blade.visible = heldWeapon === 'blade';
+
             const autoplaying = state.mode === 'autoplay';
             modeNameEl.textContent = state.mode === 'democracy' ? 'Democracy' : autoplaying ? 'Autoplay' : 'Anarchy';
             modeHintEl.textContent = autoplaying ? 'Chat !up to take over' : '';
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
             modeEl.classList.toggle('autoplay', autoplaying);
             hudEl.classList.toggle('autoplay', autoplaying);
-            helpEl.textContent = autoplaying ? 'Autoplay · !up to take over' : '!up !down !left !right !fire';
+            helpEl.textContent = autoplaying ? 'Autoplay · !up to take over' : '!up !down !left !right !fire !attack !block';
 
             const action = state.lastAction;
             if (autoplaying && action?.user === 'autoplay') {
                 lastEl.innerHTML = action.command === 'fire'
                     ? `Autoplay <span>!fire</span>`
+                    : action.command === 'attack'
+                        ? `Autoplay <span>!attack</span>`
+                        : action.command === 'block'
+                            ? `Autoplay <span>!block</span>`
                     : `Autoplay <span>walking</span>`;
             } else if (action?.displayName) {
                 const extra = action.vote
                     ? ' · voting'
                     : action.command === 'fire'
                       ? ' · fire staff'
+                      : action.command === 'attack'
+                        ? ' · sword'
+                        : action.command === 'block'
+                          ? (action.blocked ? ' · blocked' : ' · shield')
                       : action.bumped
                         ? ' · wall'
+                        : action.blocked
+                          ? ' · blocked'
                         : '';
                 lastEl.innerHTML = `${escapeHtml(action.displayName)} <span>!${escapeHtml(action.command)}${extra}</span>`;
             } else {
@@ -6425,6 +6760,14 @@
                 } else if (action.shotId !== lastShotId) {
                     lastShotId = action.shotId;
                     spawnFireBolt(action.shot);
+                }
+            }
+            if (action?.command === 'attack' && action.shot && action.shotId) {
+                if (snap) {
+                    lastShotId = action.shotId;
+                } else if (action.shotId !== lastShotId) {
+                    lastShotId = action.shotId;
+                    spawnSlash(action.shot);
                 }
             }
 
@@ -6468,6 +6811,7 @@
             camYaw = lerpAngle(camYaw, targetYaw, moveT);
             bump *= Math.exp(-dt * SNAP_LERP);
             updateEnemies(dt, moveT);
+            updateFrogs(dt, moveT);
             for (const door of doorHinges) {
                 const nearby = Math.max(Math.abs(door.x - targetPos.x), Math.abs(door.z - targetPos.z)) <= 1.01;
                 const want = nearby ? DOOR_OPEN : DOOR_CLOSED;
@@ -6484,12 +6828,24 @@
             );
             camera.rotation.y = camYaw;
             staffKick *= Math.exp(-dt * 11);
+            swordKick *= Math.exp(-dt * 10);
+            shieldGuard += ((isBlocking ? 1 : 0) - shieldGuard) * (1 - Math.exp(-dt * 10));
             staff.position.y = staffBasePos.y + bob * 0.35;
             staff.rotation.x = staffBaseRot.x - staffKick * 0.42;
             staff.rotation.z = staffBaseRot.z - staffKick * 0.14;
             staffCrystalMat.emissiveIntensity = 1.55 + staffKick * 2.4 + Math.sin(clock.elapsedTime * 9) * 0.28;
             staffLight.intensity = 0.55 + staffKick * 1.8 + Math.sin(clock.elapsedTime * 13) * 0.12;
             staffGlow.scale.setScalar(1 + staffKick * 0.35 + Math.sin(clock.elapsedTime * 11) * 0.08);
+            sword.position.y = swordBasePos.y + bob * 0.22 + swordKick * 0.08;
+            sword.rotation.x = swordBaseRot.x - swordKick * 1.15;
+            sword.rotation.z = swordBaseRot.z - swordKick * 0.55;
+            shield.position.set(
+                shieldBasePos.x + shieldGuard * 0.12,
+                shieldBasePos.y + bob * 0.18 + shieldGuard * 0.1,
+                shieldBasePos.z + shieldGuard * 0.08,
+            );
+            shield.rotation.x = shieldBaseRot.x - shieldGuard * 0.35;
+            shield.rotation.y = shieldBaseRot.y - shieldGuard * 0.45;
             updateFx(dt);
             torch.intensity = 1.6 + Math.sin(clock.elapsedTime * 11) * 0.12;
             torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
@@ -6515,6 +6871,14 @@
             exitSpot.intensity = 24 + beamPulse * 8;
             exitBeam.material.opacity = 0.14 + beamPulse * 0.08;
             exitBeamCore.material.opacity = 0.22 + beamPulse * 0.12;
+            for (const item of skylightBeams) {
+                const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 2.1 + item.phase);
+                item.beam.material.opacity = item.base * (0.72 + pulse * 0.4);
+                item.core.material.opacity = item.coreBase * (0.7 + pulse * 0.38);
+                if (item.light) {
+                    item.light.intensity = item.lightBase * (0.82 + pulse * 0.22);
+                }
+            }
             updateArtworkClips(dt);
 
             if (voteEndsAt) {

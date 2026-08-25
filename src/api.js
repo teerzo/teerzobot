@@ -103,7 +103,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             botUserId: process.env.BOT_USER_ID ?? null,
             botUsername: process.env.BOT_USERNAME ?? null,
             obs: status.obs ?? { webhook: false, listeners: 0 },
-            chat: status.chat ?? { listeners: 0 },
+            chat: status.chat ?? { listeners: 0, visible: true },
             nowPlaying: status.nowPlaying ?? { listeners: 0, track: null },
             alerts: status.alerts ?? { listeners: 0 },
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
@@ -175,6 +175,27 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
     attachSse(app, '/api/obs/events', obs);
     attachSse(app, '/api/chat/events', chatFeed);
+
+    app.get('/api/chat', (_req, res) => {
+        res.json(chatFeed?.get() ?? { visible: true });
+    });
+
+    app.post('/api/chat/clear', (_req, res) => {
+        if (!chatFeed) {
+            res.status(503).json({ error: 'Chat overlay is not available' });
+            return;
+        }
+        res.json(chatFeed.clear());
+    });
+
+    app.post('/api/chat/toggle', (_req, res) => {
+        if (!chatFeed) {
+            res.status(503).json({ error: 'Chat overlay is not available' });
+            return;
+        }
+        res.json(chatFeed.toggle());
+    });
+
     attachSse(app, '/api/now-playing/events', nowPlaying);
     attachSse(app, '/api/alerts/events', alerts);
     attachSse(app, '/api/dvd/events', dvd);

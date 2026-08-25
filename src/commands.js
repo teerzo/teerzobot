@@ -29,6 +29,7 @@ const RESERVED = new Set([
     'undvd',
     'dance',
     'undance',
+    'chat',
     'ttt',
     'tictactoe',
     'clear',
@@ -43,6 +44,8 @@ const RESERVED = new Set([
     'left',
     'right',
     'fire',
+    'attack',
+    'block',
     ...Object.keys(DUNGEON_ALIASES),
 ]);
 
@@ -67,7 +70,7 @@ function formatDungeonLayout(state) {
 const HELP_TOPICS = {
     dc: {
         aliases: ['dungeon'],
-        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !anarchy !democracy !autoplay (mods) · !clear hides',
+        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !attack !block · !anarchy !democracy !autoplay (mods) · !clear hides',
     },
     ttt: {
         aliases: ['tictactoe'],
@@ -80,6 +83,10 @@ const HELP_TOPICS = {
     dvd: {
         aliases: [],
         text: 'DVD: !dvd add logo · !undvd remove · !dvdfast / !dvdslow speed · !clear hides',
+    },
+    chat: {
+        aliases: [],
+        text: 'Chat overlay: !chat toggles visibility · !clear empties and hides it',
     },
 };
 
@@ -114,7 +121,7 @@ function sceneBuiltins() {
         }));
 }
 
-export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt, dungeon } = {}) {
+export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt, dungeon, chatFeed } = {}) {
     const cooldowns = new Map();
 
     function moveDungeon(command) {
@@ -471,7 +478,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 if (!state.changed) {
                     return say(channel, 'Already in democracy mode.');
                 }
-                return say(channel, 'Democracy mode. Vote with !up !down !left !right. !fire shoots anytime.');
+                return say(channel, 'Democracy mode. Vote with !up !down !left !right. !fire !attack !block anytime.');
             },
         },
         {
@@ -576,15 +583,28 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
+            name: 'chat',
+            response: 'Toggles the chat overlay',
+            builtin: true,
+            execute({ say, channel }) {
+                if (!chatFeed) {
+                    return say(channel, 'Chat overlay is not available.');
+                }
+                const state = chatFeed.toggle();
+                return say(channel, state.visible ? 'Chat overlay is on.' : 'Chat overlay is hidden.');
+            },
+        },
+        {
             name: 'clear',
-            response: 'Clears dance GIFs and DVD logos, and hides tic-tac-toe and dungeon overlays',
+            response: 'Clears dance GIFs and DVD logos, and hides chat, tic-tac-toe, and dungeon overlays',
             builtin: true,
             execute({ say, channel }) {
                 dance?.clear();
                 dvd?.clear();
                 ttt?.clear();
                 dungeon?.clear();
-                return say(channel, 'Cleared dance, DVD, tic-tac-toe, and dungeon overlays.');
+                chatFeed?.clear();
+                return say(channel, 'Cleared dance, DVD, chat, tic-tac-toe, and dungeon overlays.');
             },
         },
         ...sceneBuiltins(),

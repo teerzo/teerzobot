@@ -48,10 +48,39 @@ export function createObs() {
 
 export function createChatFeed() {
     const hub = createSseHub({ defaultType: 'chat' });
+    let visible = true;
+
+    function get() {
+        return { visible };
+    }
+
+    function emit(event) {
+        return hub.emit(event);
+    }
+
+    function setVisible(next) {
+        visible = Boolean(next);
+        emit({ type: 'chat-visibility', visible });
+        return get();
+    }
+
+    function hide() {
+        emit({ type: 'chat-clear' });
+        return setVisible(false);
+    }
+
+    function toggle() {
+        return setVisible(!visible);
+    }
 
     return {
-        emit: hub.emit,
+        emit,
         subscribe: hub.subscribe,
-        getStatus: () => ({ listeners: hub.listenerCount }),
+        get,
+        hide,
+        clear: hide,
+        toggle,
+        setVisible,
+        getStatus: () => ({ listeners: hub.listenerCount, visible }),
     };
 }

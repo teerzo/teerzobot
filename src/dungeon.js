@@ -49,6 +49,14 @@ const CANVAS_STEPS = [
     { width: 1600, height: 900 },
     { width: 1920, height: 1080 },
 ];
+// Portrait 9:16 presets for viewing the dungeon on a phone.
+const PHONE_STEPS = [
+    { width: 360, height: 640 },
+    { width: 405, height: 720 },
+    { width: 540, height: 960 },
+    { width: 608, height: 1080 },
+];
+const DEFAULT_PHONE = { width: 540, height: 960 };
 const ANCHORS = {
     'top-left': 'top-left',
     topleft: 'top-left',
@@ -1761,7 +1769,7 @@ export function createDungeon() {
     function setSize(rawWidth, rawHeight) {
         const size = clampCanvas(rawWidth, rawHeight);
         if (!size) {
-            const err = new Error('Usage: !dc size bigger|smaller|full');
+            const err = new Error('Usage: !dc size bigger|smaller|full|phone');
             err.code = 'USAGE';
             throw err;
         }
@@ -1775,16 +1783,24 @@ export function createDungeon() {
         return { ...snapshot(), changed: true, action: 'size' };
     }
 
-    function currentStepIndex() {
-        return CANVAS_STEPS.findIndex((step) => step.width === canvasWidth && step.height === canvasHeight);
+    function isPhoneSize() {
+        return PHONE_STEPS.some((step) => step.width === canvasWidth && step.height === canvasHeight);
     }
 
-    function nearestStepIndex() {
+    function activeSteps() {
+        return isPhoneSize() ? PHONE_STEPS : CANVAS_STEPS;
+    }
+
+    function currentStepIndex(steps) {
+        return steps.findIndex((step) => step.width === canvasWidth && step.height === canvasHeight);
+    }
+
+    function nearestStepIndex(steps) {
         const area = (canvasWidth || DEFAULT_CANVAS.width) * (canvasHeight || DEFAULT_CANVAS.height);
         let best = 0;
         let bestDelta = Infinity;
-        for (let i = 0; i < CANVAS_STEPS.length; i++) {
-            const delta = Math.abs(CANVAS_STEPS[i].width * CANVAS_STEPS[i].height - area);
+        for (let i = 0; i < steps.length; i++) {
+            const delta = Math.abs(steps[i].width * steps[i].height - area);
             if (delta < bestDelta) {
                 best = i;
                 bestDelta = delta;
@@ -1794,15 +1810,46 @@ export function createDungeon() {
     }
 
     function stepSize(delta) {
-        let index = currentStepIndex();
+        const steps = activeSteps();
+        let index = currentStepIndex(steps);
         if (index < 0) {
-            index = nearestStepIndex();
+            index = nearestStepIndex(steps);
         }
         const next = index + delta;
-        if (next < 0 || next >= CANVAS_STEPS.length) {
+        if (next < 0 || next >= steps.length) {
             return { ...snapshot(), changed: false, atLimit: true, action: 'size' };
         }
-        return setSize(CANVAS_STEPS[next].width, CANVAS_STEPS[next].height);
+        return setSize(steps[next].width, steps[next].height);
+    }
+
+    function stepPhone(delta) {
+        const index = currentStepIndex(PHONE_STEPS);
+        if (index < 0) {
+            return setSize(DEFAULT_PHONE.width, DEFAULT_PHONE.height);
+        }
+        const next = index + delta;
+        if (next < 0 || next >= PHONE_STEPS.length) {
+            return { ...snapshot(), changed: false, atLimit: true, action: 'size' };
+        }
+        return setSize(PHONE_STEPS[next].width, PHONE_STEPS[next].height);
+    }
+
+    function phoneCommand(spec) {
+        const key = String(spec ?? '').trim().toLowerCase().replace(/\s+/g, '');
+        if (key === 'bigger' || key === 'larger' || key === 'up') {
+            return stepPhone(1);
+        }
+        if (key === 'smaller' || key === 'down') {
+            return stepPhone(-1);
+        }
+        if (key === 'full' || key === 'fill' || key === 'max' || key === 'tall') {
+            const top = PHONE_STEPS[PHONE_STEPS.length - 1];
+            return setSize(top.width, top.height);
+        }
+        if (key === 'small' || key === 'min') {
+            return setSize(PHONE_STEPS[0].width, PHONE_STEPS[0].height);
+        }
+        return setSize(DEFAULT_PHONE.width, DEFAULT_PHONE.height);
     }
 
     function setAnchor(name) {
@@ -1827,7 +1874,7 @@ export function createDungeon() {
 
     function applyLayoutArgs(args) {
         const parts = (Array.isArray(args) ? args : [args])
-            .map((part) => String(part ?? '').trim().toLowerCase())
+            .flatMap((part) => String(part ?? '').trim().toLowerCase().split(/\s+/))
             .filter(Boolean);
         if (!parts.length) {
             return { ...snapshot(), changed: false, action: 'status' };
@@ -1841,6 +1888,13 @@ export function createDungeon() {
         const head = parts[0];
         const rest = parts.slice(1);
 
+        if (head === 'phone' || head === 'portrait' || head === 'mobile') {
+            return phoneCommand(rest.join(''));
+        }
+        if (head === 'landscape' || head === 'desktop' || head === 'wide') {
+            return setSize(DEFAULT_CANVAS.width, DEFAULT_CANVAS.height);
+        }
+
         if (head === 'bigger' || head === 'larger') {
             return stepSize(1);
         }
@@ -1848,13 +1902,19 @@ export function createDungeon() {
             return stepSize(-1);
         }
         if (head === 'full' || head === 'fill') {
-            return setSize(1920, 1080);
+            return isPhoneSize() ? phoneCommand('full') : setSize(1920, 1080);
         }
 
         if (head === 'size') {
             const spec = rest.join(' ');
             if (!spec) {
                 return { ...snapshot(), changed: false, action: 'status' };
+            }
+            if (rest[0] === 'phone' || rest[0] === 'portrait' || rest[0] === 'mobile') {
+                return phoneCommand(rest.slice(1).join(''));
+            }
+            if (rest[0] === 'landscape' || rest[0] === 'desktop' || rest[0] === 'wide') {
+                return setSize(DEFAULT_CANVAS.width, DEFAULT_CANVAS.height);
             }
             if (spec === 'bigger' || spec === 'larger' || spec === 'up') {
                 return stepSize(1);
@@ -1863,7 +1923,7 @@ export function createDungeon() {
                 return stepSize(-1);
             }
             if (spec === 'full' || spec === 'fill') {
-                return setSize(1920, 1080);
+                return isPhoneSize() ? phoneCommand('full') : setSize(1920, 1080);
             }
             return setSizeFromArgs(rest);
         }
@@ -1872,7 +1932,7 @@ export function createDungeon() {
             return setAnchor(rest.join('') || rest[0]);
         }
 
-        const err = new Error('Usage: !dc size bigger|smaller|full or !dc position topleft');
+        const err = new Error('Usage: !dc size bigger|smaller|full|phone or !dc position topleft');
         err.code = 'USAGE';
         throw err;
     }
@@ -1886,17 +1946,23 @@ export function createDungeon() {
         if (!text || text === 'full' || text === 'fill') {
             return setSize(1920, 1080);
         }
+        if (text === 'phone' || text === 'portrait' || text === 'mobile') {
+            return phoneCommand('');
+        }
+        if (text === 'landscape' || text === 'desktop' || text === 'wide') {
+            return setSize(DEFAULT_CANVAS.width, DEFAULT_CANVAS.height);
+        }
         if (text === 'bigger' || text === 'smaller' || text === 'larger' || ANCHORS[text.replace(/\s+/g, '')]) {
             return applyLayoutArgs(Array.isArray(args) ? args : [text]);
         }
         const compact = text.replace(/\s+/g, '');
-        const preset = CANVAS_STEPS.find((step) => `${step.width}x${step.height}` === compact);
+        const preset = [...CANVAS_STEPS, ...PHONE_STEPS].find((step) => `${step.width}x${step.height}` === compact);
         if (preset) {
             return setSize(preset.width, preset.height);
         }
         const match = text.match(/^(\d+)\s*[x×,]\s*(\d+)$/) || text.match(/^(\d+)\s+(\d+)$/);
         if (!match) {
-            const err = new Error('Usage: !dc size bigger|smaller|full');
+            const err = new Error('Usage: !dc size bigger|smaller|full|phone');
             err.code = 'USAGE';
             throw err;
         }
@@ -1921,6 +1987,7 @@ export function createDungeon() {
         setSizeFromArgs,
         setAnchor,
         stepSize,
+        phoneCommand,
         applyLayoutArgs,
         setArtwork(urls) {
             artwork = (Array.isArray(urls) ? urls : [])
@@ -1942,6 +2009,7 @@ export function createDungeon() {
             canvasWidth,
             canvasHeight,
             anchor,
+            orientation: isPhoneSize() ? 'phone' : 'landscape',
         }),
     };
 }

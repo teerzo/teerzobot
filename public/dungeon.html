@@ -253,6 +253,33 @@
         @container dungeon (max-height: 500px) {
             #help { display: none; }
         }
+        /* Portrait / phone: use the extra height, keep HUD readable, and
+           wrap the command help instead of hiding it. */
+        #stage.portrait #last {
+            max-width: 78%;
+            font-size: clamp(0.95em, 4.4cqw, 1.35em);
+        }
+        #stage.portrait #votes {
+            width: min(16em, 60cqw);
+        }
+        #stage.portrait #hp {
+            width: 8.2em;
+        }
+        #stage.portrait #floor strong {
+            font-size: clamp(1.15em, 6cqw, 1.55em);
+        }
+        #stage.portrait #help {
+            display: block;
+            white-space: normal;
+            text-align: center;
+            max-width: min(92%, 22em);
+            line-height: 1.35;
+            font-size: 0.72em;
+            top: clamp(4.6em, 15cqh, 7em);
+        }
+        #stage.portrait #transition-msg {
+            font-size: clamp(1.15em, 7.2cqw, 2.1em);
+        }
         #transition {
             position: absolute;
             inset: 0;
@@ -2542,6 +2569,8 @@
         let fpsElapsed = 0;
         let canvasW = 0;
         let canvasH = 0;
+        let canvasAnchor = 'top-left';
+        let weaponXFit = 1;
         const clock = new THREE.Clock();
         const fxItems = [];
         const boltGeo = new THREE.SphereGeometry(0.05, 10, 8);
@@ -6605,15 +6634,40 @@
             canvasH = h;
             stageEl.style.width = `${w}px`;
             stageEl.style.height = `${h}px`;
-            stageEl.style.setProperty('--ui-scale', String(w / 640));
+            // Landscape scales the HUD by width (ref 640); portrait scales by
+            // height (ref 960) so the UI stays readable on tall phone screens.
+            const portrait = h > w;
+            const uiScale = portrait ? h / 960 : w / 640;
+            stageEl.classList.toggle('portrait', portrait);
+            stageEl.style.setProperty('--ui-scale', String(uiScale));
             const anchor = corner === 'top-right' || corner === 'bottom-left' || corner === 'bottom-right'
                 ? corner
                 : 'top-left';
+            canvasAnchor = anchor;
             stageEl.classList.toggle('anchor-top-left', anchor === 'top-left');
             stageEl.classList.toggle('anchor-top-right', anchor === 'top-right');
             stageEl.classList.toggle('anchor-bottom-left', anchor === 'bottom-left');
             stageEl.classList.toggle('anchor-bottom-right', anchor === 'bottom-right');
+            const aspect = w / Math.max(1, h);
+            weaponXFit = 0.45 + 0.55 * Math.min(1, aspect / (640 / 480));
+            staff.position.x = staffBasePos.x * weaponXFit;
+            sword.position.x = swordBasePos.x * weaponXFit;
             syncRendererSize();
+            fitStageToWindow();
+        }
+
+        function fitStageToWindow() {
+            const viewW = window.innerWidth || canvasW;
+            const viewH = window.innerHeight || canvasH;
+            const s = Math.min(1, viewW / Math.max(1, canvasW), viewH / Math.max(1, canvasH));
+            const origin = {
+                'top-left': 'top left',
+                'top-right': 'top right',
+                'bottom-left': 'bottom left',
+                'bottom-right': 'bottom right',
+            }[canvasAnchor] || 'top left';
+            stageEl.style.transformOrigin = origin;
+            stageEl.style.transform = s < 0.999 ? `scale(${s})` : '';
         }
 
         function syncRendererSize() {
@@ -6841,7 +6895,7 @@
             sword.rotation.x = swordBaseRot.x - swordKick * 1.15;
             sword.rotation.z = swordBaseRot.z - swordKick * 0.55;
             shield.position.set(
-                shieldBasePos.x + shieldGuard * 0.12,
+                shieldBasePos.x * weaponXFit + shieldGuard * 0.12,
                 shieldBasePos.y + bob * 0.18 + shieldGuard * 0.1,
                 shieldBasePos.z + shieldGuard * 0.08,
             );
@@ -6892,6 +6946,7 @@
 
         addEventListener('resize', () => {
             syncRendererSize();
+            fitStageToWindow();
         });
 
         fetch('/api/dungeon')

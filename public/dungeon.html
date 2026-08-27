@@ -2207,6 +2207,18 @@
             depthWrite: true,
             side: THREE.DoubleSide,
         });
+        const outdoorDomeMat = new THREE.MeshBasicMaterial({
+            map: daySkyMat.map,
+            fog: false,
+            depthWrite: true,
+            side: THREE.BackSide,
+        });
+        const outdoorSkyFlatMat = new THREE.MeshBasicMaterial({
+            map: daySkyMat.map,
+            fog: false,
+            depthWrite: true,
+            side: THREE.FrontSide,
+        });
         const stainedGlassMats = [0, 1, 2].map((variant) => {
             const map = canvasToTexture(makeStainedGlassCanvas(variant), 1, 1);
             return new THREE.MeshStandardMaterial({
@@ -2827,7 +2839,7 @@
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
             doorWoodMat, doorIronMat,
-            daySkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
+            daySkyMat, outdoorDomeMat, outdoorSkyFlatMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, vineBarkMat, vineLeafMat, vineLeafSolidMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
             handSkinMat, handDarkMat, palmGlowMat,
@@ -7130,11 +7142,11 @@
                 }
                 const cx = room.x + (room.w - 1) / 2;
                 const cz = room.y + (room.h - 1) / 2;
-                const dome = new THREE.Mesh(outdoorSkyDomeGeo, daySkyMat);
+                const dome = new THREE.Mesh(outdoorSkyDomeGeo, outdoorDomeMat);
                 dome.position.set(cx, 0.04, cz);
                 dome.scale.set(room.w * 0.5 + 0.2, OUTDOOR_SKY_H, room.h * 0.5 + 0.2);
                 outdoorSkyRoot.add(dome);
-                const sky = new THREE.Mesh(outdoorSkyGeo, daySkyMat);
+                const sky = new THREE.Mesh(outdoorSkyGeo, outdoorSkyFlatMat);
                 sky.position.set(cx, OUTDOOR_SKY_H - 0.04, cz);
                 sky.scale.set(room.w + 1.2, 1, room.h + 1.2);
                 outdoorSkyRoot.add(sky);

@@ -13,46 +13,63 @@
             color: #e8e4dc;
             font: 14px/1.4 "Trebuchet MS", "Segoe UI", sans-serif;
         }
+        #bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            height: 44px;
+            padding: 0 16px;
+            box-sizing: border-box;
+            background: #141821;
+            border-bottom: 1px solid #2a3140;
+            pointer-events: none;
+            user-select: none;
+        }
+        #bar strong {
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 11px;
+            font-weight: 700;
+            opacity: 0.62;
+        }
+        #label {
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        #hint {
+            font-size: 12px;
+            opacity: 0.7;
+        }
         #app {
             position: fixed;
-            inset: 0;
+            top: 44px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
         }
-        #label {
-            position: fixed;
-            top: 12px;
-            left: 14px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            background: rgba(0, 0, 0, 0.45);
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            font-size: 12px;
-            pointer-events: none;
-            user-select: none;
-        }
-        #hint {
-            position: fixed;
-            bottom: 12px;
-            left: 14px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            background: rgba(0, 0, 0, 0.45);
-            font-size: 12px;
-            opacity: 0.75;
-            pointer-events: none;
-            user-select: none;
-        }
     </style>
 </head>
 <body>
+    <div id="bar">
+        <strong>Dungeon assets</strong>
+        <span id="label">goblin</span>
+        <span id="hint">drag to orbit &middot; scroll to zoom &middot; right-drag to pan</span>
+    </div>
     <div id="app"></div>
-    <div id="label">goblin</div>
-    <div id="hint">drag to orbit &middot; scroll to zoom &middot; right-drag to pan</div>
     <script type="importmap">
         {
             "imports": {

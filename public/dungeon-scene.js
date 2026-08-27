@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CEIL_KINDS, FLOOR_KINDS, WALL_MATS, ceilMats, floorMats } from './dungeon-tiles.js';
+import { CEIL_KINDS, FLOOR_KINDS, WALL_MATS, ceilMats, floorMat, setCeilAtlasUVs, setFloorAtlasUVs } from './dungeon-tiles.js';
 import { MAKERS, SCENE_MATS, SHARED_GEOS, SHARED_MATS } from './dungeon-models.js';
 
 const CELL = 1;
@@ -710,12 +710,9 @@ export function buildDungeonRoom(state) {
         metal: cloneMat(WALL_MATS.metal),
     };
     tintWallMats(wall, palette, paletteId);
-    const clonedFloor = floorMats.map((mat) => {
-        const next = cloneMat(mat);
-        next.color.setHex(palette.floor);
-        extraMats.add(next);
-        return next;
-    });
+    const clonedFloor = cloneMat(floorMat);
+    clonedFloor.color.setHex(palette.floor);
+    extraMats.add(clonedFloor);
     const clonedCeil = ceilMats.map((mat) => {
         const next = cloneMat(mat);
         extraMats.add(next);
@@ -1275,9 +1272,9 @@ export function buildDungeonRoom(state) {
         if (!positions.length) {
             continue;
         }
-        const geo = tileGeo.clone();
+        const geo = setFloorAtlasUVs(tileGeo.clone(), k);
         extraGeos.add(geo);
-        const mesh = new THREE.InstancedMesh(geo, clonedFloor[k], positions.length / 3);
+        const mesh = new THREE.InstancedMesh(geo, clonedFloor, positions.length / 3);
         mesh.receiveShadow = true;
         for (let i = 0; i < positions.length; i += 3) {
             const index = i / 3;
@@ -1316,7 +1313,7 @@ export function buildDungeonRoom(state) {
         if (!positions.length) {
             continue;
         }
-        const geo = ceilTileGeo.clone();
+        const geo = setCeilAtlasUVs(ceilTileGeo.clone(), k);
         extraGeos.add(geo);
         const mesh = new THREE.InstancedMesh(geo, clonedCeil[k], positions.length / 2);
         for (let i = 0; i < positions.length; i += 2) {

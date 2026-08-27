@@ -604,33 +604,82 @@ function makeFloorCanvas(kind) {
     return canvas;
 }
 
-const WALL_KINDS = [
-    { id: 'stone', mat: new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeStoneCanvas()),
-        roughness: 0.92,
-        metalness: 0.04,
-    }) },
-    { id: 'vine', mat: new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeVineCanvas()),
-        roughness: 0.92,
-        metalness: 0.04,
-    }) },
-    { id: 'cracked', mat: new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeCrackedCanvas()),
-        roughness: 0.94,
-        metalness: 0.03,
-    }) },
-    { id: 'wood', mat: new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeWoodCanvas()),
-        roughness: 0.88,
-        metalness: 0.04,
-    }) },
-    { id: 'metal', mat: new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeMetalCanvas()),
-        roughness: 0.42,
-        metalness: 0.72,
-    }) },
+function canvasToAtlasTexture(canvas) {
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function setAtlasPlaneUVs(geo, kindIndex, cols, rows, tilePx) {
+    const col = kindIndex % cols;
+    const row = Math.floor(kindIndex / cols);
+    const atlasW = cols * tilePx;
+    const atlasH = rows * tilePx;
+    const u0 = (col * tilePx + 0.5) / atlasW;
+    const u1 = ((col + 1) * tilePx - 0.5) / atlasW;
+    const v1 = 1 - (row * tilePx + 0.5) / atlasH;
+    const v0 = 1 - ((row + 1) * tilePx - 0.5) / atlasH;
+    const uv = geo.attributes.uv;
+    uv.setXY(0, u0, v1);
+    uv.setXY(1, u1, v1);
+    uv.setXY(2, u0, v0);
+    uv.setXY(3, u1, v0);
+    uv.needsUpdate = true;
+    return geo;
+}
+
+function atlasSliceTexture(atlasTex, kindIndex, cols, rows, { wrap = false } = {}) {
+    const col = kindIndex % cols;
+    const row = Math.floor(kindIndex / cols);
+    const tex = atlasTex.clone();
+    tex.wrapS = wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+    tex.wrapT = wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+    tex.repeat.set(1 / cols, 1 / rows);
+    tex.offset.set(col / cols, (rows - row - 1) / rows);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+const WALL_KIND_IDS = ['stone', 'vine', 'cracked', 'wood', 'metal'];
+const WALL_TILE_PX = 32;
+const WALL_ATLAS_COLS = WALL_KIND_IDS.length;
+const WALL_ATLAS_ROWS = 1;
+const WALL_ATLAS_MAKERS = [
+    makeStoneCanvas, makeVineCanvas, makeCrackedCanvas, makeWoodCanvas, makeMetalCanvas,
 ];
+const WALL_MAT_PROPS = [
+    { roughness: 0.92, metalness: 0.04 },
+    { roughness: 0.92, metalness: 0.04 },
+    { roughness: 0.94, metalness: 0.03 },
+    { roughness: 0.88, metalness: 0.04 },
+    { roughness: 0.42, metalness: 0.72 },
+];
+
+function makeWallAtlasCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = WALL_ATLAS_COLS * WALL_TILE_PX;
+    canvas.height = WALL_ATLAS_ROWS * WALL_TILE_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < WALL_ATLAS_MAKERS.length; i += 1) {
+        ctx.drawImage(WALL_ATLAS_MAKERS[i](), i * WALL_TILE_PX, 0);
+    }
+    return canvas;
+}
+
+const wallAtlasTex = canvasToAtlasTexture(makeWallAtlasCanvas());
+const WALL_KINDS = WALL_KIND_IDS.map((id, i) => ({
+    id,
+    mat: new THREE.MeshStandardMaterial({
+        map: atlasSliceTexture(wallAtlasTex, i, WALL_ATLAS_COLS, WALL_ATLAS_ROWS, { wrap: true }),
+        ...WALL_MAT_PROPS[i],
+    }),
+}));
 
 const FLOOR_KINDS = [
     'flag', 'worn', 'moss', 'dark', 'gravel', 'plank', 'dirt',
@@ -642,76 +691,96 @@ const FLOOR_KINDS = [
     'plank-dirt-edge', 'plank-dirt-corner', 'plank-dirt-end',
 ];
 
-const floorMats = FLOOR_KINDS.map((kind) => new THREE.MeshStandardMaterial({
-    map: canvasToTexture(makeFloorCanvas(kind), 1, 1),
+const FLOOR_TILE_PX = 32;
+const FLOOR_ATLAS_COLS = 8;
+const FLOOR_ATLAS_ROWS = Math.ceil(FLOOR_KINDS.length / FLOOR_ATLAS_COLS);
+
+function makeFloorAtlasCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = FLOOR_ATLAS_COLS * FLOOR_TILE_PX;
+    canvas.height = FLOOR_ATLAS_ROWS * FLOOR_TILE_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < FLOOR_KINDS.length; i += 1) {
+        const tile = makeFloorCanvas(FLOOR_KINDS[i]);
+        const col = i % FLOOR_ATLAS_COLS;
+        const row = Math.floor(i / FLOOR_ATLAS_COLS);
+        ctx.drawImage(tile, col * FLOOR_TILE_PX, row * FLOOR_TILE_PX);
+    }
+    return canvas;
+}
+
+function setFloorAtlasUVs(geo, kindIndex) {
+    return setAtlasPlaneUVs(geo, kindIndex, FLOOR_ATLAS_COLS, FLOOR_ATLAS_ROWS, FLOOR_TILE_PX);
+}
+
+function floorAtlasSliceTexture(kindIndex) {
+    return atlasSliceTexture(floorAtlasTex, kindIndex, FLOOR_ATLAS_COLS, FLOOR_ATLAS_ROWS);
+}
+
+const floorAtlasTex = canvasToAtlasTexture(makeFloorAtlasCanvas());
+const floorMat = new THREE.MeshStandardMaterial({
+    map: floorAtlasTex,
+    roughness: 0.96,
+    metalness: 0,
+});
+const floorMats = FLOOR_KINDS.map((_, i) => new THREE.MeshStandardMaterial({
+    map: floorAtlasSliceTexture(i),
     roughness: 0.96,
     metalness: 0,
 }));
 
 const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine', 'vault', 'rock', 'grate', 'soot', 'gilt', 'brick', 'plaster'];
-const ceilMats = [
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeStoneCanvas()),
-        color: 0x2a2622,
-        roughness: 0.98,
-        metalness: 0,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeStoneCanvas()),
-        roughness: 0.96,
-        metalness: 0.02,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeBeamCanvas()),
-        roughness: 0.9,
-        metalness: 0.04,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeMetalCanvas()),
-        roughness: 0.45,
-        metalness: 0.62,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeVineCanvas()),
-        roughness: 0.96,
-        metalness: 0.02,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeVaultCanvas()),
-        roughness: 0.88,
-        metalness: 0.08,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeRockCeilCanvas()),
-        roughness: 0.98,
-        metalness: 0.02,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeGrateCanvas()),
-        roughness: 0.7,
-        metalness: 0.18,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeSootCanvas()),
-        roughness: 0.98,
-        metalness: 0,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeGiltCeilCanvas()),
-        roughness: 0.55,
-        metalness: 0.28,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makeBrickCeilCanvas()),
-        roughness: 0.94,
-        metalness: 0.03,
-    }),
-    new THREE.MeshStandardMaterial({
-        map: canvasToTexture(makePlasterCanvas()),
-        roughness: 0.96,
-        metalness: 0.02,
-    }),
+const CEIL_TILE_PX = 32;
+const CEIL_ATLAS_COLS = 4;
+const CEIL_ATLAS_ROWS = Math.ceil(CEIL_KINDS.length / CEIL_ATLAS_COLS);
+const CEIL_ATLAS_MAKERS = [
+    makeStoneCanvas, makeStoneCanvas, makeBeamCanvas, makeMetalCanvas,
+    makeVineCanvas, makeVaultCanvas, makeRockCeilCanvas, makeGrateCanvas,
+    makeSootCanvas, makeGiltCeilCanvas, makeBrickCeilCanvas, makePlasterCanvas,
 ];
+const CEIL_MAT_PROPS = [
+    { color: 0x2a2622, roughness: 0.98, metalness: 0 },
+    { roughness: 0.96, metalness: 0.02 },
+    { roughness: 0.9, metalness: 0.04 },
+    { roughness: 0.45, metalness: 0.62 },
+    { roughness: 0.96, metalness: 0.02 },
+    { roughness: 0.88, metalness: 0.08 },
+    { roughness: 0.98, metalness: 0.02 },
+    { roughness: 0.7, metalness: 0.18 },
+    { roughness: 0.98, metalness: 0 },
+    { roughness: 0.55, metalness: 0.28 },
+    { roughness: 0.94, metalness: 0.03 },
+    { roughness: 0.96, metalness: 0.02 },
+];
+
+function makeCeilAtlasCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = CEIL_ATLAS_COLS * CEIL_TILE_PX;
+    canvas.height = CEIL_ATLAS_ROWS * CEIL_TILE_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < CEIL_ATLAS_MAKERS.length; i += 1) {
+        const col = i % CEIL_ATLAS_COLS;
+        const row = Math.floor(i / CEIL_ATLAS_COLS);
+        ctx.drawImage(CEIL_ATLAS_MAKERS[i](), col * CEIL_TILE_PX, row * CEIL_TILE_PX);
+    }
+    return canvas;
+}
+
+function setCeilAtlasUVs(geo, kindIndex) {
+    return setAtlasPlaneUVs(geo, kindIndex, CEIL_ATLAS_COLS, CEIL_ATLAS_ROWS, CEIL_TILE_PX);
+}
+
+const ceilAtlasTex = canvasToAtlasTexture(makeCeilAtlasCanvas());
+const ceilMats = CEIL_MAT_PROPS.map((props) => new THREE.MeshStandardMaterial({
+    map: ceilAtlasTex,
+    ...props,
+}));
+const ceilPreviewMats = CEIL_KINDS.map((_, i) => new THREE.MeshStandardMaterial({
+    map: atlasSliceTexture(ceilAtlasTex, i, CEIL_ATLAS_COLS, CEIL_ATLAS_ROWS),
+    ...CEIL_MAT_PROPS[i],
+}));
 
 const wallTileGeo = new THREE.BoxGeometry(TILE, WALL_H, TILE);
 const slabTileGeo = new THREE.BoxGeometry(TILE, SLAB_H, TILE);
@@ -750,40 +819,104 @@ function makeRoofTile(mat) {
     return group;
 }
 
-function makeTexturePlane(mat) {
+function makeTexturePlane(mat, aspect = 1) {
     const group = new THREE.Group();
-    const mesh = new THREE.Mesh(texturePlaneGeo, mat);
+    const width = 2;
+    const height = 2 / Math.max(aspect, 0.01);
+    const geo = aspect === 1 ? texturePlaneGeo : new THREE.PlaneGeometry(width, height);
+    if (aspect !== 1) {
+        geo.rotateX(-Math.PI / 2);
+    }
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = 0.002;
     group.add(mesh);
     return group;
 }
 
-function previewMaterial(map) {
-    const tex = map.clone();
-    tex.repeat.set(1, 1);
+/** Crop one atlas cell into a standalone 32×32 texture for the Texture picker. */
+function extractAtlasTileTexture(atlasCanvas, kindIndex, cols, tilePx) {
+    const col = kindIndex % cols;
+    const row = Math.floor(kindIndex / cols);
+    const canvas = document.createElement('canvas');
+    canvas.width = tilePx;
+    canvas.height = tilePx;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+        atlasCanvas,
+        col * tilePx,
+        row * tilePx,
+        tilePx,
+        tilePx,
+        0,
+        0,
+        tilePx,
+        tilePx,
+    );
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
+    return tex;
+}
+
+function atlasSheetPreviewTexture(atlasTex) {
+    const tex = atlasTex.clone();
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.repeat.set(1, 1);
+    tex.offset.set(0, 0);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function previewMaterial(map) {
     return new THREE.MeshBasicMaterial({
-        map: tex,
+        map,
         side: THREE.DoubleSide,
     });
 }
 
-function ceilMap(kind) {
-    return ceilMats[CEIL_KINDS.indexOf(kind)].map;
-}
+const wallAtlasCanvas = wallAtlasTex.image;
+const floorAtlasCanvas = floorAtlasTex.image;
+const ceilAtlasCanvas = ceilAtlasTex.image;
 
 const textureSpecs = [
-    ...WALL_KINDS.map(({ id, mat }) => ({ id, label: pretty(id), map: mat.map })),
-    { id: 'beam', label: 'beam', map: ceilMap('wood') },
-    ...['vault', 'rock', 'grate', 'soot', 'gilt', 'brick', 'plaster'].map((id) => ({
-        id,
-        label: pretty(id),
-        map: ceilMap(id),
+    {
+        id: 'wall-atlas',
+        label: 'wall atlas',
+        map: atlasSheetPreviewTexture(wallAtlasTex),
+        aspect: WALL_ATLAS_COLS / WALL_ATLAS_ROWS,
+    },
+    {
+        id: 'floor-atlas',
+        label: 'floor atlas',
+        map: atlasSheetPreviewTexture(floorAtlasTex),
+        aspect: FLOOR_ATLAS_COLS / FLOOR_ATLAS_ROWS,
+    },
+    {
+        id: 'roof-atlas',
+        label: 'roof atlas',
+        map: atlasSheetPreviewTexture(ceilAtlasTex),
+        aspect: CEIL_ATLAS_COLS / CEIL_ATLAS_ROWS,
+    },
+    ...WALL_KIND_IDS.map((id, i) => ({
+        id: `wall-${id}`,
+        label: `${pretty(id)} wall`,
+        map: extractAtlasTileTexture(wallAtlasCanvas, i, WALL_ATLAS_COLS, WALL_TILE_PX),
     })),
     ...FLOOR_KINDS.map((kind, i) => ({
         id: `floor-${kind}`,
-        label: pretty(kind),
-        map: floorMats[i].map,
+        label: `${pretty(kind)} floor`,
+        map: extractAtlasTileTexture(floorAtlasCanvas, i, FLOOR_ATLAS_COLS, FLOOR_TILE_PX),
+    })),
+    ...CEIL_KINDS.map((kind, i) => ({
+        id: `roof-${kind}`,
+        label: `${pretty(kind)} roof`,
+        map: extractAtlasTileTexture(ceilAtlasCanvas, i, CEIL_ATLAS_COLS, CEIL_TILE_PX),
     })),
 ];
 
@@ -804,22 +937,35 @@ export const floorAssets = FLOOR_KINDS.map((kind, i) => ({
 export const roofAssets = CEIL_KINDS.map((kind, i) => ({
     id: `roof-${kind}`,
     label: `${pretty(kind)} roof`,
-    build: () => makeRoofTile(ceilMats[i]),
+    build: () => makeRoofTile(ceilPreviewMats[i]),
 }));
 
 export const textureAssets = textureSpecs.map((spec, i) => ({
     id: `tex-${spec.id}`,
     label: spec.label,
-    build: () => makeTexturePlane(texturePreviewMats[i]),
+    build: () => makeTexturePlane(texturePreviewMats[i], spec.aspect || 1),
 }));
 
 export const TILE_SHARED_GEOS = new Set([wallTileGeo, slabTileGeo, texturePlaneGeo]);
 export const TILE_SHARED_MATS = new Set([
     ...WALL_KINDS.map((kind) => kind.mat),
+    floorMat,
     ...floorMats,
     ...ceilMats,
+    ...ceilPreviewMats,
     ...texturePreviewMats,
 ]);
 
-export { FLOOR_KINDS, CEIL_KINDS, floorMats, ceilMats };
+export {
+    FLOOR_KINDS,
+    CEIL_KINDS,
+    floorMat,
+    floorMats,
+    ceilMats,
+    floorAtlasTex,
+    wallAtlasTex,
+    ceilAtlasTex,
+    setFloorAtlasUVs,
+    setCeilAtlasUVs,
+};
 export const WALL_MATS = Object.fromEntries(WALL_KINDS.map((kind) => [kind.id, kind.mat]));

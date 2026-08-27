@@ -1120,10 +1120,11 @@
             canvas.height = size;
             const ctx = canvas.getContext('2d');
             const g = ctx.createLinearGradient(0, 0, 0, size);
-            g.addColorStop(0, '#1d64c8');
-            g.addColorStop(0.42, '#4f97e6');
-            g.addColorStop(0.78, '#a9d6f6');
-            g.addColorStop(1, '#e7f3ff');
+            g.addColorStop(0, '#1560c8');
+            g.addColorStop(0.28, '#2f7fe0');
+            g.addColorStop(0.58, '#5aa0ea');
+            g.addColorStop(0.82, '#8ec8f4');
+            g.addColorStop(1, '#cfe9fb');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, size, size);
             const sunX = 48;
@@ -6567,10 +6568,10 @@
                 sky.scale.set(room.w + 1.2, 1, room.h + 1.2);
                 outdoorSkyRoot.add(sky);
                 const sun = new THREE.PointLight(
-                    0xfff0c8,
-                    2.05,
-                    Math.max(room.w, room.h) + opening + 10,
-                    1.25,
+                    0xfff3c4,
+                    2.6,
+                    Math.max(room.w, room.h) + opening + 14,
+                    1.15,
                 );
                 sun.position.set(cx, Math.max(4.8, opening + 2.4), cz);
                 outdoorSkyRoot.add(sun);

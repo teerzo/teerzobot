@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CEIL_KINDS, FLOOR_KINDS, WALL_MATS, ceilMats, floorMat, setCeilAtlasUVs, setFloorAtlasUVs } from './dungeon-tiles.js';
+import { CEIL_KINDS, FLOOR_KINDS, WALL_MATS, WALL_OVERLAY_MATS, ceilMats, floorMat, setCeilAtlasUVs, setFloorAtlasUVs } from './dungeon-tiles.js';
 import { MAKERS, SCENE_MATS, SHARED_GEOS, SHARED_MATS } from './dungeon-models.js';
 
 const CELL = 1;
@@ -26,6 +26,33 @@ const PIT_DEPTH = 0.48;
 const PIT_INNER = 0.86;
 const PIT_THICK = 0.08;
 const DOOR_CLOSED = 0;
+
+function setBoxWorldUVs(geo, width, height, depth) {
+    const uv = geo.attributes.uv;
+    const faces = [
+        [depth, height],
+        [depth, height],
+        [width, depth],
+        [width, depth],
+        [width, height],
+        [width, height],
+    ];
+    for (let f = 0; f < 6; f += 1) {
+        const uMax = faces[f][0] / CELL;
+        const vMax = faces[f][1] / CELL;
+        const base = f * 4;
+        uv.setXY(base + 0, 0, vMax);
+        uv.setXY(base + 1, uMax, vMax);
+        uv.setXY(base + 2, 0, 0);
+        uv.setXY(base + 3, uMax, 0);
+    }
+    uv.needsUpdate = true;
+    return geo;
+}
+
+function makeWallBoxGeo(widthX, height, widthZ) {
+    return setBoxWorldUVs(new THREE.BoxGeometry(widthX, height, widthZ), widthX, height, widthZ);
+}
 
 const WALL_DIRS = [
     { dx: 0, dz: -1 },
@@ -167,7 +194,7 @@ const ROOM_DETAIL_MAKERS = {
     yard: [MAKERS['moss-tuft'], MAKERS['pebble-cluster'], MAKERS.plant],
 };
 
-const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+const caveBlockGeo = setBoxWorldUVs(new THREE.BoxGeometry(1, 1, 1), 1, 1, 1);
 const curveQuarterGeo = new THREE.CylinderGeometry(0.98, 0.98, 1, 16, 1, false, 0, Math.PI / 2);
 const curveHalfGeo = new THREE.CylinderGeometry(0.7, 0.7, 1, 14, 1, false, 0, Math.PI);
 const fencePostGeo = new THREE.BoxGeometry(0.04, 0.72, 0.04);
@@ -461,25 +488,6 @@ function facingHall(grid, x, z, rooms) {
     return facingOpen(grid, x, z);
 }
 
-function makeWallBoxGeo(widthX, height, widthZ) {
-    const geo = new THREE.BoxGeometry(widthX, height, widthZ);
-    const uv = geo.attributes.uv;
-    const scaleY = height / WALL_H;
-    if (scaleY < 0.999) {
-        for (let face = 0; face < 6; face++) {
-            if (face === 2 || face === 3) {
-                continue;
-            }
-            const base = face * 4;
-            for (let i = 0; i < 4; i++) {
-                uv.setY(base + i, uv.getY(base + i) * scaleY);
-            }
-        }
-        uv.needsUpdate = true;
-    }
-    return geo;
-}
-
 function faceKey(wx, wz, dx, dz) {
     return `${wx},${wz},${dx},${dz}`;
 }
@@ -615,8 +623,6 @@ function facingFromWalls(grid, cells) {
 
 function tintWallMats(wall, palette, id) {
     wall.stone.color.setHex(palette.wall);
-    wall.vine.color.setHex(palette.wall);
-    wall.cracked.color.setHex(palette.wall);
     wall.wood.color.setHex(palette.wall);
     if (id === 'moss') {
         wall.wood.color.lerp(new THREE.Color(0x88aa70), 0.22);
@@ -704,10 +710,12 @@ export function buildDungeonRoom(state) {
     const palette = paletteOf(paletteId);
     const wall = {
         stone: cloneMat(WALL_MATS.stone),
-        vine: cloneMat(WALL_MATS.vine),
-        cracked: cloneMat(WALL_MATS.cracked),
         wood: cloneMat(WALL_MATS.wood),
         metal: cloneMat(WALL_MATS.metal),
+    };
+    const overlay = {
+        vines: cloneMat(WALL_OVERLAY_MATS.vines),
+        cracks: cloneMat(WALL_OVERLAY_MATS.cracks),
     };
     tintWallMats(wall, palette, paletteId);
     const clonedFloor = cloneMat(floorMat);
@@ -720,6 +728,9 @@ export function buildDungeonRoom(state) {
     });
     tintCeilMats(clonedCeil, palette);
     for (const mat of Object.values(wall)) {
+        extraMats.add(mat);
+    }
+    for (const mat of Object.values(overlay)) {
         extraMats.add(mat);
     }
     const waterMat = cloneMat(SCENE_MATS.waterMat);
@@ -776,8 +787,10 @@ export function buildDungeonRoom(state) {
                 } else if (wallKind === 'metal') {
                     metalWalls.push(x, y);
                 } else if (wallKind === 'vine') {
+                    stoneWalls.push(x, y);
                     vineWalls.push(x, y);
                 } else if (wallKind === 'cracked') {
+                    stoneWalls.push(x, y);
                     crackedWalls.push(x, y);
                 } else {
                     stoneWalls.push(x, y);
@@ -910,10 +923,10 @@ export function buildDungeonRoom(state) {
         buildWalls(restStone, wall.stone, WALL_H);
     }
     if (restVine.length) {
-        buildWalls(restVine, wall.vine, WALL_H);
+        buildWalls(restVine, overlay.vines, WALL_H);
     }
     if (restCracked.length) {
-        buildWalls(restCracked, wall.cracked, WALL_H);
+        buildWalls(restCracked, overlay.cracks, WALL_H);
     }
     if (restWood.length) {
         buildWalls(restWood, wall.wood, WALL_H);
@@ -925,15 +938,17 @@ export function buildDungeonRoom(state) {
         buildWalls(restHalf, wall.stone, HALF_H);
     }
     if (restBroken.length) {
-        buildWalls(restBroken, wall.cracked, BROKEN_H, 0.94, 0.88);
+        buildWalls(restBroken, wall.stone, BROKEN_H, 0.94, 0.88);
+        buildWalls(restBroken, overlay.cracks, BROKEN_H, 0.94, 0.88);
     }
     buildBlockyWalls(caveStone, wall.stone, WALL_H);
-    buildBlockyWalls(caveVine, wall.vine, WALL_H);
-    buildBlockyWalls(caveCracked, wall.cracked, WALL_H);
+    buildBlockyWalls(caveVine, overlay.vines, WALL_H);
+    buildBlockyWalls(caveCracked, overlay.cracks, WALL_H);
     buildBlockyWalls(caveWood, wall.wood, WALL_H);
     buildBlockyWalls(caveMetal, wall.metal, WALL_H);
     buildBlockyWalls(caveHalf, wall.stone, HALF_H);
-    buildBlockyWalls(caveBroken, wall.cracked, BROKEN_H);
+    buildBlockyWalls(caveBroken, wall.stone, BROKEN_H);
+    buildBlockyWalls(caveBroken, overlay.cracks, BROKEN_H);
 
     function doorFrameMat(kind) {
         const themeWall = ROOM_THEMES[kind]?.wall;
@@ -942,12 +957,6 @@ export function buildDungeonRoom(state) {
         }
         if (themeWall === 'metal') {
             return wall.metal;
-        }
-        if (themeWall === 'vine') {
-            return wall.vine;
-        }
-        if (themeWall === 'cracked') {
-            return wall.cracked;
         }
         return wall.stone;
     }
@@ -999,15 +1008,15 @@ export function buildDungeonRoom(state) {
 
     function makeBreachWall() {
         const group = new THREE.Group();
-        const sill = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.26, 1.02), wall.cracked);
+        const sill = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.26, 1.02), wall.stone);
         sill.position.y = 0.13;
         const left = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wall.stone);
         left.position.set(-0.42, WALL_H / 2, 0);
         const right = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wall.stone);
         right.position.set(0.42, WALL_H / 2, 0);
-        const top = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 1.02), wall.cracked);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 1.02), wall.stone);
         top.position.y = WALL_H - 0.08;
-        const rubble = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.22), wall.cracked);
+        const rubble = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.22), wall.stone);
         rubble.position.set(0.12, 0.32, 0.2);
         group.add(sill, left, right, top, rubble);
         return group;

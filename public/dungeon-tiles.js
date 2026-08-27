@@ -144,6 +144,18 @@ function makeVineCanvas() {
     return canvas;
 }
 
+/** Transparent vine overlay — no base wall baked in. */
+function makeVineOverlayCanvas() {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
+    drawVines(ctx, size);
+    return canvas;
+}
+
 function drawCracks(ctx, size) {
     function px(x, y, color) {
         const dx = ((x % size) + size) % size;
@@ -189,6 +201,18 @@ function drawCracks(ctx, size) {
 function makeCrackedCanvas() {
     const canvas = makeStoneCanvas();
     drawCracks(canvas.getContext('2d'), canvas.width);
+    return canvas;
+}
+
+/** Transparent crack overlay — no base wall baked in. */
+function makeCrackOverlayCanvas() {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
+    drawCracks(ctx, size);
     return canvas;
 }
 
@@ -645,41 +669,116 @@ function atlasSliceTexture(atlasTex, kindIndex, cols, rows, { wrap = false } = {
     return tex;
 }
 
+const WALL_BASE_IDS = ['stone', 'wood', 'metal'];
+const WALL_OVERLAY_IDS = ['vines', 'cracks'];
 const WALL_KIND_IDS = ['stone', 'vine', 'cracked', 'wood', 'metal'];
 const WALL_TILE_PX = 32;
-const WALL_ATLAS_COLS = WALL_KIND_IDS.length;
-const WALL_ATLAS_ROWS = 1;
-const WALL_ATLAS_MAKERS = [
-    makeStoneCanvas, makeVineCanvas, makeCrackedCanvas, makeWoodCanvas, makeMetalCanvas,
-];
-const WALL_MAT_PROPS = [
-    { roughness: 0.92, metalness: 0.04 },
-    { roughness: 0.92, metalness: 0.04 },
-    { roughness: 0.94, metalness: 0.03 },
-    { roughness: 0.88, metalness: 0.04 },
-    { roughness: 0.42, metalness: 0.72 },
-];
+const WALL_BASE_COLS = WALL_BASE_IDS.length;
+const WALL_BASE_ROWS = 1;
+const WALL_OVERLAY_COLS = WALL_OVERLAY_IDS.length;
+const WALL_OVERLAY_ROWS = 1;
+const WALL_BASE_MAKERS = [makeStoneCanvas, makeWoodCanvas, makeMetalCanvas];
+const WALL_OVERLAY_MAKERS = [makeVineOverlayCanvas, makeCrackOverlayCanvas];
+const WALL_BASE_MAT_PROPS = {
+    stone: { roughness: 0.92, metalness: 0.04 },
+    wood: { roughness: 0.88, metalness: 0.04 },
+    metal: { roughness: 0.42, metalness: 0.72 },
+};
 
-function makeWallAtlasCanvas() {
+function makeWallBaseAtlasCanvas() {
     const canvas = document.createElement('canvas');
-    canvas.width = WALL_ATLAS_COLS * WALL_TILE_PX;
-    canvas.height = WALL_ATLAS_ROWS * WALL_TILE_PX;
+    canvas.width = WALL_BASE_COLS * WALL_TILE_PX;
+    canvas.height = WALL_BASE_ROWS * WALL_TILE_PX;
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    for (let i = 0; i < WALL_ATLAS_MAKERS.length; i += 1) {
-        ctx.drawImage(WALL_ATLAS_MAKERS[i](), i * WALL_TILE_PX, 0);
+    for (let i = 0; i < WALL_BASE_MAKERS.length; i += 1) {
+        ctx.drawImage(WALL_BASE_MAKERS[i](), i * WALL_TILE_PX, 0);
     }
     return canvas;
 }
 
-const wallAtlasTex = canvasToAtlasTexture(makeWallAtlasCanvas());
-const WALL_KINDS = WALL_KIND_IDS.map((id, i) => ({
-    id,
-    mat: new THREE.MeshStandardMaterial({
-        map: atlasSliceTexture(wallAtlasTex, i, WALL_ATLAS_COLS, WALL_ATLAS_ROWS, { wrap: true }),
-        ...WALL_MAT_PROPS[i],
-    }),
-}));
+function makeWallOverlayAtlasCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = WALL_OVERLAY_COLS * WALL_TILE_PX;
+    canvas.height = WALL_OVERLAY_ROWS * WALL_TILE_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < WALL_OVERLAY_MAKERS.length; i += 1) {
+        ctx.drawImage(WALL_OVERLAY_MAKERS[i](), i * WALL_TILE_PX, 0);
+    }
+    return canvas;
+}
+
+const wallBaseAtlasTex = canvasToAtlasTexture(makeWallBaseAtlasCanvas());
+const wallOverlayAtlasTex = canvasToAtlasTexture(makeWallOverlayAtlasCanvas());
+wallOverlayAtlasTex.premultiplyAlpha = false;
+
+function wallBaseSlice(index) {
+    return atlasSliceTexture(wallBaseAtlasTex, index, WALL_BASE_COLS, WALL_BASE_ROWS, { wrap: true });
+}
+
+function wallOverlaySlice(index) {
+    return atlasSliceTexture(wallOverlayAtlasTex, index, WALL_OVERLAY_COLS, WALL_OVERLAY_ROWS, { wrap: true });
+}
+
+const WALL_BASE_INDEX = { stone: 0, wood: 1, metal: 2 };
+const WALL_OVERLAY_INDEX = { vines: 0, cracks: 1, vine: 0, cracked: 1 };
+
+function makeWallBaseMat(baseId) {
+    return new THREE.MeshStandardMaterial({
+        map: wallBaseSlice(WALL_BASE_INDEX[baseId]),
+        ...WALL_BASE_MAT_PROPS[baseId],
+    });
+}
+
+function makeWallOverlayMat(overlayId) {
+    return new THREE.MeshStandardMaterial({
+        map: wallOverlaySlice(WALL_OVERLAY_INDEX[overlayId]),
+        transparent: true,
+        depthWrite: false,
+        roughness: 0.92,
+        metalness: 0.02,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+    });
+}
+
+/** Logical wall kinds → base (+ optional overlay). Vine/cracked layer on stone. */
+const WALL_KIND_LAYERS = {
+    stone: { base: 'stone', overlay: null },
+    vine: { base: 'stone', overlay: 'vines' },
+    cracked: { base: 'stone', overlay: 'cracks' },
+    wood: { base: 'wood', overlay: null },
+    metal: { base: 'metal', overlay: null },
+};
+
+const wallBaseMats = {
+    stone: makeWallBaseMat('stone'),
+    wood: makeWallBaseMat('wood'),
+    metal: makeWallBaseMat('metal'),
+};
+const wallOverlayMats = {
+    vines: makeWallOverlayMat('vines'),
+    cracks: makeWallOverlayMat('cracks'),
+};
+
+const WALL_KINDS = WALL_KIND_IDS.map((id) => {
+    const layers = WALL_KIND_LAYERS[id];
+    return {
+        id,
+        base: layers.base,
+        overlay: layers.overlay,
+        mat: wallBaseMats[layers.base],
+        overlayMat: layers.overlay ? wallOverlayMats[layers.overlay] : null,
+    };
+});
+
+/** Back-compat alias for older wall atlas export name. */
+const wallAtlasTex = wallBaseAtlasTex;
+const WALL_ATLAS_COLS = WALL_BASE_COLS;
+const WALL_ATLAS_ROWS = WALL_BASE_ROWS;
 
 const FLOOR_KINDS = [
     'flag', 'worn', 'moss', 'dark', 'gravel', 'plank', 'dirt',
@@ -782,7 +881,32 @@ const ceilPreviewMats = CEIL_KINDS.map((_, i) => new THREE.MeshStandardMaterial(
     ...CEIL_MAT_PROPS[i],
 }));
 
+/** Keep square texel aspect: UV span = world face size / TILE. */
+function setBoxWorldUVs(geo, width, height, depth) {
+    const uv = geo.attributes.uv;
+    const faces = [
+        [depth, height],
+        [depth, height],
+        [width, depth],
+        [width, depth],
+        [width, height],
+        [width, height],
+    ];
+    for (let f = 0; f < 6; f += 1) {
+        const uMax = faces[f][0] / TILE;
+        const vMax = faces[f][1] / TILE;
+        const base = f * 4;
+        uv.setXY(base + 0, 0, vMax);
+        uv.setXY(base + 1, uMax, vMax);
+        uv.setXY(base + 2, 0, 0);
+        uv.setXY(base + 3, uMax, 0);
+    }
+    uv.needsUpdate = true;
+    return geo;
+}
+
 const wallTileGeo = new THREE.BoxGeometry(TILE, WALL_H, TILE);
+setBoxWorldUVs(wallTileGeo, TILE, WALL_H, TILE);
 const slabTileGeo = new THREE.BoxGeometry(TILE, SLAB_H, TILE);
 const texturePlaneGeo = new THREE.PlaneGeometry(2, 2);
 texturePlaneGeo.rotateX(-Math.PI / 2);
@@ -791,13 +915,19 @@ function pretty(kind) {
     return String(kind).replace(/-/g, ' ');
 }
 
-function makeWallTile(mat) {
+function makeWallTile(baseMat, overlayMat = null) {
     const group = new THREE.Group();
-    const mesh = new THREE.Mesh(wallTileGeo, mat);
+    const mesh = new THREE.Mesh(wallTileGeo, baseMat);
     mesh.position.y = WALL_H / 2;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
+    if (overlayMat) {
+        const overlay = new THREE.Mesh(wallTileGeo, overlayMat);
+        overlay.position.y = WALL_H / 2;
+        overlay.scale.setScalar(1.002);
+        group.add(overlay);
+    }
     return group;
 }
 
@@ -880,16 +1010,23 @@ function previewMaterial(map) {
     });
 }
 
-const wallAtlasCanvas = wallAtlasTex.image;
+const wallBaseAtlasCanvas = wallBaseAtlasTex.image;
+const wallOverlayAtlasCanvas = wallOverlayAtlasTex.image;
 const floorAtlasCanvas = floorAtlasTex.image;
 const ceilAtlasCanvas = ceilAtlasTex.image;
 
 const textureSpecs = [
     {
-        id: 'wall-atlas',
-        label: 'wall atlas',
-        map: atlasSheetPreviewTexture(wallAtlasTex),
-        aspect: WALL_ATLAS_COLS / WALL_ATLAS_ROWS,
+        id: 'wall-base-atlas',
+        label: 'wall base atlas',
+        map: atlasSheetPreviewTexture(wallBaseAtlasTex),
+        aspect: WALL_BASE_COLS / WALL_BASE_ROWS,
+    },
+    {
+        id: 'wall-overlay-atlas',
+        label: 'wall overlay atlas',
+        map: atlasSheetPreviewTexture(wallOverlayAtlasTex),
+        aspect: WALL_OVERLAY_COLS / WALL_OVERLAY_ROWS,
     },
     {
         id: 'floor-atlas',
@@ -903,10 +1040,15 @@ const textureSpecs = [
         map: atlasSheetPreviewTexture(ceilAtlasTex),
         aspect: CEIL_ATLAS_COLS / CEIL_ATLAS_ROWS,
     },
-    ...WALL_KIND_IDS.map((id, i) => ({
-        id: `wall-${id}`,
-        label: `${pretty(id)} wall`,
-        map: extractAtlasTileTexture(wallAtlasCanvas, i, WALL_ATLAS_COLS, WALL_TILE_PX),
+    ...WALL_BASE_IDS.map((id, i) => ({
+        id: `wall-base-${id}`,
+        label: `${pretty(id)} base`,
+        map: extractAtlasTileTexture(wallBaseAtlasCanvas, i, WALL_BASE_COLS, WALL_TILE_PX),
+    })),
+    ...WALL_OVERLAY_IDS.map((id, i) => ({
+        id: `wall-overlay-${id}`,
+        label: `${pretty(id)} overlay`,
+        map: extractAtlasTileTexture(wallOverlayAtlasCanvas, i, WALL_OVERLAY_COLS, WALL_TILE_PX),
     })),
     ...FLOOR_KINDS.map((kind, i) => ({
         id: `floor-${kind}`,
@@ -920,12 +1062,19 @@ const textureSpecs = [
     })),
 ];
 
-const texturePreviewMats = textureSpecs.map((spec) => previewMaterial(spec.map));
+const texturePreviewMats = textureSpecs.map((spec) => {
+    const mat = previewMaterial(spec.map);
+    if (spec.id.startsWith('wall-overlay')) {
+        mat.transparent = true;
+        mat.depthWrite = false;
+    }
+    return mat;
+});
 
-export const wallAssets = WALL_KINDS.map(({ id, mat }) => ({
+export const wallAssets = WALL_KINDS.map(({ id, mat, overlayMat }) => ({
     id: `wall-${id}`,
     label: `${pretty(id)} wall`,
-    build: () => makeWallTile(mat),
+    build: () => makeWallTile(mat, overlayMat),
 }));
 
 export const floorAssets = FLOOR_KINDS.map((kind, i) => ({
@@ -948,7 +1097,8 @@ export const textureAssets = textureSpecs.map((spec, i) => ({
 
 export const TILE_SHARED_GEOS = new Set([wallTileGeo, slabTileGeo, texturePlaneGeo]);
 export const TILE_SHARED_MATS = new Set([
-    ...WALL_KINDS.map((kind) => kind.mat),
+    ...Object.values(wallBaseMats),
+    ...Object.values(wallOverlayMats),
     floorMat,
     ...floorMats,
     ...ceilMats,
@@ -959,13 +1109,24 @@ export const TILE_SHARED_MATS = new Set([
 export {
     FLOOR_KINDS,
     CEIL_KINDS,
+    WALL_KIND_LAYERS,
     floorMat,
     floorMats,
     ceilMats,
     floorAtlasTex,
     wallAtlasTex,
+    wallBaseAtlasTex,
+    wallOverlayAtlasTex,
     ceilAtlasTex,
     setFloorAtlasUVs,
     setCeilAtlasUVs,
 };
+/** Logical wall kind → base material (vine/cracked share stone). */
 export const WALL_MATS = Object.fromEntries(WALL_KINDS.map((kind) => [kind.id, kind.mat]));
+/** Overlay materials keyed by overlay id and logical wall kind. */
+export const WALL_OVERLAY_MATS = {
+    vines: wallOverlayMats.vines,
+    cracks: wallOverlayMats.cracks,
+    vine: wallOverlayMats.vines,
+    cracked: wallOverlayMats.cracks,
+};

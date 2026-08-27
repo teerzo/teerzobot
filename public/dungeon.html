@@ -52,7 +52,8 @@
             opacity: 1;
         }
         html.paused canvas,
-        html.paused #hud {
+        html.paused #hud,
+        html.paused #minimap {
             opacity: 0;
         }
         #hud {
@@ -248,6 +249,12 @@
             width: 100%;
             height: auto;
         }
+        #stage > canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
         #vignette {
             position: absolute;
             inset: 0;
@@ -276,14 +283,58 @@
             border-radius: 0.5em;
             background: rgba(0, 0, 0, 0.62);
         }
+        #help.hidden {
+            display: none;
+        }
         @container dungeon (max-width: 680px) {
             #help { display: none; }
         }
         @container dungeon (max-height: 500px) {
             #help { display: none; }
         }
-        /* Portrait / phone: use the extra height, keep HUD readable, and
-           wrap the command help instead of hiding it. */
+        /* Portrait / phone: game view on top, minimap as a bottom band;
+           keep HUD readable and wrap command help instead of hiding it. */
+        #stage.portrait {
+            --minimap-band: 0px;
+        }
+        #stage.portrait > canvas {
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: var(--minimap-band);
+            width: 100%;
+            height: calc(100% - var(--minimap-band));
+        }
+        #stage.portrait #hud {
+            bottom: var(--minimap-band);
+        }
+        #stage.portrait #minimap {
+            position: absolute;
+            top: auto;
+            right: auto;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: var(--minimap-band);
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0.45em 0.6em;
+            border-radius: 0;
+            background: #050403;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: none;
+            z-index: 5;
+        }
+        #stage.portrait #minimap.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #stage.portrait #minimap canvas {
+            width: auto;
+            height: 100%;
+            max-width: 100%;
+        }
         #stage.portrait #last {
             max-width: 78%;
             font-size: clamp(0.95em, 4.4cqw, 1.35em);
@@ -297,7 +348,7 @@
         #stage.portrait #floor strong {
             font-size: clamp(1.15em, 6cqw, 1.55em);
         }
-        #stage.portrait #help {
+        #stage.portrait #help:not(.hidden) {
             display: block;
             white-space: normal;
             text-align: center;
@@ -362,9 +413,9 @@
             <div class="vote"><span>!left</span><div class="bar"><i id="bar-left"></i></div><b id="n-left">0</b></div>
             <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
         </div>
-        <div id="minimap"><canvas id="minimap-canvas" width="240" height="200"></canvas></div>
         <div id="transition"><div id="transition-msg">Entering Level 0</div></div>
     </div>
+    <div id="minimap"><canvas id="minimap-canvas" width="240" height="200"></canvas></div>
     </div>
     </div>
     <script type="importmap">
@@ -917,6 +968,17 @@
             return canvas;
         }
 
+        function makeVineOverlayCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+            drawVines(ctx, size);
+            return canvas;
+        }
+
         function makeVineBarkCanvas() {
             const size = 32;
             const canvas = document.createElement('canvas');
@@ -1013,6 +1075,17 @@
         function makeCrackedCanvas() {
             const canvas = makeStoneCanvas();
             drawCracks(canvas.getContext('2d'), canvas.width);
+            return canvas;
+        }
+
+        function makeCrackOverlayCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+            drawCracks(ctx, size);
             return canvas;
         }
 
@@ -1744,8 +1817,6 @@
             floorBaseMat.color.setHex(palette.dark);
             ceilMat.color.setHex(palette.dark);
             wallMat.color.setHex(palette.wall);
-            vineWallMat.color.setHex(palette.wall);
-            crackedWallMat.color.setHex(palette.wall);
             torchFlameMat.color.setHex(palette.torch);
             torchFlameMat.emissive.setHex(palette.flame);
             torchHot.setHex(palette.torch).lerp(torchWhite, 0.42);
@@ -2167,69 +2238,101 @@
         });
         const floorBaseMat = new THREE.MeshStandardMaterial({ color: 0x12100e, roughness: 1, metalness: 0 });
 
-        const WALL_KIND_IDS = ['stone', 'vine', 'cracked', 'wood', 'metal'];
+        const WALL_BASE_IDS = ['stone', 'wood', 'metal'];
+        const WALL_OVERLAY_IDS = ['vines', 'cracks'];
         const WALL_TILE_PX = 32;
-        const WALL_ATLAS_COLS = WALL_KIND_IDS.length;
-        const WALL_ATLAS_ROWS = 1;
-        const WALL_ATLAS_MAKERS = [
-            makeStoneCanvas, makeVineCanvas, makeCrackedCanvas, makeWoodCanvas, makeMetalCanvas,
-        ];
+        const WALL_BASE_COLS = WALL_BASE_IDS.length;
+        const WALL_BASE_ROWS = 1;
+        const WALL_OVERLAY_COLS = WALL_OVERLAY_IDS.length;
+        const WALL_OVERLAY_ROWS = 1;
+        const WALL_BASE_MAKERS = [makeStoneCanvas, makeWoodCanvas, makeMetalCanvas];
+        const WALL_OVERLAY_MAKERS = [makeVineOverlayCanvas, makeCrackOverlayCanvas];
 
-        function makeWallAtlasCanvas() {
+        function makeWallBaseAtlasCanvas() {
             const canvas = document.createElement('canvas');
-            canvas.width = WALL_ATLAS_COLS * WALL_TILE_PX;
-            canvas.height = WALL_ATLAS_ROWS * WALL_TILE_PX;
+            canvas.width = WALL_BASE_COLS * WALL_TILE_PX;
+            canvas.height = WALL_BASE_ROWS * WALL_TILE_PX;
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
-            for (let i = 0; i < WALL_ATLAS_MAKERS.length; i += 1) {
-                ctx.drawImage(WALL_ATLAS_MAKERS[i](), i * WALL_TILE_PX, 0);
+            for (let i = 0; i < WALL_BASE_MAKERS.length; i += 1) {
+                ctx.drawImage(WALL_BASE_MAKERS[i](), i * WALL_TILE_PX, 0);
             }
             return canvas;
         }
 
-        const wallAtlasTex = canvasToAtlasTexture(makeWallAtlasCanvas());
-        function wallSlice(index) {
-            return atlasSliceTexture(wallAtlasTex, index, WALL_ATLAS_COLS, WALL_ATLAS_ROWS, { wrap: true });
+        function makeWallOverlayAtlasCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = WALL_OVERLAY_COLS * WALL_TILE_PX;
+            canvas.height = WALL_OVERLAY_ROWS * WALL_TILE_PX;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < WALL_OVERLAY_MAKERS.length; i += 1) {
+                ctx.drawImage(WALL_OVERLAY_MAKERS[i](), i * WALL_TILE_PX, 0);
+            }
+            return canvas;
+        }
+
+        const wallBaseAtlasTex = canvasToAtlasTexture(makeWallBaseAtlasCanvas());
+        const wallOverlayAtlasTex = canvasToAtlasTexture(makeWallOverlayAtlasCanvas());
+        wallOverlayAtlasTex.premultiplyAlpha = false;
+        function wallBaseSlice(index) {
+            return atlasSliceTexture(wallBaseAtlasTex, index, WALL_BASE_COLS, WALL_BASE_ROWS, { wrap: true });
+        }
+        function wallOverlaySlice(index) {
+            return atlasSliceTexture(wallOverlayAtlasTex, index, WALL_OVERLAY_COLS, WALL_OVERLAY_ROWS, { wrap: true });
         }
 
         const ceilMat = new THREE.MeshStandardMaterial({ color: 0x100e0c, roughness: 0.98, metalness: 0 });
         const wallMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(0),
+            map: wallBaseSlice(0),
             roughness: 0.92,
             metalness: 0.04,
         });
-        const vineWallMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(1),
+        const vineOverlayMat = new THREE.MeshStandardMaterial({
+            map: wallOverlaySlice(0),
+            transparent: true,
+            depthWrite: false,
             roughness: 0.92,
-            metalness: 0.04,
+            metalness: 0.02,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
         });
-        const crackedWallMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(2),
+        const crackOverlayMat = new THREE.MeshStandardMaterial({
+            map: wallOverlaySlice(1),
+            transparent: true,
+            depthWrite: false,
             roughness: 0.94,
-            metalness: 0.03,
+            metalness: 0.02,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
         });
         const woodWallMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(3),
+            map: wallBaseSlice(1),
             roughness: 0.88,
             metalness: 0.04,
         });
         const metalWallMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(4),
+            map: wallBaseSlice(2),
             roughness: 0.42,
             metalness: 0.72,
         });
         const doorWoodMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(3),
+            map: wallBaseSlice(1),
             color: 0xc4a07a,
             roughness: 0.86,
             metalness: 0.04,
         });
         const doorIronMat = new THREE.MeshStandardMaterial({
-            map: wallSlice(4),
+            map: wallBaseSlice(2),
             color: 0x8a9098,
             roughness: 0.38,
             metalness: 0.78,
         });
+        /** Back-compat alias for prop rubble / spikes that used baked cracked walls. */
+        const crackedWallMat = wallMat;
 
         const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine', 'vault', 'rock', 'grate', 'soot', 'gilt', 'brick', 'plaster'];
         const CEIL_TILE_PX = 32;
@@ -2792,6 +2895,8 @@
         let wallMesh = null;
         let vineWallMesh = null;
         let crackedWallMesh = null;
+        let vineOverlayMesh = null;
+        let crackOverlayMesh = null;
         let halfWallMesh = null;
         let brokenWallMesh = null;
         let woodWallMesh = null;
@@ -2941,7 +3046,7 @@
             hangCurtainGeo, cobwebHangGeo, caveBlockGeo, outdoorSkyGeo, outdoorSkyDomeGeo, curveQuarterGeo, curveHalfGeo,
         ]);
         const SHARED_MATS = new Set([
-            floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
+            floorBaseMat, ceilMat, wallMat, vineOverlayMat, crackOverlayMat, woodWallMat, metalWallMat,
             doorWoodMat, doorIronMat,
             daySkyMat, outdoorDomeMat, outdoorSkyFlatMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
@@ -5673,12 +5778,6 @@
             if (wall === 'metal') {
                 return metalWallMat;
             }
-            if (wall === 'vine') {
-                return vineWallMat;
-            }
-            if (wall === 'cracked') {
-                return crackedWallMat;
-            }
             return wallMat;
         }
 
@@ -6777,6 +6876,8 @@
             disposeMesh(wallMesh);
             disposeMesh(vineWallMesh);
             disposeMesh(crackedWallMesh);
+            disposeMesh(vineOverlayMesh);
+            disposeMesh(crackOverlayMesh);
             disposeMesh(halfWallMesh);
             disposeMesh(brokenWallMesh);
             disposeMesh(woodWallMesh);
@@ -6838,8 +6939,10 @@
                         } else if (wallKind === 'metal') {
                             metalWalls.push(x, y);
                         } else if (wallKind === 'vine') {
+                            stoneWalls.push(x, y);
                             vineWalls.push(x, y);
                         } else if (wallKind === 'cracked') {
+                            stoneWalls.push(x, y);
                             crackedWalls.push(x, y);
                         } else {
                             stoneWalls.push(x, y);
@@ -6989,19 +7092,25 @@
             const [caveBroken, restBroken] = splitCaveWalls(brokenWalls);
 
             wallMesh = restStone.length ? buildWalls(restStone, wallMat, WALL_H) : null;
-            vineWallMesh = restVine.length ? buildWalls(restVine, vineWallMat, WALL_H) : null;
-            crackedWallMesh = restCracked.length ? buildWalls(restCracked, crackedWallMat, WALL_H) : null;
+            vineWallMesh = null;
+            crackedWallMesh = null;
+            vineOverlayMesh = restVine.length ? buildWalls(restVine, vineOverlayMat, WALL_H) : null;
+            crackOverlayMesh = restCracked.length ? buildWalls(restCracked, crackOverlayMat, WALL_H) : null;
             woodWallMesh = restWood.length ? buildWalls(restWood, woodWallMat, WALL_H) : null;
             metalWallMesh = restMetal.length ? buildWalls(restMetal, metalWallMat, WALL_H) : null;
             halfWallMesh = restHalf.length ? buildWalls(restHalf, wallMat, HALF_H) : null;
-            brokenWallMesh = restBroken.length ? buildWalls(restBroken, crackedWallMat, BROKEN_H, 0.94, 0.88) : null;
+            brokenWallMesh = restBroken.length ? buildWalls(restBroken, wallMat, BROKEN_H, 0.94, 0.88) : null;
+            if (restBroken.length) {
+                caveWallMeshes.push(buildWalls(restBroken, crackOverlayMat, BROKEN_H, 0.94, 0.88));
+            }
             buildBlockyWalls(caveStone, wallMat, WALL_H);
-            buildBlockyWalls(caveVine, vineWallMat, WALL_H);
-            buildBlockyWalls(caveCracked, crackedWallMat, WALL_H);
+            buildBlockyWalls(caveVine, vineOverlayMat, WALL_H);
+            buildBlockyWalls(caveCracked, crackOverlayMat, WALL_H);
             buildBlockyWalls(caveWood, woodWallMat, WALL_H);
             buildBlockyWalls(caveMetal, metalWallMat, WALL_H);
             buildBlockyWalls(caveHalf, wallMat, HALF_H);
-            buildBlockyWalls(caveBroken, crackedWallMat, BROKEN_H);
+            buildBlockyWalls(caveBroken, wallMat, BROKEN_H);
+            buildBlockyWalls(caveBroken, crackOverlayMat, BROKEN_H);
 
             extraWallRoot = new THREE.Group();
             function addRoofCap(x, z, baseH = WALL_H) {
@@ -7339,6 +7448,14 @@
             return links.map((set) => [...set]);
         }
 
+        function setMinimapVisible(on) {
+            const wasShown = minimapEl.classList.contains('show');
+            minimapEl.classList.toggle('show', on);
+            if (wasShown !== on && stageEl.classList.contains('portrait')) {
+                syncRendererSize();
+            }
+        }
+
         function updateMinimap(state) {
             const rooms = Array.isArray(state.rooms) ? state.rooms : [];
             const key = `${state.worldId ?? 0}:${state.floor}:${state.width}:${state.height}`;
@@ -7349,7 +7466,7 @@
                 minimapDrawKey = '';
             }
             if (!rooms.length || !state.grid?.length) {
-                minimapEl.classList.remove('show');
+                setMinimapVisible(false);
                 return;
             }
             const player = state.player || { x: 0, y: 0 };
@@ -7358,7 +7475,7 @@
                 minimapVisited.add(currentRoom);
             }
             if (!minimapVisited.size) {
-                minimapEl.classList.remove('show');
+                setMinimapVisible(false);
                 return;
             }
             if (!minimapLinks) {
@@ -7376,7 +7493,7 @@
             const staticDirty = staticKey !== minimapDrawKey;
             drawMinimap(state, rooms, minimapLinks, frontier, currentRoom, staticDirty);
             minimapDrawKey = staticKey;
-            minimapEl.classList.add('show');
+            setMinimapVisible(true);
         }
 
         function drawMinimap(state, rooms, links, frontier, currentRoom, rebuildStatic = true) {
@@ -7599,10 +7716,17 @@
         function syncRendererSize() {
             const w = canvasW || 640;
             const h = canvasH || 480;
-            camera.aspect = w / Math.max(1, h);
+            const portrait = stageEl.classList.contains('portrait');
+            const showMap = portrait && minimapEl.classList.contains('show');
+            // ~22% of stage height, clamped so the map stays readable without
+            // eating the game view on short portrait canvases.
+            const band = showMap ? Math.max(96, Math.min(168, Math.round(h * 0.22))) : 0;
+            stageEl.style.setProperty('--minimap-band', `${band}px`);
+            const viewH = Math.max(1, h - band);
+            camera.aspect = w / viewH;
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(1);
-            renderer.setSize(w, h);
+            renderer.setSize(w, viewH);
         }
 
         function setOverlayVisible(on) {
@@ -7709,9 +7833,8 @@
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
             modeEl.classList.toggle('autoplay', autoplaying);
             hudEl.classList.toggle('autoplay', autoplaying);
-            helpEl.textContent = autoplaying
-                ? 'Autoplay · !up to take over'
-                : '!up !down !left !right !fire !water !nature !lightning !chaos !attack !block';
+            helpEl.textContent = '!up !down !left !right !fire !water !nature !lightning !chaos !attack !block';
+            helpEl.classList.toggle('hidden', autoplaying);
 
             const action = state.lastAction;
             if (autoplaying && action?.user === 'autoplay') {

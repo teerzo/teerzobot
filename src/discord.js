@@ -29,6 +29,27 @@ const slashReplies = {
 const STATUS_CHANNEL_NAME = 'status';
 const START_STATUS_MESSAGE = 'teerzobot start';
 
+function formatGmtTimestamp(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'UTC',
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type) => parts.find((part) => part.type === type)?.value ?? '';
+    return `${get('weekday')}, ${get('day')} ${get('month')} ${get('year')} ${get('hour')}:${get('minute')}:${get('second')} GMT+0`;
+}
+
+export function buildStartStatusMessage(date = new Date()) {
+    return `${START_STATUS_MESSAGE} ${formatGmtTimestamp(date)}`;
+}
+
 function htmlPage(title, body) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>body{font:16px/1.4 sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;color:#eee;background:#111}</style>
@@ -110,23 +131,6 @@ function isStatusChannelName(name) {
     return normalizeChannelName(name) === STATUS_CHANNEL_NAME;
 }
 
-function formatGmtTimestamp(date = new Date()) {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'UTC',
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        hourCycle: 'h23',
-    }).formatToParts(date);
-    const get = (type) => parts.find((part) => part.type === type)?.value ?? '';
-    return `${get('weekday')}, ${get('day')} ${get('month')} ${get('year')} ${get('hour')}:${get('minute')}:${get('second')} GMT+0`;
-}
-
 function artworkChannelName() {
     return normalizeChannelName(process.env.DISCORD_ARTWORK_CHANNEL || 'artwork');
 }
@@ -203,7 +207,13 @@ async function postJoinMessage(guild) {
     }
 }
 
-export function createDiscordClient({ onBridgeMessage, onDanceImage, onArtworkImage, onArtworkReady } = {}) {
+export function createDiscordClient({
+    onBridgeMessage,
+    onDanceImage,
+    onArtworkImage,
+    onArtworkReady,
+    startStatusMessage,
+} = {}) {
     const token = process.env.DISCORD_TOKEN;
     const clientId = process.env.DISCORD_CLIENT_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
@@ -292,7 +302,7 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage, onArtworkIm
             return;
         }
 
-        const line = `${START_STATUS_MESSAGE} ${formatGmtTimestamp()}`;
+        const line = startStatusMessage || buildStartStatusMessage();
         try {
             await target.send(line);
             console.log(`Posted startup status in #${target.name}`);

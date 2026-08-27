@@ -48,11 +48,13 @@ export function createChatClient(authProvider, {
     onUserClear,
     onChatClear,
     getThirdPartyEmote,
+    startStatusMessage,
 }) {
     const state = {
         connected: false,
         channel,
     };
+    let announcedStart = false;
 
     const chatClient = new ChatClient({
         authProvider,
@@ -91,8 +93,13 @@ export function createChatClient(authProvider, {
         }
 
         console.log(`Joined #${channel} as ${user}`);
-        say(joinedChannel, 'Connected').catch((err) => {
-            console.error('Failed to announce connection', err);
+        if (announcedStart) {
+            return;
+        }
+        announcedStart = true;
+        const line = startStatusMessage || 'teerzobot start';
+        say(joinedChannel, line).catch((err) => {
+            console.error('Failed to announce startup', err);
         });
     });
 

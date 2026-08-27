@@ -14,7 +14,7 @@ import { createDance } from './dance.js';
 import { createTtt } from './ttt.js';
 import { createDungeon } from './dungeon.js';
 import { createArtwork } from './artwork.js';
-import { createDiscordClient } from './discord.js';
+import { buildStartStatusMessage, createDiscordClient } from './discord.js';
 import { startFollowAlerts } from './follows.js';
 
 function requireEnv(name) {
@@ -43,7 +43,9 @@ artwork.setOnChange((urls) => dungeon.setArtwork(urls));
 artwork.listUrls().then((urls) => dungeon.setArtwork(urls)).catch((err) => {
     console.error('Failed to load dungeon artwork', err);
 });
+const startStatusMessage = buildStartStatusMessage();
 const discord = createDiscordClient({
+    startStatusMessage,
     onBridgeMessage: ({ displayName, text }) => {
         if (typeof chat.say !== 'function') {
             return;
@@ -126,6 +128,7 @@ app.listen(port, '0.0.0.0', async () => {
         });
         chat = createChatClient(authProvider, {
             channel,
+            startStatusMessage,
             onMessage: (ctx) => {
                 chatFeed.emit({
                     type: 'chat',

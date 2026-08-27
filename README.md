@@ -71,7 +71,7 @@ https://<your-app>.up.railway.app/discord/callback
 
 On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping` and `/hello`, and reports connection state on `GET /api/status` as `discord`. When it is added to a server it posts in `#general` if it can send messages there (otherwise the system channel or another text channel). Restarting does not re-post that join message.
 
-Each process start (including Railway rebuilds) posts `teerzobot start` plus a readable GMT+0 timestamp in `#status`, for example `teerzobot start Thursday, 27 August 2026 05:02:00 GMT+0`. The channel name and message are hardcoded.
+Each process start (including Railway rebuilds) posts the same `teerzobot start` line plus a readable GMT+0 timestamp in Discord `#status` and in Twitch chat, for example `teerzobot start Thursday, 27 August 2026 05:02:00 GMT+0`. The Discord channel name and message are hardcoded.
 
 ### Twitch chat bridge
 
@@ -96,7 +96,7 @@ Images posted in Discord `#artwork` (override with `DISCORD_ARTWORK_CHANNEL`) ar
 npm run dev
 ```
 
-This loads `.env` and starts `src/index.js` with Node's file watcher. Saving anything under `src/` restarts the process. The API listens on **http://localhost:3000**. When the bot joins chat it posts `Connected` in the channel.
+This loads `.env` and starts `src/index.js` with Node's file watcher. Saving anything under `src/` restarts the process. The API listens on **http://localhost:3000**. When the process starts it posts the same `teerzobot start` timestamp in Discord `#status` and in Twitch chat.
 
 On Railway, set the same variables in the service dashboard (no `.env` file). The token file is gitignored, so seed it with:
 

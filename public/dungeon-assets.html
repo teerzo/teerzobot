@@ -59,9 +59,26 @@
             background: #2a3344;
         }
         #picker {
-            min-width: 11em;
-            max-width: 18em;
+            min-width: 12em;
+            max-width: 22em;
             padding: 4px 8px;
+        }
+        #picker optgroup {
+            font-style: normal;
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a93a4;
+            background: #161b26;
+        }
+        #picker option {
+            font-weight: 400;
+            font-size: 14px;
+            letter-spacing: normal;
+            text-transform: none;
+            color: #e8e4dc;
+            background: #1e2533;
         }
         #search {
             width: 10em;
@@ -165,11 +182,15 @@
         const center = new THREE.Vector3();
         const size = new THREE.Vector3();
 
+        const KIND_ORDER = ['Enemy', 'Weapon', 'Decoration', 'Wall', 'Floor', 'Roof', 'Texture'];
+
         function matchesQuery(asset, query) {
             if (!query) {
                 return true;
             }
-            return asset.label.includes(query) || asset.id.includes(query);
+            return asset.label.includes(query)
+                || asset.id.includes(query)
+                || (asset.kind && asset.kind.toLowerCase().includes(query));
         }
 
         function filteredAssets() {
@@ -177,16 +198,28 @@
             return ASSETS.filter((asset) => matchesQuery(asset, query));
         }
 
+        function groupedAssets(assets) {
+            const groups = new Map();
+            for (const asset of assets) {
+                const kind = asset.kind || 'Other';
+                if (!groups.has(kind)) {
+                    groups.set(kind, []);
+                }
+                groups.get(kind).push(asset);
+            }
+            const kinds = KIND_ORDER.filter((kind) => groups.has(kind));
+            for (const kind of groups.keys()) {
+                if (!kinds.includes(kind)) {
+                    kinds.push(kind);
+                }
+            }
+            return kinds.map((kind) => ({ kind, assets: groups.get(kind) }));
+        }
+
         function fillPicker() {
             const query = searchEl.value.trim().toLowerCase();
             const visible = filteredAssets();
             pickerEl.replaceChildren();
-            for (const asset of visible) {
-                const option = document.createElement('option');
-                option.value = String(ASSETS.indexOf(asset));
-                option.textContent = asset.label;
-                pickerEl.appendChild(option);
-            }
             if (!visible.length) {
                 const empty = document.createElement('option');
                 empty.value = '';
@@ -194,6 +227,17 @@
                 pickerEl.appendChild(empty);
                 pickerEl.disabled = true;
                 return;
+            }
+            for (const group of groupedAssets(visible)) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = group.kind;
+                for (const asset of group.assets) {
+                    const option = document.createElement('option');
+                    option.value = String(ASSETS.indexOf(asset));
+                    option.textContent = asset.label;
+                    optgroup.appendChild(option);
+                }
+                pickerEl.appendChild(optgroup);
             }
             pickerEl.disabled = false;
             const selected = visible.find((asset) => ASSETS.indexOf(asset) === currentIndex);

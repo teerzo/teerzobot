@@ -385,7 +385,6 @@
         const EYE = 0.52;
         const WALL_H = 1.55;
         const OUTDOOR_SKY_H = 13;
-        const OUTDOOR_LOOK_PITCH = -0.2;
         const INDOOR_FOG_DENSITY = 0.42;
         const OUTDOOR_FOG_DENSITY = 0.1;
         const DAY_FOG_COLOR = new THREE.Color(0xb7d4ee);
@@ -438,6 +437,9 @@
         scene.add(ambient);
         const outdoorHemi = new THREE.HemisphereLight(0xb7d8ff, 0x6d8a52, 0);
         scene.add(outdoorHemi);
+        const outdoorSun = new THREE.DirectionalLight(0xfff3c4, 0);
+        outdoorSun.position.set(5.5, 12, 3.5);
+        scene.add(outdoorSun);
         const torch = new THREE.PointLight(0xffd6a0, 2.4, 8, 1.6);
         camera.add(torch);
         scene.add(camera);
@@ -2708,6 +2710,18 @@
         let minimapKey = '';
         let minimapVisited = new Set();
         let minimapLinks = null;
+        let minimapDrawKey = '';
+        const minimapStatic = document.createElement('canvas');
+        minimapStatic.width = minimapCanvas.width;
+        minimapStatic.height = minimapCanvas.height;
+        const minimapStaticCtx = minimapStatic.getContext('2d');
+        const LIGHT_CULL_DIST = 7.5;
+        const LIGHT_CULL_DIST2 = LIGHT_CULL_DIST * LIGHT_CULL_DIST;
+        const MAX_NEAR_TORCH_LIGHTS = 4;
+        const MAX_NEAR_MUSH_LIGHTS = 2;
+        const MAX_NEAR_WINDOW_LIGHTS = 2;
+        const MAX_NEAR_SKY_LIGHTS = 2;
+        const PARTICLE_RANGE2 = 8.5 * 8.5;
         let transitioning = false;
         let pendingState = null;
         let artworkUrls = [];
@@ -2716,7 +2730,6 @@
         const camPos = new THREE.Vector3(1, EYE, 1);
         const targetPos = new THREE.Vector3(1, EYE, 1);
         let camYaw = 0;
-        let camPitch = 0;
         let targetYaw = 0;
         let liveRooms = [];
         let outdoorBlend = 0;
@@ -3329,9 +3342,71 @@
             ember.size = spark ? 0.38 + Math.random() * 0.28 : 0.7 + Math.random() * 0.55;
         }
 
+        function lightWorldDist2(light, ox, oz) {
+            const pos = light.getWorldPosition(light._cullPos || (light._cullPos = new THREE.Vector3()));
+            const dx = pos.x - ox;
+            const dz = pos.z - oz;
+            return dx * dx + dz * dz;
+        }
+
+        function cullPointLights(lights, maxKeep, ox, oz) {
+            if (!lights.length) {
+                return;
+            }
+            if (lights.length === 1) {
+                lights[0].visible = lightWorldDist2(lights[0], ox, oz) <= LIGHT_CULL_DIST2;
+                return;
+            }
+            const ranked = lights.map((light, index) => ({
+                light,
+                index,
+                d2: lightWorldDist2(light, ox, oz),
+            }));
+            ranked.sort((a, b) => a.d2 - b.d2 || a.index - b.index);
+            for (let i = 0; i < ranked.length; i += 1) {
+                const item = ranked[i];
+                item.light.visible = i < maxKeep && item.d2 <= LIGHT_CULL_DIST2;
+            }
+        }
+
+        function cullDynamicLights(ox, oz) {
+            cullPointLights(torchLights, MAX_NEAR_TORCH_LIGHTS, ox, oz);
+            cullPointLights(mushroomLights, MAX_NEAR_MUSH_LIGHTS, ox, oz);
+            cullPointLights(windowLights, MAX_NEAR_WINDOW_LIGHTS, ox, oz);
+            if (skylightBeams.length) {
+                const skyLights = [];
+                for (const item of skylightBeams) {
+                    if (item.light) {
+                        skyLights.push(item.light);
+                    }
+                }
+                cullPointLights(skyLights, MAX_NEAR_SKY_LIGHTS, ox, oz);
+            }
+        }
+
+        function nearestEmitterDist2(emitters, ox, oz) {
+            let best = Infinity;
+            for (const origin of emitters) {
+                const dx = origin.x - ox;
+                const dz = origin.z - oz;
+                const d2 = dx * dx + dz * dz;
+                if (d2 < best) {
+                    best = d2;
+                }
+            }
+            return best;
+        }
+
         function updateTorchEmbers(dt) {
             const n = torchEmitters.length;
             if (!n) {
+                if (emberAlphas[0] !== 0) {
+                    resetTorchEmbers();
+                }
+                return;
+            }
+
+            if (nearestEmitterDist2(torchEmitters, camPos.x, camPos.z) > PARTICLE_RANGE2) {
                 if (emberAlphas[0] !== 0) {
                     resetTorchEmbers();
                 }
@@ -3416,6 +3491,13 @@
                 return;
             }
 
+            if (nearestEmitterDist2(mushroomEmitters, camPos.x, camPos.z) > PARTICLE_RANGE2) {
+                if (sporeAlphas[0] !== 0) {
+                    resetMushroomSpores();
+                }
+                return;
+            }
+
             const t = clock.elapsedTime;
             const pulse = 0.95 + Math.sin(t * 2.1) * 0.22;
             mushCapMats[0].emissiveIntensity = 0.9 + Math.sin(t * 1.7) * 0.2;
@@ -3424,6 +3506,9 @@
             mushGlowMat.opacity = 0.22 + Math.sin(t * 2.4) * 0.08;
             for (let i = 0; i < mushroomLights.length; i += 1) {
                 const light = mushroomLights[i];
+                if (!light.visible) {
+                    continue;
+                }
                 light.intensity = light.userData.base * (0.82 + Math.sin(t * 1.8 + i * 1.3) * 0.18);
             }
 
@@ -7045,7 +7130,6 @@
                 }
                 const cx = room.x + (room.w - 1) / 2;
                 const cz = room.y + (room.h - 1) / 2;
-                const opening = outdoorOpeningHeight(room);
                 const dome = new THREE.Mesh(outdoorSkyDomeGeo, daySkyMat);
                 dome.position.set(cx, 0.04, cz);
                 dome.scale.set(room.w * 0.5 + 0.2, OUTDOOR_SKY_H, room.h * 0.5 + 0.2);
@@ -7054,14 +7138,6 @@
                 sky.position.set(cx, OUTDOOR_SKY_H - 0.04, cz);
                 sky.scale.set(room.w + 1.2, 1, room.h + 1.2);
                 outdoorSkyRoot.add(sky);
-                const sun = new THREE.PointLight(
-                    0xfff3c4,
-                    2.6,
-                    Math.max(room.w, room.h) + opening + 14,
-                    1.15,
-                );
-                sun.position.set(cx, Math.max(4.8, opening + 2.4), cz);
-                outdoorSkyRoot.add(sun);
             }
             scene.add(outdoorSkyRoot);
 
@@ -7154,6 +7230,7 @@
                 minimapKey = key;
                 minimapVisited = new Set();
                 minimapLinks = null;
+                minimapDrawKey = '';
             }
             if (!rooms.length || !state.grid?.length) {
                 minimapEl.classList.remove('show');
@@ -7179,114 +7256,131 @@
                     }
                 }
             }
-            drawMinimap(state, rooms, minimapLinks, frontier, currentRoom);
+            const staticKey = `${key}:${currentRoom}:${[...minimapVisited].join(',')}:${[...frontier].join(',')}`;
+            const staticDirty = staticKey !== minimapDrawKey;
+            drawMinimap(state, rooms, minimapLinks, frontier, currentRoom, staticDirty);
+            minimapDrawKey = staticKey;
             minimapEl.classList.add('show');
         }
 
-        function drawMinimap(state, rooms, links, frontier, currentRoom) {
+        function drawMinimap(state, rooms, links, frontier, currentRoom, rebuildStatic = true) {
             const ctx = minimapCtx;
             const W = minimapCanvas.width;
             const H = minimapCanvas.height;
+            if (rebuildStatic) {
+                const sctx = minimapStaticCtx;
+                sctx.clearRect(0, 0, W, H);
+
+                const shown = [...minimapVisited, ...frontier];
+                let minX = state.player.x;
+                let minY = state.player.y;
+                let maxX = state.player.x + 1;
+                let maxY = state.player.y + 1;
+                for (const ri of shown) {
+                    const r = rooms[ri];
+                    minX = Math.min(minX, r.x);
+                    minY = Math.min(minY, r.y);
+                    maxX = Math.max(maxX, r.x + r.w);
+                    maxY = Math.max(maxY, r.y + r.h);
+                }
+                minX -= 1;
+                minY -= 1;
+                maxX += 1;
+                maxY += 1;
+                const mapW = Math.max(1, maxX - minX);
+                const mapH = Math.max(1, maxY - minY);
+                const pad = 16;
+                const scale = Math.min((W - pad * 2) / mapW, (H - pad * 2) / mapH);
+                const offX = (W - mapW * scale) / 2;
+                const offY = (H - mapH * scale) / 2;
+                const toX = (gx) => offX + (gx - minX) * scale;
+                const toY = (gy) => offY + (gy - minY) * scale;
+                const center = (r) => ({ x: toX(r.x + r.w / 2), y: toY(r.y + r.h / 2) });
+                minimapStatic._toX = toX;
+                minimapStatic._toY = toY;
+                minimapStatic._scale = scale;
+
+                sctx.lineWidth = Math.max(2, scale * 0.18);
+                sctx.strokeStyle = 'rgba(168, 160, 148, 0.55)';
+                sctx.lineCap = 'round';
+                for (const ri of minimapVisited) {
+                    const a = center(rooms[ri]);
+                    for (const rj of links[ri] || []) {
+                        if (!minimapVisited.has(rj) && !frontier.has(rj)) {
+                            continue;
+                        }
+                        if (minimapVisited.has(rj) && rj <= ri) {
+                            continue;
+                        }
+                        const b = center(rooms[rj]);
+                        sctx.beginPath();
+                        sctx.moveTo(a.x, a.y);
+                        sctx.lineTo(b.x, b.y);
+                        sctx.stroke();
+                    }
+                }
+
+                for (const ri of frontier) {
+                    const r = rooms[ri];
+                    const c = center(r);
+                    const rad = Math.max(7, Math.min(r.w, r.h) * scale * 0.38);
+                    sctx.fillStyle = '#3d3d42';
+                    sctx.beginPath();
+                    sctx.arc(c.x, c.y, rad, 0, Math.PI * 2);
+                    sctx.fill();
+                    sctx.strokeStyle = '#6e6e74';
+                    sctx.lineWidth = 1.5;
+                    sctx.stroke();
+                    sctx.fillStyle = '#b0b0b6';
+                    sctx.font = `bold ${Math.max(10, Math.round(rad * 1.45))}px "Trebuchet MS", "Segoe UI", sans-serif`;
+                    sctx.textAlign = 'center';
+                    sctx.textBaseline = 'middle';
+                    sctx.fillText('?', c.x, c.y + 0.5);
+                }
+
+                for (const ri of minimapVisited) {
+                    const r = rooms[ri];
+                    const x = toX(r.x);
+                    const y = toY(r.y);
+                    const w = Math.max(4, r.w * scale);
+                    const h = Math.max(4, r.h * scale);
+                    sctx.fillStyle = ri === currentRoom ? 'rgba(226, 184, 74, 0.95)' : 'rgba(196, 176, 128, 0.88)';
+                    sctx.beginPath();
+                    if (sctx.roundRect) {
+                        sctx.roundRect(x, y, w, h, Math.min(3, scale * 0.25));
+                    } else {
+                        sctx.rect(x, y, w, h);
+                    }
+                    sctx.fill();
+                    sctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+                    sctx.lineWidth = 1;
+                    sctx.stroke();
+                }
+
+                const grid = state.grid || [];
+                for (let gy = 0; gy < grid.length; gy += 1) {
+                    for (let gx = 0; gx < (grid[gy] || []).length; gx += 1) {
+                        if (grid[gy][gx] !== VINES_TILE) {
+                            continue;
+                        }
+                        const ri = roomIndexAt(rooms, gx, gy);
+                        if (ri === -1 || !minimapVisited.has(ri)) {
+                            continue;
+                        }
+                        sctx.fillStyle = '#3d8a32';
+                        sctx.fillRect(toX(gx), toY(gy), Math.max(3, scale * 0.9), Math.max(3, scale * 0.9));
+                    }
+                }
+            }
+
             ctx.clearRect(0, 0, W, H);
-
-            const shown = [...minimapVisited, ...frontier];
-            let minX = state.player.x;
-            let minY = state.player.y;
-            let maxX = state.player.x + 1;
-            let maxY = state.player.y + 1;
-            for (const ri of shown) {
-                const r = rooms[ri];
-                minX = Math.min(minX, r.x);
-                minY = Math.min(minY, r.y);
-                maxX = Math.max(maxX, r.x + r.w);
-                maxY = Math.max(maxY, r.y + r.h);
+            ctx.drawImage(minimapStatic, 0, 0);
+            const toX = minimapStatic._toX;
+            const toY = minimapStatic._toY;
+            const scale = minimapStatic._scale || 1;
+            if (!toX || !toY) {
+                return;
             }
-            minX -= 1;
-            minY -= 1;
-            maxX += 1;
-            maxY += 1;
-            const mapW = Math.max(1, maxX - minX);
-            const mapH = Math.max(1, maxY - minY);
-            const pad = 16;
-            const scale = Math.min((W - pad * 2) / mapW, (H - pad * 2) / mapH);
-            const offX = (W - mapW * scale) / 2;
-            const offY = (H - mapH * scale) / 2;
-            const toX = (gx) => offX + (gx - minX) * scale;
-            const toY = (gy) => offY + (gy - minY) * scale;
-            const center = (r) => ({ x: toX(r.x + r.w / 2), y: toY(r.y + r.h / 2) });
-
-            ctx.lineWidth = Math.max(2, scale * 0.18);
-            ctx.strokeStyle = 'rgba(168, 160, 148, 0.55)';
-            ctx.lineCap = 'round';
-            for (const ri of minimapVisited) {
-                const a = center(rooms[ri]);
-                for (const rj of links[ri] || []) {
-                    if (!minimapVisited.has(rj) && !frontier.has(rj)) {
-                        continue;
-                    }
-                    if (minimapVisited.has(rj) && rj <= ri) {
-                        continue;
-                    }
-                    const b = center(rooms[rj]);
-                    ctx.beginPath();
-                    ctx.moveTo(a.x, a.y);
-                    ctx.lineTo(b.x, b.y);
-                    ctx.stroke();
-                }
-            }
-
-            for (const ri of frontier) {
-                const r = rooms[ri];
-                const c = center(r);
-                const rad = Math.max(7, Math.min(r.w, r.h) * scale * 0.38);
-                ctx.fillStyle = '#3d3d42';
-                ctx.beginPath();
-                ctx.arc(c.x, c.y, rad, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#6e6e74';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-                ctx.fillStyle = '#b0b0b6';
-                ctx.font = `bold ${Math.max(10, Math.round(rad * 1.45))}px "Trebuchet MS", "Segoe UI", sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('?', c.x, c.y + 0.5);
-            }
-
-            for (const ri of minimapVisited) {
-                const r = rooms[ri];
-                const x = toX(r.x);
-                const y = toY(r.y);
-                const w = Math.max(4, r.w * scale);
-                const h = Math.max(4, r.h * scale);
-                ctx.fillStyle = ri === currentRoom ? 'rgba(226, 184, 74, 0.95)' : 'rgba(196, 176, 128, 0.88)';
-                ctx.beginPath();
-                if (ctx.roundRect) {
-                    ctx.roundRect(x, y, w, h, Math.min(3, scale * 0.25));
-                } else {
-                    ctx.rect(x, y, w, h);
-                }
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-
-            const grid = state.grid || [];
-            for (let gy = 0; gy < grid.length; gy += 1) {
-                for (let gx = 0; gx < (grid[gy] || []).length; gx += 1) {
-                    if (grid[gy][gx] !== VINES_TILE) {
-                        continue;
-                    }
-                    const ri = roomIndexAt(rooms, gx, gy);
-                    if (ri === -1 || !minimapVisited.has(ri)) {
-                        continue;
-                    }
-                    ctx.fillStyle = '#3d8a32';
-                    ctx.fillRect(toX(gx), toY(gy), Math.max(3, scale * 0.9), Math.max(3, scale * 0.9));
-                }
-            }
-
             const px = toX(state.player.x + 0.5);
             const py = toY(state.player.y + 0.5);
             ctx.fillStyle = '#ffffff';
@@ -7467,7 +7561,6 @@
                 camYaw = targetYaw;
                 bump = 0;
                 outdoorBlend = isOutdoorAt(player.x, player.y, liveRooms) ? 1 : 0;
-                camPitch = outdoorBlend ? OUTDOOR_LOOK_PITCH : 0;
             }
 
             if (state.exit) {
@@ -7602,21 +7695,22 @@
             const outdoorHere = isOutdoorAt(Math.round(targetPos.x), Math.round(targetPos.z), liveRooms);
             const outdoorWant = outdoorHere ? 1 : 0;
             outdoorBlend += (outdoorWant - outdoorBlend) * (1 - Math.exp(-dt * 3.2));
-            camPitch += (((outdoorHere ? OUTDOOR_LOOK_PITCH : 0) - camPitch) * (1 - Math.exp(-dt * 4.2)));
             scene.fog.color.copy(fogIndoor).lerp(DAY_FOG_COLOR, outdoorBlend);
             scene.fog.density = INDOOR_FOG_DENSITY + (OUTDOOR_FOG_DENSITY - INDOOR_FOG_DENSITY) * outdoorBlend;
             scene.background.copy(fogIndoor).lerp(DAY_SKY_BG, outdoorBlend);
             ambient.color.copy(ambientIndoor).lerp(DAY_AMBIENT, outdoorBlend);
             ambient.intensity = 0.4 + outdoorBlend * 1.05;
             outdoorHemi.intensity = outdoorBlend * 1.85;
+            outdoorSun.intensity = outdoorBlend * 1.35;
 
             camera.position.set(
                 camPos.x + lookX * bump,
                 camPos.y + bob,
                 camPos.z + lookZ * bump,
             );
-            camera.rotation.x = camPitch;
+            camera.rotation.x = 0;
             camera.rotation.y = camYaw;
+            cullDynamicLights(camPos.x, camPos.z);
             handKick *= Math.exp(-dt * 11);
             swordKick *= Math.exp(-dt * 10);
             shieldGuard += ((isBlocking ? 1 : 0) - shieldGuard) * (1 - Math.exp(-dt * 10));
@@ -7652,10 +7746,16 @@
             }
             for (let i = 0; i < windowLights.length; i++) {
                 const light = windowLights[i];
+                if (!light.visible) {
+                    continue;
+                }
                 light.intensity = (light.userData.base || 2.6) * (0.85 + Math.sin(clock.elapsedTime * 0.7 + i) * 0.12);
             }
             for (let i = 0; i < torchLights.length; i++) {
                 const light = torchLights[i];
+                if (!light.visible) {
+                    continue;
+                }
                 const flicker = Math.sin(clock.elapsedTime * 14 + i * 1.7) * 0.12 + Math.sin(clock.elapsedTime * 23 + i) * 0.06;
                 light.intensity = light.userData.base * (1 + flicker);
             }
@@ -7669,7 +7769,7 @@
                 const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 2.1 + item.phase);
                 item.beam.material.opacity = item.base * (0.72 + pulse * 0.4);
                 item.core.material.opacity = item.coreBase * (0.7 + pulse * 0.38);
-                if (item.light) {
+                if (item.light?.visible) {
                     item.light.intensity = item.lightBase * (0.82 + pulse * 0.22);
                 }
             }

@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import {
+    floorAssets, roofAssets, textureAssets, TILE_SHARED_GEOS, TILE_SHARED_MATS, wallAssets,
+} from './dungeon-tiles.js';
 
 const CELL = 1;
 const WALL_H = 1.55;
@@ -331,6 +334,7 @@ export const SHARED_GEOS = new Set([
     goblinTuskGeo, goblinArmGeo, goblinHandGeo, goblinLegGeo, goblinFootGeo, goblinClothGeo, goblinBladeGeo, goblinBrowGeo,
     ghostBodyGeo, ghostHeadGeo, ghostArmGeo, ghostHemGeo, ghostEyeGeo, ghostMouthGeo, ghostCoreGeo,
     frogBodyGeo, frogHeadGeo, frogEyeGeo, frogLegGeo, frogFootGeo,
+    ...TILE_SHARED_GEOS,
 ]);
 
 export const SHARED_MATS = new Set([
@@ -340,6 +344,7 @@ export const SHARED_MATS = new Set([
     ghostMat, ghostSheetMat, ghostHoleMat, mushStemMat, mushGlowMat, voidMat, goldMat, wallMat, crackedWallMat,
     waterMat, torchBracketMat, torchFlameMat, staffWoodMat, staffIronMat, staffCrystalMat, staffGlowMat,
     ...frameMats, ...paintMats, ...clothMats, ...mushCapMats,
+    ...TILE_SHARED_MATS,
 ]);
 
 function stoneish() {
@@ -1827,6 +1832,10 @@ function entry(id, label, build) {
     return { id, label, build };
 }
 
+function withKind(kind, items) {
+    return items.map((item) => ({ ...item, kind }));
+}
+
 const creatures = [
     entry('goblin', 'goblin', makeGoblin),
     entry('ghost', 'ghost', makeGhost),
@@ -1942,5 +1951,13 @@ const props = [
     entry('well', 'well', makeWell),
 ].sort((a, b) => a.label.localeCompare(b.label));
 
-export const ASSETS = [...creatures, ...weapons, ...props];
+export const ASSETS = [
+    ...withKind('Enemy', creatures),
+    ...withKind('Weapon', weapons),
+    ...withKind('Decoration', props),
+    ...withKind('Wall', wallAssets),
+    ...withKind('Floor', floorAssets),
+    ...withKind('Roof', roofAssets),
+    ...withKind('Texture', textureAssets),
+];
 

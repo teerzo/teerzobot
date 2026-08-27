@@ -1104,31 +1104,38 @@
             return canvas;
         }
 
-        function makeNightSkyCanvas() {
+        function makeDaySkyCanvas() {
             const size = 64;
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
             const g = ctx.createLinearGradient(0, 0, 0, size);
-            g.addColorStop(0, '#070818');
-            g.addColorStop(0.45, '#12143a');
-            g.addColorStop(1, '#1a1430');
+            g.addColorStop(0, '#3f83d6');
+            g.addColorStop(0.5, '#6fa8e4');
+            g.addColorStop(1, '#c4e3f6');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, size, size);
-            ctx.fillStyle = '#f4f0d8';
+            const sunX = 48;
+            const sunY = 14;
+            const glow = ctx.createRadialGradient(sunX, sunY, 2, sunX, sunY, 18);
+            glow.addColorStop(0, 'rgba(255,248,214,0.95)');
+            glow.addColorStop(1, 'rgba(255,248,214,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(sunX - 18, sunY - 18, 36, 36);
+            ctx.fillStyle = '#fff7d6';
             ctx.beginPath();
-            ctx.arc(48, 14, 7, 0, Math.PI * 2);
+            ctx.arc(sunX, sunY, 6, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = '#12143a';
-            ctx.beginPath();
-            ctx.arc(51, 12, 5, 0, Math.PI * 2);
-            ctx.fill();
-            for (let n = 0; n < 40; n++) {
-                const x = (n * 13 + 5) % size;
-                const y = (n * 17 + 3) % size;
-                ctx.fillStyle = n % 5 === 0 ? '#ffe8a0' : '#d8e8ff';
-                ctx.fillRect(x, y, n % 7 === 0 ? 2 : 1, n % 7 === 0 ? 2 : 1);
+            const clouds = [[14, 24, 5], [36, 43, 6], [8, 50, 4], [52, 36, 4]];
+            for (const [cx, cy, r] of clouds) {
+                ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.arc(cx + r, cy + 1, r * 0.8, 0, Math.PI * 2);
+                ctx.arc(cx - r, cy + 1, r * 0.7, 0, Math.PI * 2);
+                ctx.arc(cx + r * 0.4, cy - r * 0.6, r * 0.7, 0, Math.PI * 2);
+                ctx.fill();
             }
             return canvas;
         }
@@ -1548,7 +1555,7 @@
         const SLIME_ROOMS = new Set(['sewer', 'garden', 'well', 'cave', 'yard']);
         const CLEAN_ROOMS = new Set(['chapel', 'bedroom']);
         const STAINED_WINDOW_ROOMS = new Set(['chapel', 'shrine', 'library']);
-        const NIGHT_WINDOW_ROOMS = new Set(['bedroom', 'garden', 'yard']);
+        const SKY_WINDOW_ROOMS = new Set(['bedroom', 'garden', 'yard']);
         const OUTDOOR_ROOMS = new Set(['yard', 'garden']);
         const WOOD_THEME = { wall: 'wood', floor: 'plank', ceil: 'wood' };
         const ROOM_THEMES = {
@@ -1636,7 +1643,7 @@
                     mat.color.lerp(new THREE.Color(palette.wall), 0.28);
                 }
             }
-            nightSkyMat.color.setHex(
+            daySkyMat.color.setHex(
                 id === 'ember' ? 0xffd8b0
                     : id === 'crypt' ? 0xc0d0ff
                     : id === 'blood' ? 0xffc8c0
@@ -2041,8 +2048,8 @@
                 metalness: 0.02,
             }),
         ];
-        const nightSkyMat = new THREE.MeshBasicMaterial({
-            map: canvasToTexture(makeNightSkyCanvas(), 1, 1),
+        const daySkyMat = new THREE.MeshBasicMaterial({
+            map: canvasToTexture(makeDaySkyCanvas(), 1, 1),
             fog: false,
             depthWrite: true,
         });
@@ -2584,7 +2591,7 @@
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
             doorWoodMat, doorIronMat,
-            nightSkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
+            daySkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
             woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
             frogMat, frogDarkMat, frogBellyMat,
@@ -5088,7 +5095,7 @@
             lintel.position.set(0, WALL_H - 0.12, 0);
             const paneMat = stained
                 ? stainedGlassMats[Math.abs(variant) % stainedGlassMats.length]
-                : nightSkyMat;
+                : daySkyMat;
             const pane = new THREE.Mesh(windowPaneGeo, paneMat);
             pane.position.set(0, 0.91, -0.48);
             const glass = new THREE.Mesh(windowPaneGeo, windowGlassMat);
@@ -6027,15 +6034,15 @@
             west.position.set(-0.49, y, 0);
             const east = new THREE.Mesh(new THREE.BoxGeometry(rim, rim, len), woodMat);
             east.position.set(0.49, y, 0);
-            const sky = new THREE.Mesh(outdoorSkyGeo, nightSkyMat);
+            const sky = new THREE.Mesh(outdoorSkyGeo, daySkyMat);
             sky.position.y = y + 0.05;
             sky.scale.set(0.9, 1, 0.9);
             const height = Math.max(0.4, y - 0.05);
-            const beam = makeSpotBeam(0.045, 0.26, height, 0.17, 0xb4d4f4);
+            const beam = makeSpotBeam(0.045, 0.26, height, 0.17, 0xfff0c4);
             beam.position.y = 0.05 + height / 2;
-            const core = makeSpotBeam(0.016, 0.11, height, 0.28, 0xdceeff);
+            const core = makeSpotBeam(0.016, 0.11, height, 0.28, 0xfff8e4);
             core.position.y = beam.position.y;
-            const light = new THREE.PointLight(0xa8c8e8, 0.9, 4.6, 1.7);
+            const light = new THREE.PointLight(0xffe8b8, 0.9, 4.6, 1.7);
             light.position.y = y - 0.18;
             light.userData.base = 0.9;
             group.add(north, south, west, east, sky, beam, core, light);
@@ -6311,7 +6318,7 @@
                 const wz = windowTiles[i + 1];
                 const room = roomBeside(state.rooms, wx, wz);
                 const stained = STAINED_WINDOW_ROOMS.has(room?.kind)
-                    || (!NIGHT_WINDOW_ROOMS.has(room?.kind) && room?.kind !== 'cave'
+                    || (!SKY_WINDOW_ROOMS.has(room?.kind) && room?.kind !== 'cave'
                         && ((wx * 7 + wz * 13) & 1) === 0);
                 const win = makeWindowWall(stained, wx + wz * 3);
                 win.position.set(wx, 0, wz);
@@ -6527,18 +6534,18 @@
                 if (!isOutdoorRoom(room)) {
                     continue;
                 }
-                const sky = new THREE.Mesh(outdoorSkyGeo, nightSkyMat);
-                sky.position.set(room.x + (room.w - 1) / 2, 9.2, room.y + (room.h - 1) / 2);
-                sky.scale.set(room.w + 10, 1, room.h + 10);
+                const sky = new THREE.Mesh(outdoorSkyGeo, daySkyMat);
+                sky.position.set(room.x + (room.w - 1) / 2, 18.5, room.y + (room.h - 1) / 2);
+                sky.scale.set(room.w + 20, 1, room.h + 20);
                 outdoorSkyRoot.add(sky);
-                const moon = new THREE.PointLight(
-                    0x9bb8d8,
-                    1.1,
-                    Math.max(room.w, room.h) + 6,
-                    1.55,
+                const sun = new THREE.PointLight(
+                    0xfff0c8,
+                    1.5,
+                    Math.max(room.w, room.h) + 12,
+                    1.4,
                 );
-                moon.position.set(room.x + (room.w - 1) / 2, 2.55, room.y + (room.h - 1) / 2);
-                outdoorSkyRoot.add(moon);
+                sun.position.set(room.x + (room.w - 1) / 2, 5.5, room.y + (room.h - 1) / 2);
+                outdoorSkyRoot.add(sun);
             }
             scene.add(outdoorSkyRoot);
 

@@ -1343,6 +1343,70 @@ function buildFloor(floor) {
     return generateCorridor();
 }
 
+export function buildPreviewRoom() {
+    const pools = [
+        { kinds: SMALL_KINDS, w0: 3, w1: 4, h0: 3, h1: 4 },
+        { kinds: MEDIUM_KINDS, w0: 5, w1: 6, h0: 5, h1: 6 },
+        { kinds: LARGE_KINDS, w0: 7, w1: 8, h0: 6, h1: 8 },
+    ];
+    const pool = pools[Math.floor(Math.random() * pools.length)];
+    const kind = pool.kinds[Math.floor(Math.random() * pool.kinds.length)];
+    const w = pool.w0 + Math.floor(Math.random() * (pool.w1 - pool.w0 + 1));
+    const h = pool.h0 + Math.floor(Math.random() * (pool.h1 - pool.h0 + 1));
+    const width = w + 4;
+    const height = h + 4;
+    const grid = Array.from({ length: height }, () => Array(width).fill(WALL));
+    const room = { x: 2, y: 2, w, h, kind };
+    carveRoom(grid, room);
+
+    const side = Math.floor(Math.random() * 4);
+    const midX = room.x + Math.floor(room.w / 2);
+    const midY = room.y + Math.floor(room.h / 2);
+    let exitX = midX;
+    let exitY = midY;
+    if (side === 0) {
+        grid[room.y - 1][midX] = FLOOR;
+        grid[room.y - 2][midX] = FLOOR;
+        exitX = midX;
+        exitY = room.y - 2;
+    } else if (side === 1) {
+        grid[midY][room.x + room.w] = FLOOR;
+        grid[midY][room.x + room.w + 1] = FLOOR;
+        exitX = room.x + room.w + 1;
+        exitY = midY;
+    } else if (side === 2) {
+        grid[room.y + room.h][midX] = FLOOR;
+        grid[room.y + room.h + 1][midX] = FLOOR;
+        exitX = midX;
+        exitY = room.y + room.h + 1;
+    } else {
+        grid[midY][room.x - 1] = FLOOR;
+        grid[midY][room.x - 2] = FLOOR;
+        exitX = room.x - 2;
+        exitY = midY;
+    }
+
+    const rooms = [room];
+    const start = roomCenter(room);
+    styleInteriorWalls(grid, rooms);
+    placeDoorways(grid, rooms, start.x, start.y, exitX, exitY);
+    placeRoomFurniture(grid, rooms, start.x, start.y, exitX, exitY);
+    placeRoomPartitions(grid, rooms, start.x, start.y, exitX, exitY);
+    placeHazards(grid, rooms, start.x, start.y, exitX, exitY);
+
+    return {
+        width,
+        height,
+        grid,
+        rooms: snapshotRooms(rooms),
+        palette: PALETTE_IDS[Math.floor(Math.random() * PALETTE_IDS.length)],
+        player: { x: start.x, y: start.y, dir: openDir(grid, start.x, start.y) },
+        exit: { x: exitX, y: exitY },
+        floor: 0,
+        worldId: `preview-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`,
+    };
+}
+
 function layoutFilePath() {
     return process.env.DUNGEON_PATH || './data/dungeon.json';
 }

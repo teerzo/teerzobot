@@ -96,9 +96,11 @@
             white-space: nowrap;
         }
         #hint {
-            margin-left: auto;
             font-size: 12px;
             opacity: 0.7;
+        }
+        #generate {
+            margin-left: auto;
         }
         #app {
             position: relative;
@@ -125,6 +127,7 @@
         <button type="button" id="reset">Reset</button>
         <span id="count">1 / 1</span>
         <span id="hint">drag to orbit &middot; scroll to zoom &middot; right-drag to pan</span>
+        <button type="button" id="generate">Generate Room</button>
     </div>
     <div id="app"></div>
     <script type="importmap">
@@ -139,6 +142,7 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { ASSETS, SHARED_GEOS, SHARED_MATS } from '/dungeon-models.js';
+        import { PALETTES, buildDungeonRoom } from '/dungeon-scene.js';
 
         const container = document.getElementById('app');
         const pickerEl = document.getElementById('picker');
@@ -147,6 +151,7 @@
         const prevEl = document.getElementById('prev');
         const nextEl = document.getElementById('next');
         const resetEl = document.getElementById('reset');
+        const generateEl = document.getElementById('generate');
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -175,9 +180,14 @@
 
         const grid = new THREE.GridHelper(4, 16, 0x3a4356, 0x21262f);
         scene.add(grid);
+        const defaultBg = 0x0b0d12;
+        const defaultMaxDistance = 16;
+        const roomMaxDistance = 36;
 
         let currentRoot = null;
         let currentIndex = 0;
+        let roomHandle = null;
+        let generating = false;
         const bounds = new THREE.Box3();
         const center = new THREE.Vector3();
         const size = new THREE.Vector3();
@@ -277,6 +287,28 @@
             controls.update();
         }
 
+        function clearCurrent() {
+            if (roomHandle) {
+                scene.remove(roomHandle.group);
+                roomHandle.dispose();
+                roomHandle = null;
+                currentRoot = null;
+            } else if (currentRoot) {
+                scene.remove(currentRoot);
+                disposeRoot(currentRoot);
+                currentRoot = null;
+            }
+            grid.visible = true;
+            scene.background.setHex(defaultBg);
+            controls.maxDistance = defaultMaxDistance;
+        }
+
+        function enterAssetMode() {
+            grid.visible = true;
+            scene.background.setHex(defaultBg);
+            controls.maxDistance = defaultMaxDistance;
+        }
+
         function show(index) {
             if (!ASSETS.length) {
                 return;
@@ -284,17 +316,46 @@
             const next = ((index % ASSETS.length) + ASSETS.length) % ASSETS.length;
             currentIndex = next;
             const asset = ASSETS[next];
-            if (currentRoot) {
-                scene.remove(currentRoot);
-                disposeRoot(currentRoot);
-                currentRoot = null;
-            }
+            clearCurrent();
+            enterAssetMode();
             currentRoot = asset.build();
             scene.add(currentRoot);
             frameObject(currentRoot);
             countEl.textContent = `${next + 1} / ${ASSETS.length}`;
             document.title = `${asset.label} · dungeon assets`;
             fillPicker();
+        }
+
+        async function generateRoom() {
+            if (generating) {
+                return;
+            }
+            generating = true;
+            generateEl.disabled = true;
+            try {
+                const res = await fetch('/api/dungeon/preview-room');
+                if (!res.ok) {
+                    throw new Error(`preview-room ${res.status}`);
+                }
+                const payload = await res.json();
+                const built = buildDungeonRoom(payload);
+                clearCurrent();
+                roomHandle = built;
+                currentRoot = built.group;
+                scene.add(currentRoot);
+                grid.visible = false;
+                scene.background.setHex((PALETTES[payload.palette] || PALETTES.stone).fog);
+                controls.maxDistance = roomMaxDistance;
+                frameObject(currentRoot);
+                const kind = payload.rooms?.[0]?.kind || 'room';
+                countEl.textContent = `${kind} · ${payload.palette || 'stone'}`;
+                document.title = `${kind} · dungeon room`;
+            } catch (err) {
+                console.error('Failed to generate room', err);
+            } finally {
+                generating = false;
+                generateEl.disabled = false;
+            }
         }
 
         function step(delta) {
@@ -325,6 +386,9 @@
         resetEl.addEventListener('click', () => {
             searchEl.value = '';
             show(0);
+        });
+        generateEl.addEventListener('click', () => {
+            generateRoom();
         });
         window.addEventListener('keydown', (event) => {
             if (event.target === searchEl || event.target === pickerEl) {

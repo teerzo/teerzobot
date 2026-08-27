@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { normalizeTrack } from './nowPlaying.js';
 import { attachOAuthRoutes } from './auth.js';
 import { attachDiscordRoutes } from './discord.js';
+import { buildPreviewRoom } from './dungeon.js';
 
 function corsOrigin() {
     const frontend = process.env.FRONTEND_ORIGIN;
@@ -221,6 +222,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
 
     app.get('/api/dungeon', (_req, res) => {
         res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, canvasWidth: 640, canvasHeight: 480, anchor: 'top-left', grid: [] });
+    });
+
+    app.get('/api/dungeon/preview-room', (_req, res) => {
+        res.json(buildPreviewRoom());
     });
 
     app.post('/api/dungeon/reset', (_req, res) => {

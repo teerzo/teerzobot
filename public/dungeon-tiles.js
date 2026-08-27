@@ -820,3 +820,6 @@ export const TILE_SHARED_MATS = new Set([
     ...ceilMats,
     ...texturePreviewMats,
 ]);
+
+export { FLOOR_KINDS, CEIL_KINDS, floorMats, ceilMats };
+export const WALL_MATS = Object.fromEntries(WALL_KINDS.map((kind) => [kind.id, kind.mat]));

@@ -44,6 +44,7 @@ const AUTOPLAY_MS = 1600;
 const BASE_PATH = 4;
 const MIN_SIZE = 15;
 const MAX_SIZE = 31;
+// Landscape size used by !dc landscape. New overlays start in phone mode (DEFAULT_PHONE).
 const DEFAULT_CANVAS = { width: 640, height: 480 };
 const DEFAULT_ANCHOR = 'top-left';
 const CANVAS_STEPS = [
@@ -1442,8 +1443,8 @@ export function createDungeon() {
     let nextAutoCommand = 'up';
     let chatQuiet = false;
     let visible = true;
-    let canvasWidth = DEFAULT_CANVAS.width;
-    let canvasHeight = DEFAULT_CANVAS.height;
+    let canvasWidth = DEFAULT_PHONE.width;
+    let canvasHeight = DEFAULT_PHONE.height;
     let anchor = DEFAULT_ANCHOR;
     let artwork = [];
     let worldId = 0;
@@ -1975,7 +1976,7 @@ export function createDungeon() {
     }
 
     function nearestStepIndex(steps) {
-        const area = (canvasWidth || DEFAULT_CANVAS.width) * (canvasHeight || DEFAULT_CANVAS.height);
+        const area = (canvasWidth || DEFAULT_PHONE.width) * (canvasHeight || DEFAULT_PHONE.height);
         let best = 0;
         let bestDelta = Infinity;
         for (let i = 0; i < steps.length; i++) {

@@ -219,6 +219,25 @@
             background: #7ce0ff;
             transition: width 0.2s ease;
         }
+        #minimap {
+            position: absolute;
+            top: clamp(3.4em, 14cqh, 5.2em);
+            right: clamp(0.5em, 2.4cqw, 1.25em);
+            width: clamp(6.5em, 22cqw, 9em);
+            padding: 0.4em;
+            background: rgba(0, 0, 0, 0.62);
+            border-radius: 0.5em;
+            display: none;
+            z-index: 4;
+        }
+        #minimap.show {
+            display: block;
+        }
+        #minimap canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
         #vignette {
             position: absolute;
             inset: 0;
@@ -305,6 +324,7 @@
             <div class="vote"><span>!left</span><div class="bar"><i id="bar-left"></i></div><b id="n-left">0</b></div>
             <div class="vote"><span>!right</span><div class="bar"><i id="bar-right"></i></div><b id="n-right">0</b></div>
         </div>
+        <div id="minimap"><canvas id="minimap-canvas" width="240" height="200"></canvas></div>
         <div id="transition"><div id="transition-msg">Entering Level 0</div></div>
     </div>
     </div>
@@ -348,6 +368,9 @@
         const voteTitleEl = document.getElementById('vote-title');
         const transitionEl = document.getElementById('transition');
         const transitionMsgEl = document.getElementById('transition-msg');
+        const minimapEl = document.getElementById('minimap');
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x090807);
@@ -2518,6 +2541,9 @@
         let mazeKey = '';
         let shownFloor = null;
         let shownWorldId = null;
+        let minimapKey = '';
+        let minimapVisited = new Set();
+        let minimapLinks = null;
         let transitioning = false;
         let pendingState = null;
         let artworkUrls = [];
@@ -6549,6 +6575,217 @@
             placeProps(state.grid, w, h, state.player, state.exit, torchFaces, state.rooms, state.palette, state.floor);
         }
 
+        function minimapWalkable(cell) {
+            return cell === 0 || cell === 2 || cell === DOOR_TILE;
+        }
+
+        function roomIndexAt(rooms, x, y) {
+            for (let i = 0; i < rooms.length; i++) {
+                const r = rooms[i];
+                if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function computeRoomLinks(state) {
+            const { grid, rooms, width, height } = state;
+            const links = rooms.map(() => new Set());
+            const isWalk = (x, y) => minimapWalkable(grid[y]?.[x]);
+            const visited = Array.from({ length: height }, () => new Array(width).fill(false));
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (visited[y][x] || !isWalk(x, y) || roomIndexAt(rooms, x, y) !== -1) {
+                        continue;
+                    }
+                    const stack = [[x, y]];
+                    visited[y][x] = true;
+                    const touching = new Set();
+                    while (stack.length) {
+                        const [cx, cy] = stack.pop();
+                        for (const { dx, dz } of WALL_DIRS) {
+                            const nx = cx + dx;
+                            const ny = cy + dz;
+                            if (!isWalk(nx, ny)) {
+                                continue;
+                            }
+                            const ri = roomIndexAt(rooms, nx, ny);
+                            if (ri !== -1) {
+                                touching.add(ri);
+                            } else if (!visited[ny][nx]) {
+                                visited[ny][nx] = true;
+                                stack.push([nx, ny]);
+                            }
+                        }
+                    }
+                    const arr = [...touching];
+                    for (const a of arr) {
+                        for (const b of arr) {
+                            if (a !== b) {
+                                links[a].add(b);
+                            }
+                        }
+                    }
+                }
+            }
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const ri = roomIndexAt(rooms, x, y);
+                    if (ri === -1 || !isWalk(x, y)) {
+                        continue;
+                    }
+                    for (const { dx, dz } of WALL_DIRS) {
+                        if (!isWalk(x + dx, y + dz)) {
+                            continue;
+                        }
+                        const rj = roomIndexAt(rooms, x + dx, y + dz);
+                        if (rj !== -1 && rj !== ri) {
+                            links[ri].add(rj);
+                            links[rj].add(ri);
+                        }
+                    }
+                }
+            }
+            return links.map((set) => [...set]);
+        }
+
+        function updateMinimap(state) {
+            const rooms = Array.isArray(state.rooms) ? state.rooms : [];
+            const key = `${state.worldId ?? 0}:${state.floor}:${state.width}:${state.height}`;
+            if (key !== minimapKey) {
+                minimapKey = key;
+                minimapVisited = new Set();
+                minimapLinks = null;
+            }
+            if (!rooms.length || !state.grid?.length) {
+                minimapEl.classList.remove('show');
+                return;
+            }
+            const player = state.player || { x: 0, y: 0 };
+            const currentRoom = roomIndexAt(rooms, player.x, player.y);
+            if (currentRoom !== -1) {
+                minimapVisited.add(currentRoom);
+            }
+            if (!minimapVisited.size) {
+                minimapEl.classList.remove('show');
+                return;
+            }
+            if (!minimapLinks) {
+                minimapLinks = computeRoomLinks(state);
+            }
+            const frontier = new Set();
+            for (const ri of minimapVisited) {
+                for (const rj of minimapLinks[ri] || []) {
+                    if (!minimapVisited.has(rj)) {
+                        frontier.add(rj);
+                    }
+                }
+            }
+            drawMinimap(state, rooms, minimapLinks, frontier, currentRoom);
+            minimapEl.classList.add('show');
+        }
+
+        function drawMinimap(state, rooms, links, frontier, currentRoom) {
+            const ctx = minimapCtx;
+            const W = minimapCanvas.width;
+            const H = minimapCanvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const shown = [...minimapVisited, ...frontier];
+            let minX = state.player.x;
+            let minY = state.player.y;
+            let maxX = state.player.x + 1;
+            let maxY = state.player.y + 1;
+            for (const ri of shown) {
+                const r = rooms[ri];
+                minX = Math.min(minX, r.x);
+                minY = Math.min(minY, r.y);
+                maxX = Math.max(maxX, r.x + r.w);
+                maxY = Math.max(maxY, r.y + r.h);
+            }
+            minX -= 1;
+            minY -= 1;
+            maxX += 1;
+            maxY += 1;
+            const mapW = Math.max(1, maxX - minX);
+            const mapH = Math.max(1, maxY - minY);
+            const pad = 16;
+            const scale = Math.min((W - pad * 2) / mapW, (H - pad * 2) / mapH);
+            const offX = (W - mapW * scale) / 2;
+            const offY = (H - mapH * scale) / 2;
+            const toX = (gx) => offX + (gx - minX) * scale;
+            const toY = (gy) => offY + (gy - minY) * scale;
+            const center = (r) => ({ x: toX(r.x + r.w / 2), y: toY(r.y + r.h / 2) });
+
+            ctx.lineWidth = Math.max(2, scale * 0.18);
+            ctx.strokeStyle = 'rgba(168, 160, 148, 0.55)';
+            ctx.lineCap = 'round';
+            for (const ri of minimapVisited) {
+                const a = center(rooms[ri]);
+                for (const rj of links[ri] || []) {
+                    if (!minimapVisited.has(rj) && !frontier.has(rj)) {
+                        continue;
+                    }
+                    if (minimapVisited.has(rj) && rj <= ri) {
+                        continue;
+                    }
+                    const b = center(rooms[rj]);
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                }
+            }
+
+            for (const ri of frontier) {
+                const r = rooms[ri];
+                const c = center(r);
+                const rad = Math.max(7, Math.min(r.w, r.h) * scale * 0.38);
+                ctx.fillStyle = '#3d3d42';
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, rad, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#6e6e74';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.fillStyle = '#b0b0b6';
+                ctx.font = `bold ${Math.max(10, Math.round(rad * 1.45))}px "Trebuchet MS", "Segoe UI", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', c.x, c.y + 0.5);
+            }
+
+            for (const ri of minimapVisited) {
+                const r = rooms[ri];
+                const x = toX(r.x);
+                const y = toY(r.y);
+                const w = Math.max(4, r.w * scale);
+                const h = Math.max(4, r.h * scale);
+                ctx.fillStyle = ri === currentRoom ? 'rgba(226, 184, 74, 0.95)' : 'rgba(196, 176, 128, 0.88)';
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(x, y, w, h, Math.min(3, scale * 0.25));
+                } else {
+                    ctx.rect(x, y, w, h);
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            const px = toX(state.player.x + 0.5);
+            const py = toY(state.player.y + 0.5);
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(px, py, Math.max(2.5, scale * 0.42), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
         function applyState(state, snap) {
             if (!state) {
                 return;
@@ -6710,6 +6947,7 @@
             lastAt = state.at || lastAt;
 
             floorEl.textContent = String(state.floor ?? 0);
+            updateMinimap(state);
             updateHpBar(state);
             flashHurt(state);
             syncEnemies(state, snap);

@@ -3627,6 +3627,7 @@
                         tz: enemy.y * CELL,
                         dying: false,
                         dieAt: 0,
+                        hurt: 0,
                     };
                     enemyActors.set(enemy.id, actor);
                 }
@@ -3641,6 +3642,7 @@
                 if (!live.has(id) && !actor.dying) {
                     actor.dying = true;
                     actor.dieAt = clock.elapsedTime;
+                    actor.hurt = 1;
                     if (actor.kind === 'ghost') {
                         spawnGhostBurst(new THREE.Vector3(
                             actor.group.position.x,
@@ -3652,6 +3654,15 @@
                     }
                 }
             }
+            const action = state.lastAction;
+            if (!snap && action?.shotId && action.shotId !== lastShotId) {
+                for (const hit of action.hits || []) {
+                    const actor = enemyActors.get(hit.id);
+                    if (actor) {
+                        actor.hurt = 1;
+                    }
+                }
+            }
         }
 
         function updateEnemies(dt, t) {
@@ -3659,18 +3670,26 @@
             for (const [id, actor] of [...enemyActors]) {
                 actor.group.position.x += (actor.tx - actor.group.position.x) * t;
                 actor.group.position.z += (actor.tz - actor.group.position.z) * t;
+                if (actor.hurt > 0) {
+                    actor.hurt = Math.max(0, actor.hurt - dt * 6);
+                }
+                const kick = actor.hurt;
+                const jolt = kick ? Math.sin(now * 48) * kick * 0.07 : 0;
                 if (actor.kind === 'ghost') {
-                    actor.group.position.y = PROP_LIFT + 0.08 + Math.sin(now * 2.4 + (actor.group.userData.bob || 0)) * 0.05;
+                    actor.group.position.y = PROP_LIFT + 0.08 + Math.sin(now * 2.4 + (actor.group.userData.bob || 0)) * 0.05 + kick * 0.1;
+                    actor.group.position.x += jolt;
                     const sway = Math.sin(now * 1.8 + (actor.group.userData.bob || 0)) * 0.18;
                     if (actor.group.userData.armL) {
-                        actor.group.userData.armL.rotation.x = 0.35 + sway;
+                        actor.group.userData.armL.rotation.x = 0.35 + sway - kick * 0.8;
                     }
                     if (actor.group.userData.armR) {
-                        actor.group.userData.armR.rotation.x = 0.35 - sway;
+                        actor.group.userData.armR.rotation.x = 0.35 - sway - kick * 0.8;
                     }
                 } else {
                     actor.group.lookAt(targetPos.x, actor.group.position.y, targetPos.z);
                     actor.group.rotateY(Math.PI);
+                    actor.group.position.y = PROP_LIFT + kick * 0.08;
+                    actor.group.position.x += jolt;
                 }
                 if (actor.dying) {
                     const pop = actor.kind === 'ghost' ? 0.12 : 0.22;
@@ -3681,6 +3700,8 @@
                         disposeObject(actor.group);
                         enemyActors.delete(id);
                     }
+                } else {
+                    actor.group.scale.setScalar(1 + kick * 0.18);
                 }
             }
         }

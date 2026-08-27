@@ -110,7 +110,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
             dvd: status.dvd ?? { listeners: 0, speed: 1 },
             dance: status.dance ?? { listeners: 0 },
             ttt: status.ttt ?? { listeners: 0, visible: true },
-            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true, chatQuiet: false, canvasWidth: 640, canvasHeight: 480, anchor: 'top-left' },
+            dungeon: status.dungeon ?? { listeners: 0, floor: 0, mode: 'anarchy', visible: true, chatQuiet: false, canvasWidth: 540, canvasHeight: 960, anchor: 'top-left' },
             discord: status.discord ?? { connected: false },
         });
     });
@@ -221,7 +221,7 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
     });
 
     app.get('/api/dungeon', (_req, res) => {
-        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, canvasWidth: 640, canvasHeight: 480, anchor: 'top-left', grid: [] });
+        res.json(dungeon?.get() ?? { floor: 0, mode: 'anarchy', visible: true, canvasWidth: 540, canvasHeight: 960, anchor: 'top-left', grid: [] });
     });
 
     app.get('/api/dungeon/preview-room', (_req, res) => {

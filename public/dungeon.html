@@ -17,8 +17,8 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 640px;
-            height: 480px;
+            width: 540px;
+            height: 960px;
             overflow: hidden;
         }
         #stage-wrap.anchor-top-left { top: 0; left: 0; right: auto; bottom: auto; }
@@ -29,8 +29,8 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 640px;
-            height: 480px;
+            width: 540px;
+            height: 960px;
             background: #090807;
             overflow: hidden;
             transform-origin: top left;
@@ -393,7 +393,7 @@
 </head>
 <body>
     <div id="stage-wrap" class="anchor-top-left">
-    <div id="stage">
+    <div id="stage" class="portrait">
     <div id="hud">
         <div id="vignette"></div>
         <div id="top">
@@ -476,14 +476,14 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 64);
+        const camera = new THREE.PerspectiveCamera(110, 540 / 960, 0.05, 64);
         const renderer = new THREE.WebGLRenderer({
             antialias: false,
             powerPreference: 'high-performance',
             stencil: false,
         });
         renderer.setPixelRatio(1);
-        renderer.setSize(640, 480);
+        renderer.setSize(540, 960);
         renderer.shadowMap.enabled = false;
         document.getElementById('stage').prepend(renderer.domElement);
 
@@ -7675,8 +7675,8 @@
         }
 
         function applyCanvasSize(width, height, corner) {
-            const w = Number(width) > 0 ? Math.round(Number(width)) : 640;
-            const h = Number(height) > 0 ? Math.round(Number(height)) : 480;
+            const w = Number(width) > 0 ? Math.round(Number(width)) : 540;
+            const h = Number(height) > 0 ? Math.round(Number(height)) : 960;
             canvasW = w;
             canvasH = h;
             stageEl.style.width = `${w}px`;
@@ -7714,8 +7714,8 @@
         }
 
         function syncRendererSize() {
-            const w = canvasW || 640;
-            const h = canvasH || 480;
+            const w = canvasW || 540;
+            const h = canvasH || 960;
             const portrait = stageEl.classList.contains('portrait');
             const showMap = portrait && minimapEl.classList.contains('show');
             // ~22% of stage height, clamped so the map stays readable without

@@ -1302,48 +1302,21 @@ export function createDungeon() {
         const player = maze.player;
         const from = { x: player.x, y: player.y, dir: player.dir };
         let bumped = false;
+        let shotDetails = null;
 
         if (command === 'fire') {
             weapon = 'staff';
             blocking = false;
             const shot = castFire(maze);
             const { hits, killed } = applyFireHit(maze, shot);
-            lastAction = {
-                command,
-                user: actor.user,
-                displayName: actor.displayName || actor.user,
-                bumped: false,
-                from,
-                to: { ...from },
-                shot,
-                shotId: (shotSeq += 1),
-                hits,
-                killed,
-            };
-            return { floorCleared: false, previousFloor: floor, bumped: false, died: false, hurt: false };
-        }
-
-        if (command === 'attack') {
+            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed };
+        } else if (command === 'attack') {
             weapon = 'blade';
             blocking = false;
             const shot = castAttack(maze);
             const { hits, killed } = applyFireHit(maze, shot);
-            lastAction = {
-                command,
-                user: actor.user,
-                displayName: actor.displayName || actor.user,
-                bumped: false,
-                from,
-                to: { ...from },
-                shot,
-                shotId: (shotSeq += 1),
-                hits,
-                killed,
-            };
-            return { floorCleared: false, previousFloor: floor, bumped: false, died: false, hurt: false };
-        }
-
-        if (command === 'block') {
+            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed };
+        } else if (command === 'block') {
             weapon = 'blade';
             blocking = true;
         } else if (command === 'left') {
@@ -1417,6 +1390,7 @@ export function createDungeon() {
                 hurt: true,
                 died: true,
                 blocked: false,
+                ...(shotDetails || {}),
             };
             return { floorCleared: false, previousFloor: floor, bumped, died: true, hurt: true };
         }
@@ -1431,6 +1405,7 @@ export function createDungeon() {
             hurt,
             died: false,
             blocked: blockedHit,
+            ...(shotDetails || {}),
         };
 
         return { floorCleared, previousFloor, bumped, died, hurt };

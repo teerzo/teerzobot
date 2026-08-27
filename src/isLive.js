@@ -17,7 +17,17 @@ export function formatDuration(ms) {
 
 function isAuthError(err) {
     const status = err?.status ?? err?.statusCode;
-    return status === 401 || status === 403;
+    if (status === 401 || status === 403) {
+        return true;
+    }
+    const message = String(err?.message || err || '').toLowerCase();
+    return message.includes('not added to the provider') || message.includes('no user access token');
+}
+
+function scopedError(code) {
+    const err = new Error(code);
+    err.code = code;
+    return err;
 }
 
 export function createTwitchApi(api, { channel, botUserId }) {
@@ -52,9 +62,7 @@ export function createTwitchApi(api, { channel, botUserId }) {
                 return result.data[0]?.followDate ?? null;
             } catch (err) {
                 if (isAuthError(err)) {
-                    const scoped = new Error('FOLLOWAGE_SCOPE');
-                    scoped.code = 'FOLLOWAGE_SCOPE';
-                    throw scoped;
+                    throw scopedError('FOLLOWAGE_SCOPE');
                 }
                 throw err;
             }
@@ -70,9 +78,59 @@ export function createTwitchApi(api, { channel, botUserId }) {
                 );
             } catch (err) {
                 if (isAuthError(err)) {
-                    const scoped = new Error('FOLLOWAGE_SCOPE');
-                    scoped.code = 'FOLLOWAGE_SCOPE';
-                    throw scoped;
+                    throw scopedError('FOLLOWAGE_SCOPE');
+                }
+                throw err;
+            }
+        },
+        async setGame(name) {
+            const query = String(name ?? '').trim();
+            if (!query) {
+                throw scopedError('USAGE');
+            }
+            const broadcasterId = await getBroadcasterId();
+            try {
+                const result = await api.asUser(broadcasterId, (ctx) =>
+                    ctx.search.searchCategories(query, { limit: 20 }),
+                );
+                const games = result?.data ?? [];
+                if (!games.length) {
+                    throw scopedError('GAME_NOT_FOUND');
+                }
+                const needle = query.toLowerCase();
+                const exact = games.find((game) => String(game.name).toLowerCase() === needle);
+                const game = exact || games[0];
+                await api.asUser(broadcasterId, (ctx) =>
+                    ctx.channels.updateChannelInfo(broadcasterId, { gameId: game.id }),
+                );
+                return { gameName: game.name, gameId: game.id };
+            } catch (err) {
+                if (err.code === 'GAME_NOT_FOUND' || err.code === 'USAGE') {
+                    throw err;
+                }
+                if (isAuthError(err)) {
+                    throw scopedError('BROADCAST_SCOPE');
+                }
+                throw err;
+            }
+        },
+        async setTitle(title) {
+            const next = String(title ?? '').trim();
+            if (!next) {
+                throw scopedError('USAGE');
+            }
+            const broadcasterId = await getBroadcasterId();
+            try {
+                await api.asUser(broadcasterId, (ctx) =>
+                    ctx.channels.updateChannelInfo(broadcasterId, { title: next }),
+                );
+                return { title: next };
+            } catch (err) {
+                if (err.code === 'USAGE') {
+                    throw err;
+                }
+                if (isAuthError(err)) {
+                    throw scopedError('BROADCAST_SCOPE');
                 }
                 throw err;
             }

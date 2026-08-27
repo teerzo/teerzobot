@@ -13,23 +13,21 @@
             color: #e8e4dc;
             font: 14px/1.4 "Trebuchet MS", "Segoe UI", sans-serif;
         }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
         #bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
             z-index: 10;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            height: 44px;
-            padding: 0 16px;
+            gap: 8px 10px;
+            min-height: 44px;
+            padding: 8px 12px;
             box-sizing: border-box;
             background: #141821;
             border-bottom: 1px solid #2a3140;
-            pointer-events: none;
-            user-select: none;
         }
         #bar strong {
             letter-spacing: 0.08em;
@@ -37,36 +35,78 @@
             font-size: 11px;
             font-weight: 700;
             opacity: 0.62;
+            margin-right: 4px;
         }
-        #label {
-            letter-spacing: 0.06em;
+        #bar button,
+        #bar select,
+        #bar input {
+            pointer-events: auto;
+            font: inherit;
+            color: #e8e4dc;
+            background: #1e2533;
+            border: 1px solid #3a4356;
+            border-radius: 6px;
+        }
+        #bar button {
+            padding: 4px 10px;
+            cursor: pointer;
+            letter-spacing: 0.04em;
             text-transform: uppercase;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
         }
+        #bar button:hover {
+            background: #2a3344;
+        }
+        #picker {
+            min-width: 11em;
+            max-width: 18em;
+            padding: 4px 8px;
+        }
+        #search {
+            width: 10em;
+            padding: 4px 8px;
+        }
+        #search::placeholder {
+            color: #8a93a4;
+        }
+        #count {
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            opacity: 0.85;
+            white-space: nowrap;
+        }
         #hint {
+            margin-left: auto;
             font-size: 12px;
             opacity: 0.7;
         }
         #app {
-            position: fixed;
-            top: 44px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 0;
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 0;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
         }
+        @media (max-width: 720px) {
+            #hint { display: none; }
+        }
     </style>
 </head>
 <body>
     <div id="bar">
         <strong>Dungeon assets</strong>
-        <span id="label">goblin</span>
+        <button type="button" id="prev" aria-label="Previous model">Prev</button>
+        <select id="picker" aria-label="Choose model"></select>
+        <button type="button" id="next" aria-label="Next model">Next</button>
+        <input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+        <button type="button" id="reset">Reset</button>
+        <span id="count">1 / 1</span>
         <span id="hint">drag to orbit &middot; scroll to zoom &middot; right-drag to pan</span>
     </div>
     <div id="app"></div>
@@ -81,8 +121,15 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { ASSETS, SHARED_GEOS, SHARED_MATS } from '/dungeon-models.js';
 
         const container = document.getElementById('app');
+        const pickerEl = document.getElementById('picker');
+        const searchEl = document.getElementById('search');
+        const countEl = document.getElementById('count');
+        const prevEl = document.getElementById('prev');
+        const nextEl = document.getElementById('next');
+        const resetEl = document.getElementById('reset');
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -99,9 +146,8 @@
         controls.dampingFactor = 0.08;
         controls.target.set(0, 0.28, 0);
         controls.minDistance = 0.3;
-        controls.maxDistance = 8;
+        controls.maxDistance = 16;
 
-        // Lighting
         scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1a1712, 0.85));
         const keyLight = new THREE.DirectionalLight(0xfff2d8, 1.6);
         keyLight.position.set(2, 3, 2);
@@ -110,126 +156,151 @@
         fillLight.position.set(-2, 1, -1.5);
         scene.add(fillLight);
 
-        // Ground grid for reference
         const grid = new THREE.GridHelper(4, 16, 0x3a4356, 0x21262f);
-        grid.position.y = 0;
         scene.add(grid);
 
-        // ---- Goblin materials (ported from dungeon.html) ----
-        const goblinMat = new THREE.MeshStandardMaterial({ color: 0x3a8a28, roughness: 0.72, metalness: 0.04 });
-        const goblinDarkMat = new THREE.MeshStandardMaterial({ color: 0x245c18, roughness: 0.8, metalness: 0.04 });
-        const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
-        const goblinEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffee55 });
-        // Solid-color stand-ins for the texture-mapped materials used in dungeon.html
-        const sackclothMat = new THREE.MeshStandardMaterial({ color: 0xb5a380, roughness: 0.92, metalness: 0 });
-        const boneMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.78, metalness: 0.04 });
-        const rustMat = new THREE.MeshStandardMaterial({ color: 0x8a5a3a, roughness: 0.72, metalness: 0.22 });
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.86, metalness: 0.04 });
+        let currentRoot = null;
+        let currentIndex = 0;
+        const bounds = new THREE.Box3();
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
 
-        // ---- Goblin geometries (ported from dungeon.html) ----
-        const goblinBodyGeo = new THREE.BoxGeometry(0.18, 0.2, 0.13);
-        const goblinBellyGeo = new THREE.SphereGeometry(0.09, 7, 5);
-        const goblinHeadGeo = new THREE.SphereGeometry(0.095, 8, 6);
-        const goblinEarGeo = new THREE.ConeGeometry(0.032, 0.13, 5);
-        const goblinNoseGeo = new THREE.ConeGeometry(0.028, 0.07, 5);
-        const goblinEyeGeo = new THREE.BoxGeometry(0.028, 0.022, 0.018);
-        const goblinPupilGeo = new THREE.BoxGeometry(0.012, 0.012, 0.012);
-        const goblinTuskGeo = new THREE.ConeGeometry(0.012, 0.04, 4);
-        const goblinArmGeo = new THREE.BoxGeometry(0.045, 0.18, 0.045);
-        const goblinHandGeo = new THREE.BoxGeometry(0.04, 0.04, 0.04);
-        const goblinLegGeo = new THREE.BoxGeometry(0.055, 0.14, 0.055);
-        const goblinFootGeo = new THREE.BoxGeometry(0.06, 0.03, 0.09);
-        const goblinClothGeo = new THREE.BoxGeometry(0.16, 0.08, 0.04);
-        const goblinBladeGeo = new THREE.BoxGeometry(0.02, 0.16, 0.035);
-        const goblinBrowGeo = new THREE.BoxGeometry(0.12, 0.018, 0.03);
-
-        // ---- Goblin builder (ported from dungeon.html makeGoblin) ----
-        function makeGoblin() {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(goblinBodyGeo, goblinMat);
-            body.position.set(0, 0.28, 0.01);
-            body.rotation.x = 0.18;
-            const belly = new THREE.Mesh(goblinBellyGeo, goblinDarkMat);
-            belly.position.set(0, 0.22, 0.05);
-            const cloth = new THREE.Mesh(goblinClothGeo, sackclothMat);
-            cloth.position.set(0, 0.18, 0.07);
-            const head = new THREE.Mesh(goblinHeadGeo, goblinMat);
-            head.position.set(0, 0.44, 0.05);
-            const brow = new THREE.Mesh(goblinBrowGeo, goblinDarkMat);
-            brow.position.set(0, 0.49, 0.12);
-            const nose = new THREE.Mesh(goblinNoseGeo, goblinDarkMat);
-            nose.position.set(0, 0.42, 0.14);
-            nose.rotation.x = Math.PI / 2;
-            const earL = new THREE.Mesh(goblinEarGeo, goblinMat);
-            earL.position.set(-0.09, 0.5, 0.02);
-            earL.rotation.z = 0.7;
-            const earR = new THREE.Mesh(goblinEarGeo, goblinMat);
-            earR.position.set(0.09, 0.5, 0.02);
-            earR.rotation.z = -0.7;
-            const eyeL = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
-            eyeL.position.set(-0.035, 0.455, 0.13);
-            const eyeR = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
-            eyeR.position.set(0.035, 0.455, 0.13);
-            const pupilL = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
-            pupilL.position.set(-0.035, 0.455, 0.14);
-            const pupilR = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
-            pupilR.position.set(0.035, 0.455, 0.14);
-            const tuskL = new THREE.Mesh(goblinTuskGeo, boneMat);
-            tuskL.position.set(-0.03, 0.38, 0.12);
-            tuskL.rotation.x = 2.4;
-            const tuskR = new THREE.Mesh(goblinTuskGeo, boneMat);
-            tuskR.position.set(0.03, 0.38, 0.12);
-            tuskR.rotation.x = 2.4;
-            const armL = new THREE.Mesh(goblinArmGeo, goblinMat);
-            armL.position.set(-0.13, 0.24, 0.02);
-            armL.rotation.z = 0.45;
-            const armR = new THREE.Mesh(goblinArmGeo, goblinMat);
-            armR.position.set(0.14, 0.26, 0.04);
-            armR.rotation.z = -0.85;
-            armR.rotation.x = -0.4;
-            const handL = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
-            handL.position.set(-0.16, 0.14, 0.02);
-            const handR = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
-            handR.position.set(0.2, 0.16, 0.1);
-            const blade = new THREE.Mesh(goblinBladeGeo, rustMat);
-            blade.position.set(0.2, 0.24, 0.12);
-            blade.rotation.z = -0.3;
-            const hilt = new THREE.Mesh(goblinHandGeo, woodMat);
-            hilt.position.set(0.2, 0.16, 0.1);
-            hilt.scale.set(0.6, 1.2, 0.6);
-            const legL = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
-            legL.position.set(-0.05, 0.1, 0);
-            const legR = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
-            legR.position.set(0.05, 0.1, 0.02);
-            const footL = new THREE.Mesh(goblinFootGeo, sackclothMat);
-            footL.position.set(-0.05, 0.02, 0.02);
-            const footR = new THREE.Mesh(goblinFootGeo, sackclothMat);
-            footR.position.set(0.05, 0.02, 0.04);
-            group.add(
-                body, belly, cloth, head, brow, nose, earL, earR,
-                eyeL, eyeR, pupilL, pupilR, tuskL, tuskR,
-                armL, armR, handL, handR, blade, hilt, legL, legR, footL, footR,
-            );
-            group.rotation.y = Math.PI;
-            return group;
+        function matchesQuery(asset, query) {
+            if (!query) {
+                return true;
+            }
+            return asset.label.includes(query) || asset.id.includes(query);
         }
 
-        const goblin = makeGoblin();
-        scene.add(goblin);
+        function filteredAssets() {
+            const query = searchEl.value.trim().toLowerCase();
+            return ASSETS.filter((asset) => matchesQuery(asset, query));
+        }
 
-        // Frame the model so orbit target sits at its visual center
-        const bounds = new THREE.Box3().setFromObject(goblin);
-        const center = bounds.getCenter(new THREE.Vector3());
-        const size = bounds.getSize(new THREE.Vector3());
-        controls.target.copy(center);
-        const radius = Math.max(size.x, size.y, size.z) * 0.5 || 0.4;
-        camera.position.set(center.x + radius * 2.2, center.y + radius * 1.4, center.z + radius * 2.8);
-        controls.update();
+        function fillPicker() {
+            const query = searchEl.value.trim().toLowerCase();
+            const visible = filteredAssets();
+            pickerEl.replaceChildren();
+            for (const asset of visible) {
+                const option = document.createElement('option');
+                option.value = String(ASSETS.indexOf(asset));
+                option.textContent = asset.label;
+                pickerEl.appendChild(option);
+            }
+            if (!visible.length) {
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = query ? 'no matches' : 'none';
+                pickerEl.appendChild(empty);
+                pickerEl.disabled = true;
+                return;
+            }
+            pickerEl.disabled = false;
+            const selected = visible.find((asset) => ASSETS.indexOf(asset) === currentIndex);
+            pickerEl.value = String(ASSETS.indexOf(selected || visible[0]));
+        }
+
+        function disposeRoot(root) {
+            if (!root) {
+                return;
+            }
+            root.traverse((obj) => {
+                if (obj.geometry && !SHARED_GEOS.has(obj.geometry)) {
+                    obj.geometry.dispose();
+                }
+                const mats = obj.material
+                    ? (Array.isArray(obj.material) ? obj.material : [obj.material])
+                    : [];
+                for (const mat of mats) {
+                    if (mat && !SHARED_MATS.has(mat) && !mat.userData?.shared) {
+                        mat.dispose();
+                    }
+                }
+            });
+        }
+
+        function frameObject(root) {
+            bounds.setFromObject(root);
+            bounds.getCenter(center);
+            bounds.getSize(size);
+            controls.target.copy(center);
+            const radius = Math.max(size.x, size.y, size.z) * 0.5 || 0.4;
+            camera.position.set(
+                center.x + radius * 2.2,
+                center.y + radius * 1.4,
+                center.z + radius * 2.8,
+            );
+            controls.update();
+        }
+
+        function show(index) {
+            if (!ASSETS.length) {
+                return;
+            }
+            const next = ((index % ASSETS.length) + ASSETS.length) % ASSETS.length;
+            currentIndex = next;
+            const asset = ASSETS[next];
+            if (currentRoot) {
+                scene.remove(currentRoot);
+                disposeRoot(currentRoot);
+                currentRoot = null;
+            }
+            currentRoot = asset.build();
+            scene.add(currentRoot);
+            frameObject(currentRoot);
+            countEl.textContent = `${next + 1} / ${ASSETS.length}`;
+            document.title = `${asset.label} · dungeon assets`;
+            fillPicker();
+        }
+
+        function step(delta) {
+            show(currentIndex + delta);
+        }
+
+        prevEl.addEventListener('click', () => step(-1));
+        nextEl.addEventListener('click', () => step(1));
+        pickerEl.addEventListener('change', () => {
+            const index = Number(pickerEl.value);
+            if (Number.isFinite(index)) {
+                show(index);
+            }
+        });
+        searchEl.addEventListener('input', () => {
+            fillPicker();
+        });
+        searchEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') {
+                return;
+            }
+            event.preventDefault();
+            const visible = filteredAssets();
+            if (visible.length) {
+                show(ASSETS.indexOf(visible[0]));
+            }
+        });
+        resetEl.addEventListener('click', () => {
+            searchEl.value = '';
+            show(0);
+        });
+        window.addEventListener('keydown', (event) => {
+            if (event.target === searchEl || event.target === pickerEl) {
+                return;
+            }
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                step(-1);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                step(1);
+            }
+        });
 
         function resize() {
             const width = container.clientWidth || window.innerWidth;
             const height = container.clientHeight || window.innerHeight;
-            if (width < 1 || height < 1) return;
+            if (width < 1 || height < 1) {
+                return;
+            }
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height, false);
@@ -239,6 +310,8 @@
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(resize).observe(container);
         }
+
+        show(0);
 
         renderer.setAnimationLoop(() => {
             controls.update();

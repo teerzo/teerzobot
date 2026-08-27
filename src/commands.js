@@ -7,7 +7,6 @@ import { DUNGEON_ALIASES } from './dungeon.js';
 const COOLDOWN_MS = 1_000;
 const ALIASES = {
     help: 'commands',
-    song: 'currentsong',
     tictactoe: 'ttt',
     ...DUNGEON_ALIASES,
 };
@@ -40,11 +39,16 @@ const RESERVED = new Set([
     'autoplay',
     'resize',
     'phone',
+    'obs',
     'up',
     'down',
     'left',
     'right',
     'fire',
+    'water',
+    'nature',
+    'lightning',
+    'chaos',
     'attack',
     'block',
     ...Object.keys(DUNGEON_ALIASES),
@@ -69,26 +73,49 @@ function formatDungeonLayout(state) {
     return `Dungeon ${size}, ${corner}.`;
 }
 
+function formatDungeonMode(state) {
+    if (state.mode === 'anarchy') {
+        return state.changed
+            ? 'Anarchy mode. Every command runs immediately.'
+            : 'Already in anarchy mode.';
+    }
+    if (state.mode === 'democracy') {
+        return state.changed
+            ? 'Democracy mode. Vote with !up !down !left !right. !fire !water !nature !lightning !chaos !attack !block anytime.'
+            : 'Already in democracy mode.';
+    }
+    if (state.mode === 'autoplay') {
+        return state.changed
+            ? 'Autoplay mode. Chat with !up !down !left !right to take over.'
+            : 'Already in autoplay mode.';
+    }
+    return `Dungeon mode: ${state.mode}.`;
+}
+
 const HELP_TOPICS = {
     dc: {
         aliases: ['dungeon'],
-        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc phone / !phone portrait screen (mods) · !dc landscape back to wide (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !attack !block · !anarchy !democracy !autoplay (mods) · !clear hides',
+        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc phone / !phone portrait (mods) · !dc landscape (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !dc anarchy/democracy/autoplay (mods) · !dc shh toggles floor/autoplay chat (mods) · !up !down !left !right · !fire !water !nature !lightning !chaos · !attack !block · !clear hides',
     },
     ttt: {
         aliases: ['tictactoe'],
-        text: 'Tic-tac-toe: !ttt start · !ttt 1-9 play · !clear hides',
+        text: 'Tic-tac-toe: !ttt start · !ttt 1-9 play · !clear hides (mods)',
     },
     dance: {
         aliases: [],
-        text: 'Dance: !dance <image url> queues a GIF · !undance removes one · !clear hides',
+        text: 'Dance: !dance <image url> queues a GIF · !dance remove · !dance clear · !clear hides (mods)',
     },
     dvd: {
         aliases: [],
-        text: 'DVD: !dvd add logo · !undvd remove · !dvdfast / !dvdslow speed · !clear hides',
+        text: 'DVD: !dvd / !dvd add · !dvd remove · !dvd fast / !dvd slow · !clear hides (mods)',
     },
     chat: {
         aliases: [],
-        text: 'Chat overlay: !chat toggles visibility · !clear empties and hides it',
+        text: 'Chat overlay: !chat toggles visibility (mods) · !clear empties and hides it (mods)',
+    },
+    obs: {
+        aliases: [],
+        text: 'OBS: !obs lists scenes · !obs <name> switches to that scene',
     },
 };
 
@@ -110,19 +137,6 @@ function resolveHelpTopic(raw) {
     return Object.values(HELP_TOPICS).find((topic) => topic.aliases.includes(key)) ?? null;
 }
 
-function sceneBuiltins() {
-    return Object.entries(getSceneMap())
-        .filter(([name]) => !RESERVED.has(name))
-        .map(([name, scene]) => ({
-            name,
-            response: `OBS scene ${scene}`,
-            builtin: true,
-            execute() {
-                return true;
-            },
-        }));
-}
-
 export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd, dance, ttt, dungeon, chatFeed } = {}) {
     const cooldowns = new Map();
 
@@ -138,6 +152,59 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 return false;
             }
         };
+    }
+
+    function toggleDungeonShh({ say, channel, isMod, isBroadcaster }) {
+        if (!dungeon) {
+            return say(channel, 'Dungeon overlay is not available.');
+        }
+        if (!isMod && !isBroadcaster) {
+            return;
+        }
+        const { chatQuiet } = dungeon.toggleChatQuiet();
+        return say(
+            channel,
+            chatQuiet
+                ? 'Dungeon chat muted. Floor clears and autoplay will stay quiet.'
+                : 'Dungeon chat unmuted.',
+        );
+    }
+
+    function setDungeonMode(mode, { say, channel, isMod, isBroadcaster }) {
+        if (!dungeon) {
+            return say(channel, 'Dungeon overlay is not available.');
+        }
+        if (!isMod && !isBroadcaster) {
+            return;
+        }
+        const state = dungeon.setMode(mode);
+        return say(channel, formatDungeonMode(state));
+    }
+
+    function runDungeonCommand({ say, channel, args, isMod, isBroadcaster }) {
+        if (!dungeon) {
+            return say(channel, 'Dungeon overlay is not available.');
+        }
+        const sub = String(args[0] ?? '').trim().toLowerCase();
+        if (!sub || sub === 'reset' || sub === 'show' || sub === 'start') {
+            dungeon.reset();
+            return say(channel, 'Dungeon overlay is on. Reset to floor 0 and refreshing the overlay.');
+        }
+        if (sub === 'shh' || sub === 'quiet' || sub === 'mute') {
+            return toggleDungeonShh({ say, channel, isMod, isBroadcaster });
+        }
+        if (sub === 'anarchy' || sub === 'democracy' || sub === 'autoplay') {
+            return setDungeonMode(sub, { say, channel, isMod, isBroadcaster });
+        }
+        if (!isMod && !isBroadcaster) {
+            return;
+        }
+        try {
+            const state = dungeon.applyLayoutArgs(args);
+            return say(channel, formatDungeonLayout(state));
+        } catch (err) {
+            return say(channel, err.message || 'Usage: !dc size bigger|smaller|full|phone or !dc position topleft');
+        }
     }
 
     const builtins = [
@@ -206,12 +273,37 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'game',
-            response: 'Current game',
+            response: 'Current game, or !game <name> to set (mods)',
             builtin: true,
-            async execute({ say, channel }) {
+            async execute({ say, channel, args, isMod, isBroadcaster }) {
                 const twitch = getTwitch?.();
                 if (!twitch) {
                     return say(channel, 'Bot is still connecting.');
+                }
+                const query = args.join(' ').trim();
+                if (query) {
+                    if (!isMod && !isBroadcaster) {
+                        return;
+                    }
+                    try {
+                        const result = await twitch.setGame(query);
+                        return say(channel, `Set game to ${result.gameName}.`);
+                    } catch (err) {
+                        if (err.code === 'BROADCAST_SCOPE') {
+                            return say(
+                                channel,
+                                'Cannot set game. Authorize the broadcaster at /oauth/streamer with channel:manage:broadcast.',
+                            );
+                        }
+                        if (err.code === 'GAME_NOT_FOUND') {
+                            return say(channel, `No Twitch category matched "${query}".`);
+                        }
+                        if (err.code === 'USAGE') {
+                            return say(channel, 'Usage: !game <category name>');
+                        }
+                        console.error('!game set failed', err);
+                        return say(channel, 'Could not update the game.');
+                    }
                 }
                 try {
                     const stream = await twitch.getStream();
@@ -229,12 +321,34 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'title',
-            response: 'Current stream title',
+            response: 'Current stream title, or !title <text> to set (mods)',
             builtin: true,
-            async execute({ say, channel }) {
+            async execute({ say, channel, args, isMod, isBroadcaster }) {
                 const twitch = getTwitch?.();
                 if (!twitch) {
                     return say(channel, 'Bot is still connecting.');
+                }
+                const next = args.join(' ').trim();
+                if (next) {
+                    if (!isMod && !isBroadcaster) {
+                        return;
+                    }
+                    try {
+                        const result = await twitch.setTitle(next);
+                        return say(channel, `Title set to ${result.title}`);
+                    } catch (err) {
+                        if (err.code === 'BROADCAST_SCOPE') {
+                            return say(
+                                channel,
+                                'Cannot set title. Authorize the broadcaster at /oauth/streamer with channel:manage:broadcast.',
+                            );
+                        }
+                        if (err.code === 'USAGE') {
+                            return say(channel, 'Usage: !title <stream title>');
+                        }
+                        console.error('!title set failed', err);
+                        return say(channel, 'Could not update the title.');
+                    }
                 }
                 try {
                     const stream = await twitch.getStream();
@@ -299,14 +413,6 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
-            name: 'currentsong',
-            response: 'Currently playing song',
-            builtin: true,
-            execute({ say, channel }) {
-                return say(channel, formatChatLine(getNowPlaying?.() ?? null));
-            },
-        },
-        {
             name: 'song',
             response: 'Currently playing song',
             builtin: true,
@@ -315,70 +421,60 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
-            name: 'dvdfast',
-            response: 'Speeds up the DVD overlay',
-            builtin: true,
-            execute({ say, channel }) {
-                if (!dvd) {
-                    return say(channel, 'DVD overlay is not available.');
-                }
-                const { speed, changed } = dvd.faster();
-                if (!changed) {
-                    return say(channel, `DVD logo is already at max speed (${formatDvdSpeed(speed)}).`);
-                }
-                return say(channel, `DVD logo faster (${formatDvdSpeed(speed)}).`);
-            },
-        },
-        {
-            name: 'dvdslow',
-            response: 'Slows down the DVD overlay',
-            builtin: true,
-            execute({ say, channel }) {
-                if (!dvd) {
-                    return say(channel, 'DVD overlay is not available.');
-                }
-                const { speed, changed } = dvd.slower();
-                if (!changed) {
-                    return say(channel, `DVD logo is already at min speed (${formatDvdSpeed(speed)}).`);
-                }
-                return say(channel, `DVD logo slower (${formatDvdSpeed(speed)}).`);
-            },
-        },
-        {
             name: 'dvd',
-            response: 'Adds another bouncing DVD logo',
+            response: 'DVD overlay: !dvd add|remove|fast|slow',
             builtin: true,
-            execute({ say, channel }) {
+            execute({ say, channel, args }) {
                 if (!dvd) {
                     return say(channel, 'DVD overlay is not available.');
                 }
-                dvd.addLogo();
-                return say(channel, 'Added a DVD logo.');
-            },
-        },
-        {
-            name: 'undvd',
-            response: 'Removes a random bouncing DVD logo',
-            builtin: true,
-            execute({ say, channel }) {
-                if (!dvd) {
-                    return say(channel, 'DVD overlay is not available.');
+                const sub = String(args[0] ?? '').trim().toLowerCase();
+                if (!sub || sub === 'add') {
+                    dvd.addLogo();
+                    return say(channel, 'Added a DVD logo.');
                 }
-                dvd.removeRandom();
-                return say(channel, 'Removed a random DVD logo.');
+                if (sub === 'remove' || sub === 'rm' || sub === 'del' || sub === 'delete') {
+                    dvd.removeRandom();
+                    return say(channel, 'Removed a random DVD logo.');
+                }
+                if (sub === 'fast' || sub === 'faster') {
+                    const { speed, changed } = dvd.faster();
+                    if (!changed) {
+                        return say(channel, `DVD logo is already at max speed (${formatDvdSpeed(speed)}).`);
+                    }
+                    return say(channel, `DVD logo faster (${formatDvdSpeed(speed)}).`);
+                }
+                if (sub === 'slow' || sub === 'slower') {
+                    const { speed, changed } = dvd.slower();
+                    if (!changed) {
+                        return say(channel, `DVD logo is already at min speed (${formatDvdSpeed(speed)}).`);
+                    }
+                    return say(channel, `DVD logo slower (${formatDvdSpeed(speed)}).`);
+                }
+                say(channel, 'Usage: !dvd add|remove|fast|slow');
+                return false;
             },
         },
         {
             name: 'dance',
-            response: 'Queues an image URL for dance overlay approval',
+            response: 'Dance overlay: !dance <url> · !dance remove · !dance clear',
             builtin: true,
             async execute({ say, channel, args, user, displayName }) {
                 if (!dance) {
                     return say(channel, 'Dance overlay is not available.');
                 }
+                const sub = String(args[0] ?? '').trim().toLowerCase();
+                if (sub === 'remove' || sub === 'rm' || sub === 'del' || sub === 'delete') {
+                    dance.removeRandom();
+                    return say(channel, 'Removed a random dance GIF.');
+                }
+                if (sub === 'clear') {
+                    dance.clear();
+                    return say(channel, 'Cleared dance GIFs.');
+                }
                 const raw = String(args[0] ?? '').trim();
                 if (!raw) {
-                    say(channel, 'Usage: !dance <image url>');
+                    say(channel, 'Usage: !dance <image url> · !dance remove · !dance clear');
                     return false;
                 }
                 try {
@@ -386,7 +482,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     return say(channel, `Dance GIF queued for approval (${displayName}).`);
                 } catch (err) {
                     if (err.code === 'INVALID_URL') {
-                        say(channel, 'Usage: !dance <image url>');
+                        say(channel, 'Usage: !dance <image url> · !dance remove · !dance clear');
                         return false;
                     }
                     if (err.code === 'ALREADY_PENDING') {
@@ -404,100 +500,16 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
             },
         },
         {
-            name: 'undance',
-            response: 'Removes a random GIF from the dance overlay',
-            builtin: true,
-            execute({ say, channel }) {
-                if (!dance) {
-                    return say(channel, 'Dance overlay is not available.');
-                }
-                dance.removeRandom();
-                return say(channel, 'Removed a random dance GIF.');
-            },
-        },
-        {
             name: 'dungeon',
-            response: 'Shows and resets the dungeon crawler overlay to floor 0',
+            response: 'Dungeon: !dungeon · !dungeon anarchy|democracy|autoplay|shh (mods)',
             builtin: true,
-            execute({ say, channel }) {
-                if (!dungeon) {
-                    return say(channel, 'Dungeon overlay is not available.');
-                }
-                dungeon.reset();
-                return say(channel, 'Dungeon overlay is on. Reset to floor 0 and refreshing the overlay.');
-            },
+            execute: runDungeonCommand,
         },
         {
             name: 'dc',
-            response: 'Dungeon layout: !dc size bigger|smaller|full · !dc phone|landscape · !dc position topleft',
+            response: 'Dungeon: !dc · !dc anarchy|democracy|autoplay|shh · !dc size bigger|smaller|full|phone',
             builtin: true,
-            execute({ say, channel, args, isMod, isBroadcaster }) {
-                if (!dungeon) {
-                    return say(channel, 'Dungeon overlay is not available.');
-                }
-                const sub = String(args[0] ?? '').trim().toLowerCase();
-                if (!sub || sub === 'reset' || sub === 'show' || sub === 'start') {
-                    dungeon.reset();
-                    return say(channel, 'Dungeon overlay is on. Reset to floor 0 and refreshing the overlay.');
-                }
-                if (!isMod && !isBroadcaster) {
-                    return;
-                }
-                try {
-                    const state = dungeon.applyLayoutArgs(args);
-                    return say(channel, formatDungeonLayout(state));
-                } catch (err) {
-                    return say(channel, err.message || 'Usage: !dc size bigger|smaller|full|phone or !dc position topleft');
-                }
-            },
-        },
-        {
-            name: 'anarchy',
-            response: 'Switch the dungeon to anarchy mode (mods)',
-            builtin: true,
-            modOnly: true,
-            execute({ say, channel }) {
-                if (!dungeon) {
-                    return say(channel, 'Dungeon overlay is not available.');
-                }
-                const state = dungeon.setMode('anarchy');
-                if (!state.changed) {
-                    return say(channel, 'Already in anarchy mode.');
-                }
-                return say(channel, 'Anarchy mode. Every command runs immediately.');
-            },
-        },
-        {
-            name: 'democracy',
-            response: 'Switch the dungeon to democracy mode (mods)',
-            builtin: true,
-            modOnly: true,
-            execute({ say, channel }) {
-                if (!dungeon) {
-                    return say(channel, 'Dungeon overlay is not available.');
-                }
-                const state = dungeon.setMode('democracy');
-                if (!state.changed) {
-                    return say(channel, 'Already in democracy mode.');
-                }
-                return say(channel, 'Democracy mode. Vote with !up !down !left !right. !fire !attack !block anytime.');
-            },
-        },
-        {
-            name: 'autoplay',
-            response: 'Switch the dungeon to autoplay mode (mods)',
-            builtin: true,
-            modOnly: true,
-            execute({ say, channel }) {
-                if (!dungeon) {
-                    return say(channel, 'Dungeon overlay is not available.');
-                }
-                const state = dungeon.setMode('autoplay');
-                if (!state.changed) {
-                    return say(channel, 'Already in autoplay mode.');
-                }
-                return say(channel, 'Autoplay mode. Chat with !up !down !left !right to take over.');
-            },
+            execute: runDungeonCommand,
         },
         {
             name: 'resize',
@@ -563,10 +575,52 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'fire',
-            response: 'Dungeon: shoot the fire staff',
+            response: 'Dungeon: cast fire',
             builtin: true,
             skipCooldown: true,
             execute: moveDungeon('fire'),
+        },
+        {
+            name: 'water',
+            response: 'Dungeon: cast water',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('water'),
+        },
+        {
+            name: 'nature',
+            response: 'Dungeon: cast nature',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('nature'),
+        },
+        {
+            name: 'lightning',
+            response: 'Dungeon: cast lightning',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('lightning'),
+        },
+        {
+            name: 'chaos',
+            response: 'Dungeon: cast chaos',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('chaos'),
+        },
+        {
+            name: 'attack',
+            response: 'Dungeon: melee attack',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('attack'),
+        },
+        {
+            name: 'block',
+            response: 'Dungeon: raise the shield',
+            builtin: true,
+            skipCooldown: true,
+            execute: moveDungeon('block'),
         },
         {
             name: 'ttt',
@@ -603,8 +657,9 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'chat',
-            response: 'Toggles the chat overlay',
+            response: 'Toggles the chat overlay (mods)',
             builtin: true,
+            modOnly: true,
             execute({ say, channel }) {
                 if (!chatFeed) {
                     return say(channel, 'Chat overlay is not available.');
@@ -615,8 +670,9 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'clear',
-            response: 'Clears dance GIFs and DVD logos, and hides chat, tic-tac-toe, and dungeon overlays',
+            response: 'Clears dance GIFs and DVD logos, and hides chat, tic-tac-toe, and dungeon overlays (mods)',
             builtin: true,
+            modOnly: true,
             execute({ say, channel }) {
                 dance?.clear();
                 dvd?.clear();
@@ -626,7 +682,35 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                 return say(channel, 'Cleared dance, DVD, chat, tic-tac-toe, and dungeon overlays.');
             },
         },
-        ...sceneBuiltins(),
+        {
+            name: 'obs',
+            response: 'OBS scene switch: !obs <name>',
+            builtin: true,
+            execute({ say, channel, args }) {
+                const scenes = getSceneMap();
+                const names = Object.keys(scenes).sort();
+                const key = String(args[0] ?? '')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/^!/, '');
+                if (!key) {
+                    if (!names.length) {
+                        return say(channel, 'No OBS scenes mapped. Set OBS_SCENE_<NAME> env vars.');
+                    }
+                    return say(channel, `OBS scenes: ${names.map((name) => `!obs ${name}`).join(', ')}`);
+                }
+                if (!scenes[key]) {
+                    if (!names.length) {
+                        return say(channel, `Unknown OBS scene "${key}". No OBS_SCENE_* env vars are set.`);
+                    }
+                    return say(
+                        channel,
+                        `Unknown OBS scene "${key}". Try: ${names.map((name) => `!obs ${name}`).join(', ')}`,
+                    );
+                }
+                return say(channel, `Switching OBS to ${scenes[key]}.`);
+            },
+        },
     ];
 
     function normalizeName(name) {

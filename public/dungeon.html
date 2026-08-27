@@ -353,7 +353,7 @@
             </div>
             <div id="mode"><strong id="mode-name">Anarchy</strong><span id="mode-hint"></span></div>
         </div>
-        <div id="help">!up !down !left !right !fire !attack !block</div>
+        <div id="help">!up !down !left !right !fire !water !nature !lightning !chaos !attack !block</div>
         <div id="last"><span>Waiting for chat</span></div>
         <div id="votes">
             <h2 id="vote-title">Democracy</h2>
@@ -452,45 +452,68 @@
             roughness: 0.38,
             metalness: 0.78,
         });
-        const staffCrystalMat = new THREE.MeshStandardMaterial({
-            color: 0xff4a14,
-            emissive: 0xff2a00,
-            emissiveIntensity: 1.8,
-            roughness: 0.22,
-            metalness: 0.12,
-            transparent: true,
-            opacity: 0.94,
+        const handSkinMat = new THREE.MeshStandardMaterial({
+            color: 0xc4a07a,
+            roughness: 0.74,
+            metalness: 0.04,
         });
-        const staff = new THREE.Group();
-        const staffShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.026, 0.78, 7), staffWoodMat);
-        staffShaft.position.y = 0.16;
-        const staffGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.1, 7), staffIronMat);
-        staffGrip.position.y = -0.16;
-        const staffBand = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.04, 8), staffIronMat);
-        staffBand.position.y = 0.48;
-        const staffCrystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.055, 0), staffCrystalMat);
-        staffCrystal.position.y = 0.58;
-        const staffGlow = new THREE.Mesh(
-            new THREE.SphereGeometry(0.07, 10, 8),
-            new THREE.MeshBasicMaterial({
-                color: 0xff6622,
-                transparent: true,
-                opacity: 0.35,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending,
-            }),
-        );
-        staffGlow.position.y = 0.58;
-        const staffLight = new THREE.PointLight(0xff6a22, 0.7, 1.6, 2);
-        staffLight.position.y = 0.58;
-        const staffTip = new THREE.Object3D();
-        staffTip.position.y = 0.62;
-        staff.add(staffShaft, staffGrip, staffBand, staffCrystal, staffGlow, staffLight, staffTip);
-        staff.position.set(0.28, -0.36, -0.46);
-        staff.rotation.set(1.12, 0.22, -0.58);
-        const staffBasePos = staff.position.clone();
-        const staffBaseRot = staff.rotation.clone();
-        camera.add(staff);
+        const handDarkMat = new THREE.MeshStandardMaterial({
+            color: 0x9a7454,
+            roughness: 0.82,
+            metalness: 0.03,
+        });
+        const palmGlowMat = new THREE.MeshBasicMaterial({
+            color: 0xff6622,
+            transparent: true,
+            opacity: 0.38,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const handPalmGeo = new THREE.BoxGeometry(0.074, 0.092, 0.032);
+        const handFingerGeo = new THREE.BoxGeometry(0.014, 0.054, 0.016);
+        const handThumbGeo = new THREE.BoxGeometry(0.016, 0.044, 0.016);
+        const handArmGeo = new THREE.BoxGeometry(0.05, 0.18, 0.05);
+        const palmGlowGeo = new THREE.SphereGeometry(0.048, 8, 6);
+
+        function makeViewHand(side) {
+            const group = new THREE.Group();
+            const arm = new THREE.Mesh(handArmGeo, handDarkMat);
+            arm.position.set(0, -0.12, 0.018);
+            const palm = new THREE.Mesh(handPalmGeo, handSkinMat);
+            palm.position.set(0, 0.018, 0);
+            group.add(arm, palm);
+            for (let i = 0; i < 4; i += 1) {
+                const finger = new THREE.Mesh(handFingerGeo, handSkinMat);
+                finger.position.set((i - 1.5) * 0.017, 0.078, 0);
+                finger.rotation.x = -0.18 - i * 0.04;
+                group.add(finger);
+            }
+            const thumb = new THREE.Mesh(handThumbGeo, handSkinMat);
+            thumb.position.set(side * 0.048, 0.012, 0.012);
+            thumb.rotation.z = side * -0.72;
+            thumb.rotation.y = side * 0.22;
+            group.add(thumb);
+            return group;
+        }
+
+        const hands = new THREE.Group();
+        const handRight = makeViewHand(1);
+        handRight.position.set(0.1, 0.02, 0);
+        const handLeft = makeViewHand(-1);
+        handLeft.position.set(-0.16, -0.05, 0.05);
+        handLeft.rotation.set(0.12, 0.08, 0.22);
+        const palmGlow = new THREE.Mesh(palmGlowGeo, palmGlowMat);
+        palmGlow.position.set(0.1, 0.07, -0.012);
+        const palmLight = new THREE.PointLight(0xff6a22, 0.5, 1.5, 2);
+        palmLight.position.copy(palmGlow.position);
+        const palmTip = new THREE.Object3D();
+        palmTip.position.set(0.1, 0.09, -0.05);
+        hands.add(handRight, handLeft, palmGlow, palmLight, palmTip);
+        hands.position.set(0.2, -0.3, -0.42);
+        hands.rotation.set(0.92, 0.14, -0.38);
+        const handsBasePos = hands.position.clone();
+        const handsBaseRot = hands.rotation.clone();
+        camera.add(hands);
 
         const blade = new THREE.Group();
         const sword = new THREE.Group();
@@ -886,6 +909,57 @@
         function makeVineCanvas() {
             const canvas = makeStoneCanvas();
             drawVines(canvas.getContext('2d'), canvas.width);
+            return canvas;
+        }
+
+        function makeVineBarkCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a1c12';
+            ctx.fillRect(0, 0, size, size);
+            for (let y = 0; y < size; y += 1) {
+                for (let x = 0; x < size; x += 1) {
+                    const n = (x * 7 + y * 13) % 9;
+                    if (n < 2) {
+                        ctx.fillStyle = '#3a2818';
+                        ctx.fillRect(x, y, 1, 1);
+                    } else if (n === 3) {
+                        ctx.fillStyle = '#1a100a';
+                        ctx.fillRect(x, y, 1, 1);
+                    } else if ((x + y * 3) % 8 === 0) {
+                        ctx.fillStyle = '#4a3420';
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            return canvas;
+        }
+
+        function makeVineLeafCanvas() {
+            const size = 32;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+            const tones = ['#245820', '#2e6e28', '#3d8a32', '#52a83e', '#6cbc4a'];
+            ctx.fillStyle = tones[2];
+            ctx.beginPath();
+            ctx.moveTo(size / 2, 2);
+            ctx.quadraticCurveTo(size - 2, size / 2, size / 2, size - 2);
+            ctx.quadraticCurveTo(2, size / 2, size / 2, 2);
+            ctx.fill();
+            for (let i = 0; i < 18; i += 1) {
+                ctx.fillStyle = tones[i % tones.length];
+                const x = 6 + ((i * 11) % 20);
+                const y = 5 + ((i * 7) % 22);
+                ctx.fillRect(x, y, 2, 2);
+            }
+            ctx.fillStyle = '#1d4a1a';
+            ctx.fillRect(size / 2 - 1, 4, 2, size - 8);
             return canvas;
         }
 
@@ -2389,6 +2463,30 @@
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.45, metalness: 0.7 });
         const potMat = new THREE.MeshStandardMaterial({ color: 0x6a3a28, roughness: 0.8, metalness: 0.05 });
         const plantMat = new THREE.MeshStandardMaterial({ color: 0x2f7a32, roughness: 0.75, metalness: 0 });
+        const vineBarkMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeVineBarkCanvas(), 1, 2),
+            color: 0x8a6a48,
+            roughness: 0.94,
+            metalness: 0.02,
+        });
+        const vineLeafMat = new THREE.MeshStandardMaterial({
+            map: canvasToTexture(makeVineLeafCanvas(), 1, 1),
+            color: 0x6cbc4a,
+            roughness: 0.72,
+            metalness: 0,
+            emissive: 0x143810,
+            emissiveIntensity: 0.22,
+            transparent: true,
+            alphaTest: 0.28,
+            side: THREE.DoubleSide,
+        });
+        const vineLeafSolidMat = new THREE.MeshStandardMaterial({
+            color: 0x3d8a32,
+            roughness: 0.7,
+            metalness: 0,
+            emissive: 0x1a4a18,
+            emissiveIntensity: 0.18,
+        });
         const strawMat = new THREE.MeshStandardMaterial({
             map: canvasToTexture(makeStrawCanvas(), 1, 1), roughness: 0.95, metalness: 0,
         });
@@ -2502,6 +2600,7 @@
         const DOOR_TILE = 12;
         const ANGLE_WALL = 13;
         const CURVE_WALL = 14;
+        const VINES_TILE = 15;
         const HALF_H = WALL_H * 0.22;
         const BROKEN_H = WALL_H * 0.32;
 
@@ -2590,6 +2689,8 @@
         const enemyActors = new Map();
         let frogRoot = null;
         const frogActors = new Map();
+        let vineRoot = null;
+        const vineActors = new Map();
         let stainRoot = null;
         let lastHurtKey = '';
         let waterMeshes = [];
@@ -2624,10 +2725,11 @@
         let bump = 0;
         let lastAt = '';
         let lastShotId = 0;
-        let staffKick = 0;
+        let handKick = 0;
         let swordKick = 0;
         let shieldGuard = 0;
-        let heldWeapon = 'staff';
+        let heldWeapon = 'hands';
+        let heldElement = 'fire';
         let isBlocking = false;
         let voteEndsAt = 0;
         let overlayOn = true;
@@ -2640,12 +2742,42 @@
         let weaponXFit = 1;
         const clock = new THREE.Clock();
         const fxItems = [];
+        const ELEMENT_COMMANDS = new Set(['fire', 'water', 'nature', 'lightning', 'chaos']);
+        const ELEMENT_PALETTES = {
+            fire: {
+                core: 0xfff2c4, glow: 0xff4a10, streak: 0xff7722, light: 0xff5511,
+                sparkA: 0xffaa44, sparkB: 0xff3300, boom: 0xffeeaa,
+            },
+            water: {
+                core: 0xe8f8ff, glow: 0x2aa8d8, streak: 0x4ec4ee, light: 0x3ec8ff,
+                sparkA: 0xa8e8ff, sparkB: 0x1a7aaa, boom: 0xb8ecff,
+            },
+            nature: {
+                core: 0xe8ffc4, glow: 0x3d8a32, streak: 0x6cbc4a, light: 0x52a83e,
+                sparkA: 0x8ee05a, sparkB: 0x245820, boom: 0xd4ff9a,
+            },
+            lightning: {
+                core: 0xffffff, glow: 0xffee88, streak: 0xfff6b0, light: 0xfff0a0,
+                sparkA: 0xffffff, sparkB: 0xffcc33, boom: 0xffffee,
+            },
+            chaos: {
+                core: 0xffd0ff, glow: 0xaa22cc, streak: 0xff44aa, light: 0xcc44ff,
+                sparkA: 0xff66cc, sparkB: 0x441166, boom: 0xffb0ee,
+            },
+        };
         const boltGeo = new THREE.SphereGeometry(0.05, 10, 8);
         const boltGlowGeo = new THREE.SphereGeometry(0.09, 10, 8);
         const streakGeo = new THREE.ConeGeometry(0.032, 0.22, 6);
         const sparkGeo = new THREE.SphereGeometry(0.028, 6, 6);
         const boomGeo = new THREE.SphereGeometry(0.08, 12, 10);
         const slashGeo = new THREE.BoxGeometry(0.46, 0.045, 0.09);
+        const dropletGeo = new THREE.SphereGeometry(0.042, 8, 6);
+        const thornGeo = new THREE.ConeGeometry(0.028, 0.16, 5);
+        const leafFxGeo = new THREE.ConeGeometry(0.034, 0.08, 5);
+        const shardGeo = new THREE.OctahedronGeometry(0.046, 0);
+        const zapSegGeo = new THREE.BoxGeometry(0.018, 0.018, 0.16);
+        const vineStemGeo = new THREE.CylinderGeometry(0.028, 0.046, 1, 6);
+        const vineLeafGeo = new THREE.PlaneGeometry(0.16, 0.22);
 
         function fireAlong(dir) {
             const yaw = YAWS[dir] ?? 0;
@@ -2668,6 +2800,8 @@
             fencePostGeo, fenceRailGeo,
             emberGeo, sporeGeo,
             boltGeo, boltGlowGeo, streakGeo, sparkGeo, boomGeo, slashGeo,
+            dropletGeo, thornGeo, leafFxGeo, shardGeo, zapSegGeo, vineStemGeo, vineLeafGeo,
+            handPalmGeo, handFingerGeo, handThumbGeo, handArmGeo, palmGlowGeo,
             pitBottomGeo, pitNsGeo, pitEwGeo, pitRimNsGeo, pitRimEwGeo, pitWaterGeo, pitSpikeGeo,
             windowPaneGeo, windowMullionVGeo, windowMullionHGeo,
             doorJambGeo, doorLintelGeo, doorLeafGeo,
@@ -2682,7 +2816,8 @@
             doorWoodMat, doorIronMat,
             daySkyMat, windowGlassMat, bloodSplatterMat, slimeSplatterMat, cobwebHangMat, vineHangMat, plantHangMat, waterMat, spikeMat, pitMat,
             torchBracketMat, torchFlameMat, emberMat, sporeMat,
-            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
+            woodMat, artworkEmptyMat, ironMat, potMat, plantMat, vineBarkMat, vineLeafMat, vineLeafSolidMat, goblinMat, goblinDarkMat, goblinEyeMat, goblinEyeGlowMat,
+            handSkinMat, handDarkMat, palmGlowMat,
             frogMat, frogDarkMat, frogBellyMat,
             ghostMat, ghostSheetMat, ghostHoleMat, mushStemMat, mushGlowMat, voidMat,
             goldMat, pillarMat, strawMat, sackclothMat, linenMat, boneMat, rustMat, waxMat, crystalMat, slimeClutterMat,
@@ -2731,30 +2866,41 @@
             fxItems.length = 0;
         }
 
-        function spawnExplosion(pos) {
+        function elementPalette(element) {
+            return ELEMENT_PALETTES[element] || ELEMENT_PALETTES.fire;
+        }
+
+        function spawnExplosion(pos, element = 'fire') {
+            const pal = elementPalette(element);
             const group = new THREE.Group();
             group.position.copy(pos);
             scene.add(group);
 
-            const coreMat = makeFireMat(0xffeeaa, 0.95);
+            const coreMat = makeFireMat(pal.boom, 0.95);
             coreMat.userData.fx = true;
             const core = new THREE.Mesh(boomGeo, coreMat);
             group.add(core);
 
-            const glowMat = makeFireMat(0xff5511, 0.7);
+            const glowMat = makeFireMat(pal.glow, 0.7);
             glowMat.userData.fx = true;
             const glow = new THREE.Mesh(boltGlowGeo, glowMat);
             glow.scale.setScalar(1.6);
             group.add(glow);
 
-            const light = new THREE.PointLight(0xff6622, 12, 5, 2);
+            const light = new THREE.PointLight(pal.light, 12, 5, 2);
             group.add(light);
 
             const sparks = [];
-            for (let i = 0; i < 14; i += 1) {
-                const sparkMat = makeFireMat(i % 2 ? 0xffaa44 : 0xff3300, 1);
+            const sparkCount = element === 'lightning' ? 18 : 14;
+            for (let i = 0; i < sparkCount; i += 1) {
+                const sparkGeoPick = element === 'nature' && i % 3 === 0
+                    ? leafFxGeo
+                    : element === 'chaos' && i % 3 === 0
+                        ? shardGeo
+                        : sparkGeo;
+                const sparkMat = makeFireMat(i % 2 ? pal.sparkA : pal.sparkB, 1);
                 sparkMat.userData.fx = true;
-                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                const spark = new THREE.Mesh(sparkGeoPick, sparkMat);
                 spark.position.set((Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08);
                 group.add(spark);
                 sparks.push({
@@ -2775,7 +2921,92 @@
                 light,
                 sparks,
                 t: 0,
-                duration: 0.42,
+                duration: element === 'lightning' ? 0.28 : 0.42,
+            });
+        }
+
+        function spawnVineBurn(pos) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+            scene.add(group);
+            const coreMat = makeFireMat(0xffeeaa, 0.95);
+            coreMat.userData.fx = true;
+            const core = new THREE.Mesh(boomGeo, coreMat);
+            group.add(core);
+            const glowMat = makeFireMat(0x6cbc4a, 0.72);
+            glowMat.userData.fx = true;
+            const glow = new THREE.Mesh(boltGlowGeo, glowMat);
+            glow.scale.setScalar(1.8);
+            group.add(glow);
+            const light = new THREE.PointLight(0xff7722, 10, 4.6, 2);
+            group.add(light);
+            const sparks = [];
+            for (let i = 0; i < 16; i += 1) {
+                const sparkMat = makeFireMat(i % 2 ? 0xffaa44 : 0x52a83e, 1);
+                sparkMat.userData.fx = true;
+                const spark = new THREE.Mesh(i % 2 ? leafFxGeo : sparkGeo, sparkMat);
+                spark.position.set((Math.random() - 0.5) * 0.12, Math.random() * 0.2, (Math.random() - 0.5) * 0.12);
+                group.add(spark);
+                sparks.push({
+                    mesh: spark,
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 1.8,
+                        0.6 + Math.random() * 2.2,
+                        (Math.random() - 0.5) * 1.8,
+                    ),
+                });
+            }
+            fxItems.push({
+                kind: 'boom',
+                group,
+                core,
+                glow,
+                light,
+                sparks,
+                t: 0,
+                duration: 0.55,
+            });
+        }
+
+        function spawnCastBurst(element) {
+            const pal = elementPalette(element);
+            const start = new THREE.Vector3();
+            camera.updateMatrixWorld(true);
+            palmTip.getWorldPosition(start);
+            const group = new THREE.Group();
+            group.position.copy(start);
+            scene.add(group);
+            const glowMat = makeFireMat(pal.glow, 0.8);
+            glowMat.userData.fx = true;
+            const glow = new THREE.Mesh(boltGlowGeo, glowMat);
+            glow.scale.setScalar(0.7);
+            group.add(glow);
+            const light = new THREE.PointLight(pal.light, 4, 1.8, 2);
+            group.add(light);
+            const sparks = [];
+            for (let i = 0; i < 10; i += 1) {
+                const sparkMat = makeFireMat(i % 2 ? pal.sparkA : pal.core, 1);
+                sparkMat.userData.fx = true;
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.set((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04);
+                group.add(spark);
+                sparks.push({
+                    mesh: spark,
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 1.6,
+                        0.2 + Math.random() * 1.2,
+                        (Math.random() - 0.5) * 1.6,
+                    ),
+                });
+            }
+            fxItems.push({
+                kind: 'cast',
+                group,
+                glow,
+                light,
+                sparks,
+                t: 0,
+                duration: 0.24,
             });
         }
 
@@ -2830,7 +3061,9 @@
             });
         }
 
-        function spawnFireBolt(shot) {
+        function spawnElementBolt(shot) {
+            const element = ELEMENT_PALETTES[shot.element] ? shot.element : 'fire';
+            const pal = elementPalette(element);
             const along = fireAlong(shot.dir);
             const impact = new THREE.Vector3(shot.hit.x * CELL, 0.52, shot.hit.y * CELL);
             impact.addScaledVector(along, -0.52);
@@ -2838,56 +3071,89 @@
             const origin = new THREE.Vector3(shot.from.x * CELL, EYE - 0.04, shot.from.y * CELL);
             const start = new THREE.Vector3();
             camera.updateMatrixWorld(true);
-            staffTip.getWorldPosition(start);
+            palmTip.getWorldPosition(start);
             const toHit = impact.clone().sub(origin);
             const rayLen = toHit.length();
             if (rayLen > 0.02) {
                 const dirN = toHit.multiplyScalar(1 / rayLen);
-                const alongStaff = Number.isFinite(start.x) ? start.clone().sub(origin).dot(dirN) : 0.28;
-                const t = Math.min(rayLen - 0.02, Math.max(0.16, alongStaff));
+                const alongPalm = Number.isFinite(start.x) ? start.clone().sub(origin).dot(dirN) : 0.28;
+                const t = Math.min(rayLen - 0.02, Math.max(0.16, alongPalm));
                 start.copy(origin).addScaledVector(dirN, t);
             } else {
                 start.copy(origin);
             }
 
             const dist = Math.max(0.12, start.distanceTo(impact));
-            const duration = Math.min(2.4, Math.max(0.4, dist * 0.42));
+            let duration = Math.min(2.4, Math.max(0.4, dist * 0.42));
+            if (element === 'lightning') {
+                duration = Math.min(0.22, Math.max(0.08, dist * 0.08));
+            } else if (element === 'chaos') {
+                duration *= 1.12;
+            }
 
             const group = new THREE.Group();
             group.position.copy(start);
             scene.add(group);
 
-            const coreMat = makeFireMat(0xfff2c4, 1);
+            const coreMat = makeFireMat(pal.core, 1);
             coreMat.userData.fx = true;
-            const core = new THREE.Mesh(boltGeo, coreMat);
+            let coreGeo = boltGeo;
+            if (element === 'water') {
+                coreGeo = dropletGeo;
+            } else if (element === 'nature') {
+                coreGeo = thornGeo;
+            } else if (element === 'chaos') {
+                coreGeo = shardGeo;
+            }
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            if (element === 'nature') {
+                core.rotation.x = Math.PI / 2;
+            }
             group.add(core);
 
-            const glowMat = makeFireMat(0xff4a10, 0.65);
+            const glowMat = makeFireMat(pal.glow, 0.65);
             glowMat.userData.fx = true;
             const glow = new THREE.Mesh(boltGlowGeo, glowMat);
             group.add(glow);
 
-            const streakMat = makeFireMat(0xff7722, 0.8);
-            streakMat.userData.fx = true;
-            const streak = new THREE.Mesh(streakGeo, streakMat);
-            streak.rotation.x = Math.PI / 2;
-            streak.position.z = 0.12;
-            group.add(streak);
+            if (element === 'lightning') {
+                for (let i = 0; i < 5; i += 1) {
+                    const zapMat = makeFireMat(i % 2 ? pal.core : pal.streak, 0.9);
+                    zapMat.userData.fx = true;
+                    const zap = new THREE.Mesh(zapSegGeo, zapMat);
+                    zap.position.set((Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08, 0.08 * i);
+                    zap.rotation.z = (Math.random() - 0.5) * 0.8;
+                    group.add(zap);
+                }
+            } else {
+                const streakMat = makeFireMat(pal.streak, 0.8);
+                streakMat.userData.fx = true;
+                const streak = new THREE.Mesh(streakGeo, streakMat);
+                streak.rotation.x = Math.PI / 2;
+                streak.position.z = 0.12;
+                group.add(streak);
+            }
 
-            const light = new THREE.PointLight(0xff5511, 3.4, 3.2, 2);
+            const light = new THREE.PointLight(pal.light, 3.4, 3.2, 2);
             group.add(light);
             group.lookAt(impact);
 
             fxItems.push({
                 kind: 'bolt',
+                element,
+                vineBurn: false,
                 group,
+                core,
                 start: start.clone(),
                 end: impact,
                 t: 0,
                 duration,
                 light,
+                spin: element === 'chaos' || element === 'nature',
+                wobble: element === 'water',
             });
-            staffKick = 1;
+            handKick = 1;
+            spawnCastBurst(element);
         }
 
         function spawnSlash(shot) {
@@ -2923,13 +3189,44 @@
                     fx.t += dt / fx.duration;
                     if (fx.t >= 1) {
                         const pos = fx.end.clone();
+                        const element = fx.element || 'fire';
+                        const vineBurn = Boolean(fx.vineBurn);
                         disposeObject(fx.group);
                         fxItems.splice(i, 1);
-                        spawnExplosion(pos);
+                        if (vineBurn) {
+                            spawnVineBurn(pos);
+                        } else {
+                            spawnExplosion(pos, element);
+                        }
                     } else {
                         fx.group.position.lerpVectors(fx.start, fx.end, fx.t);
                         fx.group.lookAt(fx.end);
+                        if (fx.wobble) {
+                            fx.group.position.y += Math.sin(fx.t * 18) * 0.04;
+                        }
+                        if (fx.spin && fx.core) {
+                            fx.core.rotation.z += dt * 10;
+                            fx.core.rotation.x += dt * 6;
+                        }
                         fx.light.intensity = 3.2 + Math.sin(clock.elapsedTime * 40) * 0.5;
+                    }
+                    continue;
+                }
+
+                if (fx.kind === 'cast') {
+                    fx.t += dt;
+                    const u = Math.min(1, fx.t / fx.duration);
+                    const fade = 1 - u;
+                    fx.glow.scale.setScalar(0.7 + u * 1.8);
+                    fx.glow.material.opacity = 0.8 * fade;
+                    fx.light.intensity = 4 * fade * fade;
+                    for (const spark of fx.sparks) {
+                        spark.mesh.position.addScaledVector(spark.vel, dt);
+                        spark.mesh.material.opacity = fade;
+                    }
+                    if (u >= 1) {
+                        disposeObject(fx.group);
+                        fxItems.splice(i, 1);
                     }
                     continue;
                 }
@@ -3426,6 +3723,13 @@
             disposeObject(frogRoot);
             frogRoot = null;
             frogActors.clear();
+            clearVines();
+        }
+
+        function clearVines() {
+            disposeObject(vineRoot);
+            vineRoot = null;
+            vineActors.clear();
         }
 
         function clearStains() {
@@ -3770,12 +4074,60 @@
             }
         }
 
+        function syncVines(state, snap) {
+            if (!vineRoot) {
+                vineRoot = new THREE.Group();
+                scene.add(vineRoot);
+            }
+            const live = new Set();
+            const grid = state.grid || [];
+            for (let y = 0; y < grid.length; y += 1) {
+                for (let x = 0; x < (grid[y] || []).length; x += 1) {
+                    if (grid[y][x] !== VINES_TILE) {
+                        continue;
+                    }
+                    const key = `${x},${y}`;
+                    live.add(key);
+                    if (!vineActors.has(key)) {
+                        const group = makeVineBlock(x, y);
+                        group.position.set(x * CELL, PROP_LIFT, y * CELL);
+                        vineRoot.add(group);
+                        vineActors.set(key, {
+                            group,
+                            x,
+                            y,
+                            phase: (x * 1.7 + y * 2.3) % (Math.PI * 2),
+                        });
+                    }
+                }
+            }
+            for (const [key, actor] of [...vineActors]) {
+                if (live.has(key)) {
+                    continue;
+                }
+                if (!snap) {
+                    spawnVineBurn(new THREE.Vector3(actor.x * CELL, 0.55, actor.y * CELL));
+                }
+                vineRoot.remove(actor.group);
+                releaseGpu(actor.group);
+                vineActors.delete(key);
+            }
+        }
+
+        function updateVines(elapsed) {
+            for (const actor of vineActors.values()) {
+                const sway = Math.sin(elapsed * 1.4 + actor.phase) * 0.04;
+                actor.group.rotation.z = sway;
+                actor.group.rotation.x = Math.cos(elapsed * 1.1 + actor.phase) * 0.03;
+            }
+        }
+
         function isWalkable(cell) {
             return cell === 0 || cell === 2 || cell === DOOR_TILE;
         }
 
         function isFloorTile(cell) {
-            return cell === 0 || cell === 2 || cell === FURNITURE || cell === DOOR_TILE;
+            return cell === 0 || cell === 2 || cell === FURNITURE || cell === DOOR_TILE || cell === VINES_TILE;
         }
 
         function isCeilTile(cell) {
@@ -3945,6 +4297,52 @@
             const leaf3 = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.1, 6), plantMat);
             leaf3.position.set(-0.03, 0.15, -0.02);
             group.add(pot, leaf1, leaf2, leaf3);
+            return group;
+        }
+
+        function makeVineBlock(x = 0, z = 0) {
+            const group = new THREE.Group();
+            const hash = Math.abs(x * 17 + z * 29);
+            const mound = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.1, 8), vineBarkMat);
+            mound.position.y = 0.04;
+            group.add(mound);
+            const stemCount = 5 + (hash % 3);
+            for (let i = 0; i < stemCount; i += 1) {
+                const h = 0.85 + ((hash + i * 11) % 7) * 0.08;
+                const stem = new THREE.Mesh(vineStemGeo, vineBarkMat);
+                stem.scale.set(0.7 + (i % 3) * 0.18, h, 0.7 + (i % 3) * 0.18);
+                const ang = (i / stemCount) * Math.PI * 2 + (hash % 5) * 0.15;
+                const r = 0.12 + (i % 2) * 0.1;
+                stem.position.set(Math.cos(ang) * r, h / 2, Math.sin(ang) * r);
+                stem.rotation.z = Math.cos(ang) * 0.28;
+                stem.rotation.x = Math.sin(ang) * 0.22;
+                group.add(stem);
+                for (let leaf = 0; leaf < 4; leaf += 1) {
+                    const blade = new THREE.Mesh(vineLeafGeo, vineLeafMat);
+                    const ly = 0.18 + leaf * (h / 5);
+                    blade.position.set(
+                        Math.cos(ang) * (r + 0.08),
+                        ly,
+                        Math.sin(ang) * (r + 0.08),
+                    );
+                    blade.rotation.set(-0.6, ang + leaf * 0.4, 0.35);
+                    group.add(blade);
+                    if (leaf % 2 === 0) {
+                        const tuft = new THREE.Mesh(leafFxGeo, vineLeafSolidMat);
+                        tuft.position.set(
+                            Math.cos(ang + 0.4) * (r + 0.04),
+                            ly + 0.06,
+                            Math.sin(ang + 0.4) * (r + 0.04),
+                        );
+                        tuft.rotation.z = -0.4;
+                        group.add(tuft);
+                    }
+                }
+            }
+            const crown = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 5), vineLeafSolidMat);
+            crown.scale.set(1.3, 0.55, 1.3);
+            crown.position.y = 0.95;
+            group.add(crown);
             return group;
         }
 
@@ -5803,7 +6201,7 @@
                 for (let y = room.y; y < room.y + room.h && !hazard; y++) {
                     for (let x = room.x; x < room.x + room.w; x++) {
                         const cell = grid?.[y]?.[x];
-                        if (cell === WATER_TILE || cell === SPIKE_TILE) {
+                        if (cell === WATER_TILE || cell === SPIKE_TILE || cell === VINES_TILE) {
                             hazard = true;
                             break;
                         }
@@ -6874,6 +7272,21 @@
                 ctx.stroke();
             }
 
+            const grid = state.grid || [];
+            for (let gy = 0; gy < grid.length; gy += 1) {
+                for (let gx = 0; gx < (grid[gy] || []).length; gx += 1) {
+                    if (grid[gy][gx] !== VINES_TILE) {
+                        continue;
+                    }
+                    const ri = roomIndexAt(rooms, gx, gy);
+                    if (ri === -1 || !minimapVisited.has(ri)) {
+                        continue;
+                    }
+                    ctx.fillStyle = '#3d8a32';
+                    ctx.fillRect(toX(gx), toY(gy), Math.max(3, scale * 0.9), Math.max(3, scale * 0.9));
+                }
+            }
+
             const px = toX(state.player.x + 0.5);
             const py = toY(state.player.y + 0.5);
             ctx.fillStyle = '#ffffff';
@@ -6957,7 +7370,7 @@
             stageWrapEl.classList.toggle('anchor-bottom-right', anchor === 'bottom-right');
             const aspect = w / Math.max(1, h);
             weaponXFit = 0.45 + 0.55 * Math.min(1, aspect / (640 / 480));
-            staff.position.x = staffBasePos.x * weaponXFit;
+            hands.position.x = handsBasePos.x * weaponXFit;
             sword.position.x = swordBasePos.x * weaponXFit;
             syncRendererSize();
             fitStageToWindow();
@@ -7074,9 +7487,11 @@
             flashHurt(state);
             syncEnemies(state, snap);
             syncFrogs(state, snap);
-            heldWeapon = state.weapon === 'blade' ? 'blade' : 'staff';
+            syncVines(state, snap);
+            heldWeapon = state.weapon === 'blade' ? 'blade' : 'hands';
+            heldElement = ELEMENT_PALETTES[state.element] ? state.element : 'fire';
             isBlocking = Boolean(state.blocking);
-            staff.visible = heldWeapon !== 'blade';
+            hands.visible = heldWeapon !== 'blade';
             blade.visible = heldWeapon === 'blade';
 
             const autoplaying = state.mode === 'autoplay';
@@ -7085,12 +7500,14 @@
             modeEl.classList.toggle('democracy', state.mode === 'democracy');
             modeEl.classList.toggle('autoplay', autoplaying);
             hudEl.classList.toggle('autoplay', autoplaying);
-            helpEl.textContent = autoplaying ? 'Autoplay · !up to take over' : '!up !down !left !right !fire !attack !block';
+            helpEl.textContent = autoplaying
+                ? 'Autoplay · !up to take over'
+                : '!up !down !left !right !fire !water !nature !lightning !chaos !attack !block';
 
             const action = state.lastAction;
             if (autoplaying && action?.user === 'autoplay') {
-                lastEl.innerHTML = action.command === 'fire'
-                    ? `Autoplay <span>!fire</span>`
+                lastEl.innerHTML = ELEMENT_COMMANDS.has(action.command)
+                    ? `Autoplay <span>!${escapeHtml(action.command)}</span>`
                     : action.command === 'attack'
                         ? `Autoplay <span>!attack</span>`
                         : action.command === 'block'
@@ -7099,8 +7516,8 @@
             } else if (action?.displayName) {
                 const extra = action.vote
                     ? ' · voting'
-                    : action.command === 'fire'
-                      ? ' · fire staff'
+                    : ELEMENT_COMMANDS.has(action.command)
+                      ? ` · ${action.command}`
                       : action.command === 'attack'
                         ? ' · sword'
                         : action.command === 'block'
@@ -7115,12 +7532,12 @@
                 lastEl.innerHTML = '<span>Waiting for chat</span>';
             }
 
-            if (action?.command === 'fire' && action.shot && action.shotId) {
+            if (ELEMENT_COMMANDS.has(action?.command) && action.shot && action.shotId) {
                 if (snap) {
                     lastShotId = action.shotId;
                 } else if (action.shotId !== lastShotId) {
                     lastShotId = action.shotId;
-                    spawnFireBolt(action.shot);
+                    spawnElementBolt(action.shot);
                 }
             }
             if (action?.command === 'attack' && action.shot && action.shotId) {
@@ -7200,15 +7617,18 @@
             );
             camera.rotation.x = camPitch;
             camera.rotation.y = camYaw;
-            staffKick *= Math.exp(-dt * 11);
+            handKick *= Math.exp(-dt * 11);
             swordKick *= Math.exp(-dt * 10);
             shieldGuard += ((isBlocking ? 1 : 0) - shieldGuard) * (1 - Math.exp(-dt * 10));
-            staff.position.y = staffBasePos.y + bob * 0.35;
-            staff.rotation.x = staffBaseRot.x - staffKick * 0.42;
-            staff.rotation.z = staffBaseRot.z - staffKick * 0.14;
-            staffCrystalMat.emissiveIntensity = 1.55 + staffKick * 2.4 + Math.sin(clock.elapsedTime * 9) * 0.28;
-            staffLight.intensity = 0.55 + staffKick * 1.8 + Math.sin(clock.elapsedTime * 13) * 0.12;
-            staffGlow.scale.setScalar(1 + staffKick * 0.35 + Math.sin(clock.elapsedTime * 11) * 0.08);
+            const pal = elementPalette(heldElement);
+            hands.position.y = handsBasePos.y + bob * 0.35;
+            hands.position.z = handsBasePos.z - handKick * 0.1;
+            hands.rotation.x = handsBaseRot.x - handKick * 0.55;
+            hands.rotation.z = handsBaseRot.z - handKick * 0.12;
+            palmGlowMat.color.setHex(pal.glow);
+            palmGlow.scale.setScalar(1 + handKick * 0.55 + Math.sin(clock.elapsedTime * 11) * 0.08);
+            palmLight.color.setHex(pal.light);
+            palmLight.intensity = 0.4 + handKick * 1.6 + Math.sin(clock.elapsedTime * 13) * 0.1;
             sword.position.y = swordBasePos.y + bob * 0.22 + swordKick * 0.08;
             sword.rotation.x = swordBaseRot.x - swordKick * 1.15;
             sword.rotation.z = swordBaseRot.z - swordKick * 0.55;
@@ -7220,6 +7640,7 @@
             shield.rotation.x = shieldBaseRot.x - shieldGuard * 0.35;
             shield.rotation.y = shieldBaseRot.y - shieldGuard * 0.45;
             updateFx(dt);
+            updateVines(clock.elapsedTime);
             torch.intensity = (1.6 + Math.sin(clock.elapsedTime * 11) * 0.12) * (1 - outdoorBlend * 0.55);
             torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
             updateTorchEmbers(dt);

@@ -23,12 +23,12 @@ https://<your-app>.up.railway.app/oauth/callback
 
 Set `TWITCH_REDIRECT_URI` to the URL you are using. Then visit:
 
-- Local: `http://localhost:3000/oauth/login`
-- Railway: `https://<your-app>.up.railway.app/oauth/login?key=YOUR_OAUTH_SECRET`
+- Bot (teerzobot): `http://localhost:3000/oauth/login` or Railway `https://<your-app>.up.railway.app/oauth/login?key=YOUR_OAUTH_SECRET`
+- Streamer (broadcaster, for `!game` / `!title` edits): `http://localhost:3000/oauth/streamer` or Railway `https://<your-app>.up.railway.app/oauth/streamer?key=YOUR_OAUTH_SECRET`
 
-Log in as **teerzobot**. That saves a token with `chat:read`, `chat:edit`, and `moderator:read:followers`. Restart the service afterward so follow alerts reconnect.
+Log in as **teerzobot** for bot scopes (`chat:read`, `chat:edit`, `moderator:read:followers`). Log in as the **channel account** for streamer scopes (`channel:manage:broadcast`). Restart after bot re-auth so follow alerts reconnect.
 
-On Railway, set `OAUTH_SECRET` and `TWITCH_REDIRECT_URI`, and keep `TOKEN_PATH` on a volume so the new token survives restarts.
+On Railway, set `OAUTH_SECRET` and `TWITCH_REDIRECT_URI`, and keep `TOKEN_PATH` (and optional `STREAMER_TOKEN_PATH`) on a volume so tokens survive restarts.
 
 ## Discord
 
@@ -107,13 +107,14 @@ Attach a volume (for example at `/data`) and set:
 
 ```
 TOKEN_PATH=/data/token.536204553.json
+STREAMER_TOKEN_PATH=/data/streamer.token.json
 COMMANDS_PATH=/data/commands.json
 DANCE_PATH=/data/gifs
 ARTWORK_PATH=/data/artwork
 DUNGEON_PATH=/data/dungeon.json
 ```
 
-The first boot writes the env token onto the volume. After that, Twitch refreshes persist across deploys. Without a volume, a refresh can invalidate the env token on the next restart.
+The first boot writes the env token onto the volume. After that, Twitch refreshes persist across deploys. Without a volume, a refresh can invalidate the env token on the next restart. If `STREAMER_TOKEN_PATH` is unset, the streamer token defaults to `streamer.token.json` next to `TOKEN_PATH`.
 
 ## Chat commands
 
@@ -121,45 +122,54 @@ The first boot writes the env token onto the volume. After that, Twitch refreshe
 | --- | --- | --- |
 | `!ping` | everyone | Replies `Pong!` |
 | `!commands` / `!help` | everyone | Lists built-in and custom commands |
-| `!commands dc` | everyone | Dungeon command help (`ttt`, `dance`, `dvd` also work) |
+| `!commands dc` | everyone | Dungeon command help (`ttt`, `dance`, `dvd`, `chat`, `obs` also work) |
 | `!lurk` | everyone | Thanks the chatter for lurking |
 | `!so <user>` | everyone | Chat shoutout with a Twitch link |
 | `!game` | everyone | Current game |
+| `!game <name>` | mods | Set the Twitch category (needs streamer OAuth) |
 | `!title` | everyone | Current stream title |
+| `!title <text>` | mods | Set the stream title (needs streamer OAuth) |
 | `!uptime` | everyone | How long the stream has been live |
 | `!followage` | everyone | How long that chatter has followed |
-| `!currentsong` / `!song` | everyone | Currently playing song from the Chrome plugin |
-| `!dvdfast` | everyone | Speeds up the DVD overlay (`0.25x`–`8x`) |
-| `!dvdslow` | everyone | Slows down the DVD overlay (`0.25x`–`8x`) |
-| `!dvd` | everyone | Adds another bouncing DVD logo |
-| `!undvd` | everyone | Removes a random bouncing DVD logo |
+| `!song` | everyone | Currently playing song from the Chrome plugin |
+| `!dvd` / `!dvd add` | everyone | Adds another bouncing DVD logo |
+| `!dvd remove` | everyone | Removes a random bouncing DVD logo |
+| `!dvd fast` / `!dvd slow` | everyone | Speeds up / slows down the DVD overlay (`0.25x`–`8x`) |
 | `!dance <url>` | everyone | Queues an image/GIF for approval, then shows it on `/dance` after you accept it |
-| `!undance` | everyone | Removes a random GIF from the dance overlay |
+| `!dance remove` | everyone | Removes a random GIF from the dance overlay |
+| `!dance clear` | everyone | Clears all dance GIFs from the overlay |
 | `!ttt` | everyone | Show the tic-tac-toe overlay and start a new game |
 | `!ttt 1-9` | everyone | Places X or O in that cell (first player X, second O) |
 | `!up` / `!u` / `!f` / `!forward` | everyone | Dungeon: step forward |
 | `!down` / `!d` / `!b` / `!back` | everyone | Dungeon: step backward |
 | `!left` / `!l` | everyone | Dungeon: turn 90° left |
 | `!right` / `!r` | everyone | Dungeon: turn 90° right |
-| `!dungeon` | everyone | Show the dungeon overlay and reset to floor 0 |
-| `!dc` | everyone | Same as `!dungeon` |
+| `!dungeon` / `!dc` | everyone | Show the dungeon overlay and reset to floor 0 |
 | `!dc bigger` / `!dc smaller` | mods | Step the dungeon canvas through size breakpoints |
 | `!dc phone` / `!phone` | mods | Switch the dungeon canvas to a portrait (9:16) phone size |
 | `!phone bigger` / `!phone smaller` | mods | Step through the portrait phone size breakpoints |
 | `!dc landscape` | mods | Switch the dungeon canvas back to the default wide size |
 | `!dc topleft` / `topright` / `bottomleft` / `bottomright` | mods | Snap the dungeon canvas to a corner |
 | `!resize bigger` / `!resize smaller` | mods | Alias of `!dc size bigger` / `smaller` |
-| `!anarchy` | mods | Dungeon anarchy mode (every command runs immediately) |
-| `!democracy` | mods | Dungeon democracy mode (chat votes for 8 seconds) |
-| `!autoplay` | mods | Dungeon autoplay (bot walks the maze until chat takes over) |
-| `!clear` | everyone | Clears dance GIFs and DVD logos, and hides tic-tac-toe and dungeon overlays |
+| `!dc anarchy` / `!dungeon anarchy` | mods | Dungeon anarchy mode (every command runs immediately) |
+| `!dc democracy` / `!dungeon democracy` | mods | Dungeon democracy mode (chat votes for 8 seconds) |
+| `!dc autoplay` / `!dungeon autoplay` | mods | Dungeon autoplay (bot walks the maze until chat takes over) |
+| `!dc shh` / `!dungeon shh` | mods | Toggle dungeon Twitch announcements (floor clears / autoplay) |
+| `!chat` | mods | Toggle the chat overlay |
+| `!clear` | mods | Clears dance GIFs and DVD logos, and hides chat, tic-tac-toe, and dungeon overlays |
+| `!obs` | everyone | Lists mapped OBS scenes |
+| `!obs <name>` | everyone | Switch OBS to that scene (`OBS_SCENE_<NAME>`) |
 | `!<name>` | everyone | Any custom command created via the API |
 
-Commands have a 10 second cooldown.
+Commands have a 1 second cooldown (dungeon move/combat commands skip it).
 
 ### !followage
 
 `!followage` and follow thank-yous need `moderator:read:followers`. Make teerzobot a channel mod, then authorize at `/oauth/login` while logged in as teerzobot.
+
+### !game / !title edits
+
+Setting the category or title needs the broadcaster token. Authorize at `/oauth/streamer` while logged in as the channel account (`TWITCH_CHANNEL`). That stores `channel:manage:broadcast` at `STREAMER_TOKEN_PATH` (default: `streamer.token.json` next to `TOKEN_PATH`).
 
 ## OBS
 
@@ -168,10 +178,10 @@ The bot on Railway cannot open OBS on your PC. Instead it exposes events. Open *
 1. **Chat overlay:** add a Browser Source pointed at `https://<your-app>/chat` (locally `http://localhost:3000/chat`). Display-only; Control Level can stay at the default.
 2. **Follow alerts:** add a Browser Source pointed at `https://<your-app>/alerts` (preview: `/alerts?preview=1`). Keep it on every scene you want alerts on. When someone follows, chat posts `Thanks for the follow, {name}!` and this overlay shows a graphic. Optional custom image: `FOLLOW_ALERT_IMAGE`.
 3. **Now playing:** add a Browser Source pointed at `https://<your-app>.up.railway.app/now-playing`. The Chrome extension should `POST` track changes to the Railway `/api/now-playing` endpoint.
-4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvdfast` and `!dvdslow` change bounce speed. `!dvd` adds another logo; `!undvd` removes one at random.
-5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` queues the file; accept it at `/manage/dance` to show it on the overlay.
-6. **Tic-tac-toe:** add a Browser Source pointed at `https://<your-app>/ttt` (locally `http://localhost:3000/ttt`). `!ttt` shows the overlay and starts a game; `!ttt 1-9` places a mark. `!clear` hides it until `!ttt` is used again.
-7. **Dungeon:** add a Browser Source pointed at `https://<your-app>/dungeon` (locally `http://localhost:3000/dungeon`) at **1920×1080**. The canvas starts at **640×480** in the top-left; unused area is transparent. Mods: `!dc bigger` / `!dc smaller` step 480×270 → 640×360 → 640×480 → 854×480 → 960×540 → 1280×720 → 1600×900 → 1920×1080. For displaying on a phone, `!dc phone` (or `!phone`) switches to a portrait **9:16** canvas that starts at **540×960**; `!phone bigger` / `!phone smaller` step 360×640 → 405×720 → 540×960 → 608×1080, and `!dc landscape` returns to the default wide size. The HUD scales with the canvas (by width in landscape, by height in portrait) so it stays readable on a phone. `!dc topleft` `!dc topright` `!dc bottomleft` `!dc bottomright` snap the canvas. Chat moves with `!up` `!down` `!left` `!right`. Starts on floor 0. Mods can switch `!anarchy` / `!democracy` / `!autoplay`. After 1 minute with no chat movement, it autoplays. `!clear` hides it; `!dungeon` or `!dc` shows it again. Test walk: `/dungeon?preview=1`.
+4. **DVD logo:** add a Browser Source pointed at `https://<your-app>/dvd` (locally `http://localhost:3000/dvd`). `!dvd fast` and `!dvd slow` change bounce speed. `!dvd` / `!dvd add` adds another logo; `!dvd remove` removes one at random.
+5. **Dance GIFs:** add a Browser Source pointed at `https://<your-app>/dance` (locally `http://localhost:3000/dance`). Chat `!dance <image url>` queues the file; `!dance remove` / `!dance clear` manage shown GIFs; accept queued ones at `/manage/dance`.
+6. **Tic-tac-toe:** add a Browser Source pointed at `https://<your-app>/ttt` (locally `http://localhost:3000/ttt`). `!ttt` shows the overlay and starts a game; `!ttt 1-9` places a mark. `!clear` (mods) hides it until `!ttt` is used again.
+7. **Dungeon:** add a Browser Source pointed at `https://<your-app>/dungeon` (locally `http://localhost:3000/dungeon`) at **1920×1080**. The canvas starts at **640×480** in the top-left; unused area is transparent. Mods: `!dc bigger` / `!dc smaller` step 480×270 → 640×360 → 640×480 → 854×480 → 960×540 → 1280×720 → 1600×900 → 1920×1080. For displaying on a phone, `!dc phone` (or `!phone`) switches to a portrait **9:16** canvas that starts at **540×960**; `!phone bigger` / `!phone smaller` step 360×640 → 405×720 → 540×960 → 608×1080, and `!dc landscape` returns to the default wide size. The HUD scales with the canvas (by width in landscape, by height in portrait) so it stays readable on a phone. `!dc topleft` `!dc topright` `!dc bottomleft` `!dc bottomright` snap the canvas. Chat moves with `!up` `!down` `!left` `!right`. Starts on floor 0. Mods can switch `!dc anarchy` / `!dc democracy` / `!dc autoplay`. After 1 minute with no chat movement, it autoplays. `!dc shh` (or `!dungeon shh`) mutes floor-clear and autoplay chat announcements. `!clear` hides it; `!dungeon` or `!dc` shows it again. Test walk: `/dungeon?preview=1`.
 8. **Scene control:** add a Browser Source pointed at `https://<your-app>/obs`. Set **Control Level** to **Advanced**. The page listens to `/api/obs/events` and can switch scenes via `window.obsstudio`.
 9. **Webhook:** set `OBS_WEBHOOK_URL` to a public URL (Cloudflare Tunnel, ngrok, Streamer.bot). The bot `POST`s JSON on each successful command.
 
@@ -182,7 +192,7 @@ OBS_SCENE_BRB=BRB
 OBS_SCENE_LIVE=Live
 ```
 
-That creates `!brb` and `!live`. The overlay switches to those scene names when the commands fire.
+That creates `!obs brb` and `!obs live`. The overlay switches to those scene names when the commands fire.
 
 Example webhook payload:
 
@@ -202,7 +212,8 @@ Example webhook payload:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/oauth/login` | Start Twitch OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
+| `GET` | `/oauth/login` | Start Twitch bot OAuth (optional `?key=` if `OAUTH_SECRET` is set) |
+| `GET` | `/oauth/streamer` | Start Twitch streamer OAuth for `!game` / `!title` edits |
 | `GET` | `/oauth/callback` | Twitch OAuth redirect |
 | `GET` | `/discord/install` | Discord bot install (`bot` + `applications.commands`, guild) |
 | `GET` | `/discord/invite` | Alias of `/discord/install` |

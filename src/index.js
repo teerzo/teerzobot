@@ -162,11 +162,17 @@ app.listen(port, '0.0.0.0', async () => {
         });
         await chat.connect();
         dungeon.setOnFloorClear(({ previousFloor, floor }) => {
+            if (dungeon.isChatQuiet()) {
+                return;
+            }
             chat.say(`Floor ${previousFloor} cleared! Entering floor ${floor}.`).catch((err) => {
                 console.error('Dungeon floor announce failed', err);
             });
         });
         dungeon.setOnAutoplay(() => {
+            if (dungeon.isChatQuiet()) {
+                return;
+            }
             chat.say('Dungeon is autoplaying. Chat with !up !down !left !right to take over.').catch((err) => {
                 console.error('Dungeon autoplay announce failed', err);
             });

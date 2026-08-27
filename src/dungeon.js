@@ -17,6 +17,7 @@ const SPIKES = 11;
 const DOOR = 12;
 const ANGLE = 13;
 const CURVE = 14;
+const VINES = 15;
 
 const DIRS = [
     { dx: 0, dy: -1 },
@@ -25,10 +26,16 @@ const DIRS = [
     { dx: -1, dy: 0 },
 ];
 
+const ELEMENTS = ['fire', 'water', 'nature', 'lightning', 'chaos'];
+const ELEMENT_ACTIONS = new Set(ELEMENTS);
 const MOVES = new Set(['up', 'down', 'left', 'right']);
-const ACTIONS = new Set(['fire', 'attack', 'block']);
+const ACTIONS = new Set([...ELEMENTS, 'attack', 'block']);
 const COMMANDS = new Set([...MOVES, ...ACTIONS]);
-const COMBAT_ACTIONS = new Set(['fire', 'attack', 'block']);
+const COMBAT_ACTIONS = new Set([...ELEMENT_ACTIONS, 'attack', 'block']);
+const OBSTACLE_WEAKNESS = {
+    [VINES]: 'fire',
+};
+const VINE_ROOMS = new Set(['garden', 'well', 'cave', 'hall']);
 const ANARCHY_LOCK_MS = 350;
 const FIRE_LOCK_MS = 500;
 const DEMOCRACY_MS = 8_000;
@@ -96,6 +103,19 @@ export const DUNGEON_ALIASES = {
     blast: 'fire',
     bolt: 'fire',
     cast: 'fire',
+    burn: 'fire',
+    splash: 'water',
+    wave: 'water',
+    frost: 'water',
+    thorn: 'nature',
+    bloom: 'nature',
+    root: 'nature',
+    zap: 'lightning',
+    shock: 'lightning',
+    thunder: 'lightning',
+    void: 'chaos',
+    hex: 'chaos',
+    warp: 'chaos',
     slash: 'attack',
     hit: 'attack',
     stab: 'attack',
@@ -116,6 +136,17 @@ export function normalizeDungeonCommand(value) {
 
 function isOpen(cell) {
     return cell === FLOOR || cell === EXIT || cell === DOOR;
+}
+
+function isOpenOrVine(cell) {
+    return isOpen(cell) || cell === VINES;
+}
+
+function obstacleKind(cell) {
+    if (cell === VINES) {
+        return 'vines';
+    }
+    return null;
 }
 
 const PLAYER_MAX_HP = 5;
@@ -225,7 +256,7 @@ function spawnEnemies(maze, floor) {
     return maze;
 }
 
-function castFire(maze) {
+function castBolt(maze) {
     const { x, y, dir } = maze.player;
     const { dx, dy } = DIRS[dir];
     const limit = maze.width + maze.height;
@@ -244,7 +275,18 @@ function castFire(maze) {
                 enemyId: foe.id,
             };
         }
-        if (!isOpen(maze.grid[ny]?.[nx])) {
+        const cell = maze.grid[ny]?.[nx];
+        const kind = obstacleKind(cell);
+        if (kind) {
+            return {
+                from: { x, y },
+                dir,
+                hit: { x: nx, y: ny },
+                hitKind: 'obstacle',
+                obstacle: kind,
+            };
+        }
+        if (!isOpen(cell)) {
             return {
                 from: { x, y },
                 dir,
@@ -286,15 +328,31 @@ function castAttack(maze) {
     };
 }
 
-function applyFireHit(maze, shot) {
+function applyBoltHit(maze, shot) {
     const hits = [];
     const killed = [];
+    const cleared = [];
+    if (shot?.hitKind === 'obstacle') {
+        const { x, y } = shot.hit || {};
+        const cell = maze.grid[y]?.[x];
+        const need = OBSTACLE_WEAKNESS[cell];
+        if (need && shot.element === need) {
+            maze.grid[y][x] = FLOOR;
+            cleared.push({
+                x,
+                y,
+                kind: obstacleKind(cell) || 'obstacle',
+                element: shot.element,
+            });
+        }
+        return { hits, killed, cleared };
+    }
     if (shot?.hitKind !== 'enemy') {
-        return { hits, killed };
+        return { hits, killed, cleared };
     }
     const enemy = (maze.enemies || []).find((item) => item.id === shot.enemyId);
     if (!enemy) {
-        return { hits, killed };
+        return { hits, killed, cleared };
     }
     enemy.hp -= 1;
     hits.push({ id: enemy.id, kind: enemy.kind, x: enemy.x, y: enemy.y, hp: enemy.hp });
@@ -302,7 +360,7 @@ function applyFireHit(maze, shot) {
         killed.push({ id: enemy.id, kind: enemy.kind, x: enemy.x, y: enemy.y });
         maze.enemies = maze.enemies.filter((item) => item.id !== enemy.id);
     }
-    return { hits, killed };
+    return { hits, killed, cleared };
 }
 
 function stepTowardOpen(maze, enemy) {
@@ -362,7 +420,13 @@ function enemyMelee(maze) {
 }
 
 function enemyInFront(maze) {
-    return castFire(maze).hitKind === 'enemy';
+    return castBolt(maze).hitKind === 'enemy';
+}
+
+function vineInFront(maze) {
+    const { x, y, dir } = maze.player;
+    const { dx, dy } = DIRS[dir];
+    return maze.grid[y + dy]?.[x + dx] === VINES;
 }
 
 function enemyInMeleeRange(maze) {
@@ -385,11 +449,11 @@ function sizeForFloor(floor) {
     return Math.min(MAX_SIZE, odd);
 }
 
-function distFrom(grid, ox, oy) {
+function distFrom(grid, ox, oy, canWalk = isOpen) {
     const height = grid.length;
     const width = grid[0].length;
     const dist = Array.from({ length: height }, () => Array(width).fill(-1));
-    if (!isOpen(grid[oy]?.[ox])) {
+    if (!canWalk(grid[oy]?.[ox])) {
         return dist;
     }
     dist[oy][ox] = 0;
@@ -402,7 +466,7 @@ function distFrom(grid, ox, oy) {
             if (ny < 0 || nx < 0 || ny >= height || nx >= width) {
                 continue;
             }
-            if (dist[ny][nx] >= 0 || !isOpen(grid[ny][nx])) {
+            if (dist[ny][nx] >= 0 || !canWalk(grid[ny][nx])) {
                 continue;
             }
             dist[ny][nx] = dist[y][x] + 1;
@@ -1031,6 +1095,63 @@ function placeHazards(grid, rooms, startX, startY, exitX, exitY) {
     }
 }
 
+function occupiedByActor(maze, x, y) {
+    if (maze.player?.x === x && maze.player?.y === y) {
+        return true;
+    }
+    if (enemyAt(maze.enemies, x, y)) {
+        return true;
+    }
+    return (maze.frogs || []).some((frog) => frog.x === x && frog.y === y);
+}
+
+function stampVine(grid, x, y, startX, startY, exitX, exitY) {
+    if (grid[y]?.[x] !== FLOOR) {
+        return false;
+    }
+    if ((x === startX && y === startY) || (x === exitX && y === exitY)) {
+        return false;
+    }
+    grid[y][x] = VINES;
+    return true;
+}
+
+function placeVines(maze, floor) {
+    const { grid, player, exit } = maze;
+    const startX = player.x;
+    const startY = player.y;
+    const exitX = exit.x;
+    const exitY = exit.y;
+    const count = floor <= 0 ? 1 : Math.min(3, 1 + Math.floor(floor / 4));
+    const spots = [];
+    for (let y = 0; y < maze.height; y += 1) {
+        for (let x = 0; x < maze.width; x += 1) {
+            if (grid[y][x] !== FLOOR) {
+                continue;
+            }
+            if ((x === startX && y === startY) || (x === exitX && y === exitY)) {
+                continue;
+            }
+            if (occupiedByActor(maze, x, y)) {
+                continue;
+            }
+            const kind = roomKindAt(maze.rooms, x, y);
+            spots.push({ x, y, prefer: VINE_ROOMS.has(kind) });
+        }
+    }
+    shuffle(spots);
+    const ordered = [...spots.filter((spot) => spot.prefer), ...spots.filter((spot) => !spot.prefer)];
+    let placed = 0;
+    for (const spot of ordered) {
+        if (placed >= count) {
+            break;
+        }
+        if (stampVine(grid, spot.x, spot.y, startX, startY, exitX, exitY)) {
+            placed += 1;
+        }
+    }
+}
+
 function openDir(grid, x, y) {
     for (let dir = 0; dir < 4; dir++) {
         const nx = x + DIRS[dir].dx;
@@ -1042,8 +1163,8 @@ function openDir(grid, x, y) {
     return 0;
 }
 
-function bestDirToward(grid, x, y, tx, ty, facing) {
-    const dist = distFrom(grid, tx, ty);
+function bestDirToward(grid, x, y, tx, ty, facing, canWalk = isOpen) {
+    const dist = distFrom(grid, tx, ty, canWalk);
     if ((dist[y]?.[x] ?? -1) < 0) {
         return null;
     }
@@ -1098,6 +1219,7 @@ function generateCorridor() {
     const startY = y;
     const exit = { x: 5, y };
     grid[exit.y][exit.x] = EXIT;
+    grid[y][3] = VINES;
     const maze = {
         width,
         height,
@@ -1207,13 +1329,18 @@ function buildFloor(floor) {
         last = mazePayload(size, grid, startX, startY, exit, rooms, floor);
         const dist = distFrom(grid, startX, startY)[exit.y][exit.x];
         if (dist >= targetPath) {
+            placeVines(last, floor);
             return last;
         }
         if (size < MAX_SIZE) {
             size = Math.min(MAX_SIZE, size + 2);
         }
     }
-    return last || generateCorridor();
+    if (last) {
+        placeVines(last, floor);
+        return last;
+    }
+    return generateCorridor();
 }
 
 function layoutFilePath() {
@@ -1249,6 +1376,7 @@ export function createDungeon() {
     let idleTimer = null;
     let autoplayTimer = null;
     let nextAutoCommand = 'up';
+    let chatQuiet = false;
     let visible = true;
     let canvasWidth = DEFAULT_CANVAS.width;
     let canvasHeight = DEFAULT_CANVAS.height;
@@ -1256,7 +1384,8 @@ export function createDungeon() {
     let artwork = [];
     let worldId = 0;
     let hp = PLAYER_MAX_HP;
-    let weapon = 'staff';
+    let weapon = 'hands';
+    let element = 'fire';
     let blocking = false;
 
     function snapshot() {
@@ -1281,6 +1410,7 @@ export function createDungeon() {
             hp,
             maxHp: PLAYER_MAX_HP,
             weapon,
+            element,
             blocking,
             lastAction: lastAction ? { ...lastAction } : null,
             votes: mode === 'democracy' && voteEndsAt ? tally() : null,
@@ -1315,18 +1445,21 @@ export function createDungeon() {
         let bumped = false;
         let shotDetails = null;
 
-        if (command === 'fire') {
-            weapon = 'staff';
+        if (ELEMENT_ACTIONS.has(command)) {
+            weapon = 'hands';
+            element = command;
             blocking = false;
-            const shot = castFire(maze);
-            const { hits, killed } = applyFireHit(maze, shot);
-            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed };
+            const shot = castBolt(maze);
+            shot.element = command;
+            const { hits, killed, cleared } = applyBoltHit(maze, shot);
+            shot.cleared = cleared;
+            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed, cleared };
         } else if (command === 'attack') {
             weapon = 'blade';
             blocking = false;
             const shot = castAttack(maze);
-            const { hits, killed } = applyFireHit(maze, shot);
-            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed };
+            const { hits, killed, cleared } = applyBoltHit(maze, shot);
+            shotDetails = { shot, shotId: (shotSeq += 1), hits, killed, cleared };
         } else if (command === 'block') {
             weapon = 'blade';
             blocking = true;
@@ -1453,7 +1586,7 @@ export function createDungeon() {
 
     function pickNextAuto(bumped, command) {
         const { player, exit, grid } = maze;
-        const goal = bestDirToward(grid, player.x, player.y, exit.x, exit.y, player.dir);
+        const goal = bestDirToward(grid, player.x, player.y, exit.x, exit.y, player.dir, isOpenOrVine);
 
         const randomTurn = () => (Math.random() < 0.5 ? 'left' : 'right');
         const seekTurn = (chance) => {
@@ -1467,11 +1600,14 @@ export function createDungeon() {
         if (enemyInMeleeRange(maze)) {
             return 'attack';
         }
+        if (vineInFront(maze)) {
+            return 'fire';
+        }
         if (enemyInFront(maze)) {
             return 'fire';
         }
 
-        if (command === 'fire' || command === 'attack') {
+        if (ELEMENT_ACTIONS.has(command) || command === 'attack') {
             const { dx, dy } = DIRS[player.dir];
             if (!isOpen(grid[player.y + dy]?.[player.x + dx]) || enemyAt(maze.enemies, player.x + dx, player.y + dy)) {
                 return seekTurn(0.85);
@@ -1574,7 +1710,7 @@ export function createDungeon() {
     function input({ command: raw, user, displayName } = {}) {
         const command = normalizeDungeonCommand(raw);
         if (!command) {
-            const err = new Error('Usage: !up !down !left !right !fire !attack !block');
+            const err = new Error('Usage: !up !down !left !right !fire !water !nature !lightning !chaos !attack !block');
             err.code = 'USAGE';
             throw err;
         }
@@ -1673,7 +1809,8 @@ export function createDungeon() {
         worldId += 1;
         floor = 0;
         hp = PLAYER_MAX_HP;
-        weapon = 'staff';
+        weapon = 'hands';
+        element = 'fire';
         blocking = false;
         maze = buildFloor(floor);
         lastAction = null;
@@ -1979,11 +2116,17 @@ export function createDungeon() {
         setOnAutoplay(fn) {
             onAutoplay = typeof fn === 'function' ? fn : null;
         },
+        isChatQuiet: () => chatQuiet,
+        toggleChatQuiet() {
+            chatQuiet = !chatQuiet;
+            return { chatQuiet };
+        },
         getStatus: () => ({
             listeners: hub.listenerCount,
             floor,
             mode,
             visible,
+            chatQuiet,
             canvasWidth,
             canvasHeight,
             anchor,

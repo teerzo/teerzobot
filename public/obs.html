@@ -58,18 +58,27 @@
 
             source.onopen = () => {
                 const extra = sceneNames.length
-                    ? `scenes: ${sceneNames.map((name) => `!${name}`).join(', ')}`
+                    ? `scenes: ${sceneNames.map((name) => `!obs ${name}`).join(', ')}`
                     : 'no OBS_SCENE_* mapped';
                 setStatus(`teerzobot OBS — connected · ${extra}`);
             };
 
             source.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                const scene = scenes[data.command];
+                const sceneKey =
+                    data.command === 'obs'
+                        ? String(data.args?.[0] ?? '')
+                              .trim()
+                              .toLowerCase()
+                              .replace(/^!/, '')
+                        : data.command;
+                const scene = sceneKey ? scenes[sceneKey] : null;
                 if (scene && window.obsstudio && typeof window.obsstudio.setCurrentScene === 'function') {
                     window.obsstudio.setCurrentScene(scene);
                 }
-                if (data.command) {
+                if (data.command === 'obs' && sceneKey) {
+                    show(`obs ${sceneKey} (${data.displayName || data.user || 'chat'})`);
+                } else if (data.command) {
                     show(`${data.command} (${data.displayName || data.user || 'chat'})`);
                 }
             };

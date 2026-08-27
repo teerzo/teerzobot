@@ -26,6 +26,9 @@ const slashReplies = {
     hello: 'Hello! teerzobot is online.',
 };
 
+const STATUS_CHANNEL_NAME = 'status';
+const START_STATUS_MESSAGE = 'teerzobot start';
+
 function htmlPage(title, body) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>body{font:16px/1.4 sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;color:#eee;background:#111}</style>
@@ -101,6 +104,27 @@ function danceChannelName() {
 
 function isDanceChannelName(name) {
     return normalizeChannelName(name) === danceChannelName();
+}
+
+function isStatusChannelName(name) {
+    return normalizeChannelName(name) === STATUS_CHANNEL_NAME;
+}
+
+function formatGmtTimestamp(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'UTC',
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type) => parts.find((part) => part.type === type)?.value ?? '';
+    return `${get('weekday')}, ${get('day')} ${get('month')} ${get('year')} ${get('hour')}:${get('minute')}:${get('second')} GMT+0`;
 }
 
 function artworkChannelName() {
@@ -257,6 +281,26 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage, onArtworkIm
         return null;
     }
 
+    async function postStartupStatus() {
+        const target = await resolveNamedTextChannel(isStatusChannelName);
+        if (!target) {
+            console.log(`Discord status channel: no #${STATUS_CHANNEL_NAME} channel found`);
+            return;
+        }
+        if (!canSend(target)) {
+            console.log(`Discord status channel: cannot send messages in #${target.name}`);
+            return;
+        }
+
+        const line = `${START_STATUS_MESSAGE} ${formatGmtTimestamp()}`;
+        try {
+            await target.send(line);
+            console.log(`Posted startup status in #${target.name}`);
+        } catch (err) {
+            console.error(`Failed to post startup status in #${target.name}`, err);
+        }
+    }
+
     async function ingestArtworkUrls(urls, { silent = false } = {}) {
         if (!urls.length) {
             return 0;
@@ -387,6 +431,7 @@ export function createDiscordClient({ onBridgeMessage, onDanceImage, onArtworkIm
                 console.log(`Discord Twitch chat bridge: no #${bridgeChannelName()} channel found`);
             }
             console.log(`Discord dance queue channel: #${danceChannelName()}`);
+            await postStartupStatus();
             await loadArtworkHistory();
 
             if (!clientId) {

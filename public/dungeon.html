@@ -381,9 +381,12 @@
 
         const params = new URLSearchParams(location.search);
         const preview = params.has('preview');
-        const CELL = 1;
+        const TILE_W = 1;      // cell width (X)
+        const TILE_D = 1;      // cell depth (Z)
+        const TILE_H = 1.55;   // full wall / default ceiling height (Y)
+        const CELL = TILE_W;
         const EYE = 0.52;
-        const WALL_H = 1.55;
+        const WALL_H = TILE_H;
         const OUTDOOR_SKY_H = 13;
         const INDOOR_FOG_DENSITY = 0.42;
         const OUTDOOR_FOG_DENSITY = 0.1;
@@ -2101,38 +2104,38 @@
 
         const ceilMat = new THREE.MeshStandardMaterial({ color: 0x100e0c, roughness: 0.98, metalness: 0 });
         const wallMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeStoneCanvas()),
+            map: canvasToTexture(makeStoneCanvas(), 1, 1),
             roughness: 0.92,
             metalness: 0.04,
         });
         const vineWallMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeVineCanvas()),
+            map: canvasToTexture(makeVineCanvas(), 1, 1),
             roughness: 0.92,
             metalness: 0.04,
         });
         const crackedWallMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeCrackedCanvas()),
+            map: canvasToTexture(makeCrackedCanvas(), 1, 1),
             roughness: 0.94,
             metalness: 0.03,
         });
         const woodWallMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeWoodCanvas()),
+            map: canvasToTexture(makeWoodCanvas(), 1, 1),
             roughness: 0.88,
             metalness: 0.04,
         });
         const metalWallMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeMetalCanvas()),
+            map: canvasToTexture(makeMetalCanvas(), 1, 1),
             roughness: 0.42,
             metalness: 0.72,
         });
         const doorWoodMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeWoodCanvas(), 1, 2),
+            map: canvasToTexture(makeWoodCanvas(), 1, 1),
             color: 0xc4a07a,
             roughness: 0.86,
             metalness: 0.04,
         });
         const doorIronMat = new THREE.MeshStandardMaterial({
-            map: canvasToTexture(makeMetalCanvas(), 1, 2),
+            map: canvasToTexture(makeMetalCanvas(), 1, 1),
             color: 0x8a9098,
             roughness: 0.38,
             metalness: 0.78,
@@ -2140,63 +2143,63 @@
         const CEIL_KINDS = ['dark', 'stone', 'wood', 'metal', 'vine', 'vault', 'rock', 'grate', 'soot', 'gilt', 'brick', 'plaster'];
         const ceilMats = [
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeStoneCanvas()),
+                map: canvasToTexture(makeStoneCanvas(), 1, 1),
                 color: 0x2a2622,
                 roughness: 0.98,
                 metalness: 0,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeStoneCanvas()),
+                map: canvasToTexture(makeStoneCanvas(), 1, 1),
                 roughness: 0.96,
                 metalness: 0.02,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeBeamCanvas()),
+                map: canvasToTexture(makeBeamCanvas(), 1, 1),
                 roughness: 0.9,
                 metalness: 0.04,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeMetalCanvas()),
+                map: canvasToTexture(makeMetalCanvas(), 1, 1),
                 roughness: 0.45,
                 metalness: 0.62,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeVineCanvas()),
+                map: canvasToTexture(makeVineCanvas(), 1, 1),
                 roughness: 0.96,
                 metalness: 0.02,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeVaultCanvas()),
+                map: canvasToTexture(makeVaultCanvas(), 1, 1),
                 roughness: 0.88,
                 metalness: 0.08,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeRockCeilCanvas()),
+                map: canvasToTexture(makeRockCeilCanvas(), 1, 1),
                 roughness: 0.98,
                 metalness: 0.02,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeGrateCanvas()),
+                map: canvasToTexture(makeGrateCanvas(), 1, 1),
                 roughness: 0.7,
                 metalness: 0.18,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeSootCanvas()),
+                map: canvasToTexture(makeSootCanvas(), 1, 1),
                 roughness: 0.98,
                 metalness: 0,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeGiltCeilCanvas()),
+                map: canvasToTexture(makeGiltCeilCanvas(), 1, 1),
                 roughness: 0.55,
                 metalness: 0.28,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makeBrickCeilCanvas()),
+                map: canvasToTexture(makeBrickCeilCanvas(), 1, 1),
                 roughness: 0.94,
                 metalness: 0.03,
             }),
             new THREE.MeshStandardMaterial({
-                map: canvasToTexture(makePlasterCanvas()),
+                map: canvasToTexture(makePlasterCanvas(), 1, 1),
                 roughness: 0.96,
                 metalness: 0.02,
             }),
@@ -2618,32 +2621,59 @@
         const HALF_H = WALL_H * 0.22;
         const BROKEN_H = WALL_H * 0.32;
 
-        function makeWallBoxGeo(widthX, height, widthZ) {
-            const geo = new THREE.BoxGeometry(widthX, height, widthZ);
+        // BoxGeometry face order: +x, -x, +y, -y, +z, -z. Each face has 4 UVs
+        // at (0,1), (1,1), (0,0), (1,0). Scale those by world face size / TILE_W
+        // so square textures keep a square texel aspect at any wall size.
+        function setBoxWorldUVs(geo, width, height, depth) {
             const uv = geo.attributes.uv;
-            const scaleY = height / WALL_H;
-            if (scaleY < 0.999) {
-                for (let face = 0; face < 6; face++) {
-                    if (face === 2 || face === 3) {
-                        continue;
-                    }
-                    const base = face * 4;
-                    for (let i = 0; i < 4; i++) {
-                        uv.setY(base + i, uv.getY(base + i) * scaleY);
-                    }
-                }
-                uv.needsUpdate = true;
+            const faces = [
+                [depth, height],
+                [depth, height],
+                [width, depth],
+                [width, depth],
+                [width, height],
+                [width, height],
+            ];
+            for (let f = 0; f < 6; f += 1) {
+                const uMax = faces[f][0] / TILE_W;
+                const vMax = faces[f][1] / TILE_W;
+                const base = f * 4;
+                uv.setXY(base + 0, 0, vMax);
+                uv.setXY(base + 1, uMax, vMax);
+                uv.setXY(base + 2, 0, 0);
+                uv.setXY(base + 3, uMax, 0);
             }
+            uv.needsUpdate = true;
             return geo;
         }
-        const fencePostGeo = new THREE.BoxGeometry(0.04, 0.72, 0.04);
-        const fenceRailGeo = new THREE.BoxGeometry(0.98, 0.03, 0.03);
+
+        function setPlaneWorldUVs(geo, width, depth) {
+            const uv = geo.attributes.uv;
+            const uMax = width / TILE_W;
+            const vMax = depth / TILE_D;
+            uv.setXY(0, 0, vMax);
+            uv.setXY(1, uMax, vMax);
+            uv.setXY(2, 0, 0);
+            uv.setXY(3, uMax, 0);
+            uv.needsUpdate = true;
+            return geo;
+        }
+
+        function boxWithWorldUVs(width, height, depth) {
+            return setBoxWorldUVs(new THREE.BoxGeometry(width, height, depth), width, height, depth);
+        }
+
+        function makeWallBoxGeo(widthX, height, widthZ) {
+            return boxWithWorldUVs(widthX, height, widthZ);
+        }
+        const fencePostGeo = boxWithWorldUVs(0.04, 0.72, 0.04);
+        const fenceRailGeo = boxWithWorldUVs(0.98, 0.03, 0.03);
         const windowPaneGeo = new THREE.PlaneGeometry(0.56, 0.78);
-        const windowMullionVGeo = new THREE.BoxGeometry(0.035, 0.78, 0.045);
-        const windowMullionHGeo = new THREE.BoxGeometry(0.56, 0.035, 0.045);
-        const doorJambGeo = new THREE.BoxGeometry(0.12, WALL_H, 0.16);
-        const doorLintelGeo = new THREE.BoxGeometry(1.02, 0.16, 0.18);
-        const doorLeafGeo = new THREE.BoxGeometry(0.72, WALL_H * 0.78, 0.05);
+        const windowMullionVGeo = boxWithWorldUVs(0.035, 0.78, 0.045);
+        const windowMullionHGeo = boxWithWorldUVs(0.56, 0.035, 0.045);
+        const doorJambGeo = boxWithWorldUVs(0.12, TILE_H, 0.16);
+        const doorLintelGeo = boxWithWorldUVs(TILE_W + 0.02, 0.16, 0.18);
+        const doorLeafGeo = boxWithWorldUVs(0.72, TILE_H * 0.78, 0.05);
         const goblinBodyGeo = new THREE.BoxGeometry(0.18, 0.2, 0.13);
         const goblinBellyGeo = new THREE.SphereGeometry(0.09, 7, 5);
         const goblinHeadGeo = new THREE.SphereGeometry(0.095, 8, 6);
@@ -2674,7 +2704,7 @@
         const bloodStainGeo = new THREE.PlaneGeometry(0.78, 0.62);
         const hangCurtainGeo = new THREE.PlaneGeometry(0.96, WALL_H * 0.96);
         const cobwebHangGeo = new THREE.PlaneGeometry(0.94, 0.82);
-        const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+        const caveBlockGeo = boxWithWorldUVs(1, 1, 1);
         const outdoorSkyGeo = new THREE.PlaneGeometry(1, 1);
         outdoorSkyGeo.rotateX(Math.PI / 2);
         const outdoorSkyDomeGeo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -5525,8 +5555,8 @@
 
         function makeHoleWall() {
             const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1.02, WALL_H, 1.02), wallMat);
-            body.position.y = WALL_H / 2;
+            const body = new THREE.Mesh(boxWithWorldUVs(TILE_W + 0.02, TILE_H, TILE_D + 0.02), wallMat);
+            body.position.y = TILE_H / 2;
             body.castShadow = true;
             body.receiveShadow = true;
             const holeZ = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 1.12), voidMat);
@@ -5690,14 +5720,14 @@
 
         function makeWindowWall(stained, variant) {
             const group = new THREE.Group();
-            const left = new THREE.Mesh(new THREE.BoxGeometry(0.22, WALL_H, 1.02), wallMat);
-            left.position.set(-0.4, WALL_H / 2, 0);
-            const right = new THREE.Mesh(new THREE.BoxGeometry(0.22, WALL_H, 1.02), wallMat);
-            right.position.set(0.4, WALL_H / 2, 0);
-            const sill = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 1.02), wallMat);
+            const left = new THREE.Mesh(boxWithWorldUVs(0.22, TILE_H, TILE_D + 0.02), wallMat);
+            left.position.set(-0.4, TILE_H / 2, 0);
+            const right = new THREE.Mesh(boxWithWorldUVs(0.22, TILE_H, TILE_D + 0.02), wallMat);
+            right.position.set(0.4, TILE_H / 2, 0);
+            const sill = new THREE.Mesh(boxWithWorldUVs(0.62, 0.18, TILE_D + 0.02), wallMat);
             sill.position.set(0, 0.42, 0);
-            const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 1.02), wallMat);
-            lintel.position.set(0, WALL_H - 0.12, 0);
+            const lintel = new THREE.Mesh(boxWithWorldUVs(0.62, 0.22, TILE_D + 0.02), wallMat);
+            lintel.position.set(0, TILE_H - 0.12, 0);
             const paneMat = stained
                 ? stainedGlassMats[Math.abs(variant) % stainedGlassMats.length]
                 : daySkyMat;
@@ -5730,15 +5760,15 @@
 
         function makeBreachWall() {
             const group = new THREE.Group();
-            const sill = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.26, 1.02), crackedWallMat);
+            const sill = new THREE.Mesh(boxWithWorldUVs(TILE_W + 0.02, 0.26, TILE_D + 0.02), crackedWallMat);
             sill.position.y = 0.13;
-            const left = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wallMat);
-            left.position.set(-0.42, WALL_H / 2, 0);
-            const right = new THREE.Mesh(new THREE.BoxGeometry(0.18, WALL_H, 1.02), wallMat);
-            right.position.set(0.42, WALL_H / 2, 0);
-            const top = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 1.02), crackedWallMat);
-            top.position.y = WALL_H - 0.08;
-            const rubble = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.22), crackedWallMat);
+            const left = new THREE.Mesh(boxWithWorldUVs(0.18, TILE_H, TILE_D + 0.02), wallMat);
+            left.position.set(-0.42, TILE_H / 2, 0);
+            const right = new THREE.Mesh(boxWithWorldUVs(0.18, TILE_H, TILE_D + 0.02), wallMat);
+            right.position.set(0.42, TILE_H / 2, 0);
+            const top = new THREE.Mesh(boxWithWorldUVs(0.7, 0.16, TILE_D + 0.02), crackedWallMat);
+            top.position.y = TILE_H - 0.08;
+            const rubble = new THREE.Mesh(boxWithWorldUVs(0.28, 0.18, 0.22), crackedWallMat);
             rubble.position.set(0.12, 0.32, 0.2);
             group.add(sill, left, right, top, rubble);
             return group;
@@ -7041,8 +7071,9 @@
                 }
             }
 
-            const tileGeo = new THREE.PlaneGeometry(1, 1);
+            const tileGeo = new THREE.PlaneGeometry(TILE_W, TILE_D);
             tileGeo.rotateX(-Math.PI / 2);
+            setPlaneWorldUVs(tileGeo, TILE_W, TILE_D);
             const dummy = new THREE.Object3D();
             const color = new THREE.Color();
             for (let k = 0; k < floorBuckets.length; k++) {
@@ -7090,8 +7121,9 @@
                     ceilBuckets[kind].push(x, y);
                 }
             }
-            const ceilTileGeo = new THREE.PlaneGeometry(1, 1);
+            const ceilTileGeo = new THREE.PlaneGeometry(TILE_W, TILE_D);
             ceilTileGeo.rotateX(Math.PI / 2);
+            setPlaneWorldUVs(ceilTileGeo, TILE_W, TILE_D);
             for (let k = 0; k < ceilBuckets.length; k++) {
                 const positions = ceilBuckets[k];
                 if (!positions.length) {

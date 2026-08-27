@@ -39,6 +39,7 @@ const RESERVED = new Set([
     'democracy',
     'autoplay',
     'resize',
+    'phone',
     'up',
     'down',
     'left',
@@ -50,7 +51,8 @@ const RESERVED = new Set([
 ]);
 
 function formatDungeonLayout(state) {
-    const size = `${state.canvasWidth}×${state.canvasHeight}`;
+    const portrait = Number(state.canvasHeight) > Number(state.canvasWidth);
+    const size = `${state.canvasWidth}×${state.canvasHeight}${portrait ? ' (phone)' : ''}`;
     const corner = String(state.anchor || 'top-left').replace('-', ' ');
     if (state.action === 'anchor') {
         if (!state.changed) {
@@ -70,7 +72,7 @@ function formatDungeonLayout(state) {
 const HELP_TOPICS = {
     dc: {
         aliases: ['dungeon'],
-        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !attack !block · !anarchy !democracy !autoplay (mods) · !clear hides',
+        text: 'Dungeon: !dc / !dungeon show+reset · !dc bigger/smaller (mods) · !dc phone / !phone portrait screen (mods) · !dc landscape back to wide (mods) · !dc topleft/topright/bottomleft/bottomright (mods) · !up !down !left !right · !fire · !attack !block · !anarchy !democracy !autoplay (mods) · !clear hides',
     },
     ttt: {
         aliases: ['tictactoe'],
@@ -427,7 +429,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'dc',
-            response: 'Dungeon layout: !dc size bigger|smaller|full · !dc position topleft',
+            response: 'Dungeon layout: !dc size bigger|smaller|full · !dc phone|landscape · !dc position topleft',
             builtin: true,
             execute({ say, channel, args, isMod, isBroadcaster }) {
                 if (!dungeon) {
@@ -445,7 +447,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     const state = dungeon.applyLayoutArgs(args);
                     return say(channel, formatDungeonLayout(state));
                 } catch (err) {
-                    return say(channel, err.message || 'Usage: !dc size bigger|smaller|full or !dc position topleft');
+                    return say(channel, err.message || 'Usage: !dc size bigger|smaller|full|phone or !dc position topleft');
                 }
             },
         },
@@ -499,7 +501,7 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
         },
         {
             name: 'resize',
-            response: 'Resize the dungeon canvas (mods): !resize bigger|smaller|full',
+            response: 'Resize the dungeon canvas (mods): !resize bigger|smaller|full|phone',
             builtin: true,
             modOnly: true,
             execute({ say, channel, args }) {
@@ -510,7 +512,24 @@ export function createCommandHandler(store, { getTwitch, obs, getNowPlaying, dvd
                     const state = dungeon.applyLayoutArgs(['size', ...args]);
                     return say(channel, formatDungeonLayout(state));
                 } catch (err) {
-                    return say(channel, err.message || 'Usage: !resize bigger|smaller|full');
+                    return say(channel, err.message || 'Usage: !resize bigger|smaller|full|phone');
+                }
+            },
+        },
+        {
+            name: 'phone',
+            response: 'Switch the dungeon to a portrait phone size (mods): !phone bigger|smaller',
+            builtin: true,
+            modOnly: true,
+            execute({ say, channel, args }) {
+                if (!dungeon) {
+                    return say(channel, 'Dungeon overlay is not available.');
+                }
+                try {
+                    const state = dungeon.applyLayoutArgs(['phone', ...args]);
+                    return say(channel, formatDungeonLayout(state));
+                } catch (err) {
+                    return say(channel, err.message || 'Usage: !phone or !phone bigger|smaller');
                 }
             },
         },

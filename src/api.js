@@ -249,6 +249,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
                 res.json(dungeon.setAnchor(req.body.anchor));
                 return;
             }
+            if (req.body?.phone === true || String(req.body?.orientation || '').toLowerCase() === 'phone') {
+                res.json(dungeon.phoneCommand(req.body?.spec ?? req.body?.size));
+                return;
+            }
             if (req.body?.step) {
                 res.json(dungeon.stepSize(Number(req.body.step)));
                 return;

@@ -59,12 +59,13 @@
             {
                 name: 'Dungeon',
                 path: '/dungeon',
-                commands: ['!up', '!down', '!left', '!right', '!fire', '!dungeon', '!dc bigger', '!dc smaller', '!dc topleft', '!anarchy', '!democracy', '!autoplay'],
-                note: 'OBS Browser Source 1920×1080. Canvas starts 640×480 top-left. Mods: !dc bigger / !dc smaller / !dc topleft. !fire shoots a firebolt that explodes on walls. !clear hides it; !dungeon shows it again. Preview: /dungeon?preview=1',
+                commands: ['!up', '!down', '!left', '!right', '!fire', '!dungeon', '!dc bigger', '!dc smaller', '!phone', '!phone bigger', '!dc landscape', '!dc topleft', '!anarchy', '!democracy', '!autoplay'],
+                note: 'OBS Browser Source 1920×1080. Canvas starts 640×480 top-left. Mods: !dc bigger / !dc smaller / !dc topleft. For phones, !dc phone (or !phone) switches to a portrait 9:16 canvas (540×960) with a scaled HUD; !phone bigger / smaller step 360×640 → 405×720 → 540×960 → 608×1080, and !dc landscape returns to wide. !fire shoots a firebolt that explodes on walls. !clear hides it; !dungeon shows it again. Preview: /dungeon?preview=1',
                 clearPath: '/api/dungeon/clear',
                 previewClass: 'ratio-16x9',
                 sizes: [
                     { label: '1920×1080', width: 1920, height: 1080 },
+                    { label: 'Phone 540×960', width: 540, height: 960 },
                 ],
             },
             {

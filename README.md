@@ -69,7 +69,9 @@ http://localhost:3000/discord/callback
 https://<your-app>.up.railway.app/discord/callback
 ```
 
-On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping` and `/hello`, and reports connection state on `GET /api/status` as `discord`. When it is added to a server it posts in `#general` if it can send messages there (otherwise the system channel or another text channel). Restarting does not re-post.
+On ready the bot goes online (Watching `TWITCH_CHANNEL`), registers guild-scoped `/ping` and `/hello`, and reports connection state on `GET /api/status` as `discord`. When it is added to a server it posts in `#general` if it can send messages there (otherwise the system channel or another text channel). Restarting does not re-post that join message.
+
+Each process start (including Railway rebuilds) posts `teerzobot start` plus a readable GMT+0 timestamp in `#status`, for example `teerzobot start Thursday, 27 August 2026 05:02:00 GMT+0`. The channel name and message are hardcoded.
 
 ### Twitch chat bridge
 

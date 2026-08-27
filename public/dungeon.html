@@ -329,9 +329,9 @@
         const OUTDOOR_LOOK_PITCH = -0.2;
         const INDOOR_FOG_DENSITY = 0.42;
         const OUTDOOR_FOG_DENSITY = 0.1;
-        const DAY_FOG_COLOR = new THREE.Color(0x8eb7dc);
-        const DAY_SKY_BG = new THREE.Color(0x6fa8e4);
-        const DAY_AMBIENT = new THREE.Color(0xc4d6ee);
+        const DAY_FOG_COLOR = new THREE.Color(0xb7d4ee);
+        const DAY_SKY_BG = new THREE.Color(0x5ea6e8);
+        const DAY_AMBIENT = new THREE.Color(0xe7f0ff);
         const PROP_LIFT = 0.028;
         const WALL_PUSH = 0.62;
         const WALL_DECAL = 0.57;
@@ -1120,9 +1120,10 @@
             canvas.height = size;
             const ctx = canvas.getContext('2d');
             const g = ctx.createLinearGradient(0, 0, 0, size);
-            g.addColorStop(0, '#3f83d6');
-            g.addColorStop(0.5, '#6fa8e4');
-            g.addColorStop(1, '#c4e3f6');
+            g.addColorStop(0, '#1d64c8');
+            g.addColorStop(0.42, '#4f97e6');
+            g.addColorStop(0.78, '#a9d6f6');
+            g.addColorStop(1, '#e7f3ff');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, size, size);
             const sunX = 48;
@@ -1652,14 +1653,7 @@
                     mat.color.lerp(new THREE.Color(palette.wall), 0.28);
                 }
             }
-            daySkyMat.color.setHex(
-                id === 'ember' ? 0xffd8b0
-                    : id === 'crypt' ? 0xc0d0ff
-                    : id === 'blood' ? 0xffc8c0
-                    : id === 'gilt' ? 0xffe8c8
-                    : id === 'cave' ? 0xe8dcc8
-                    : 0xffffff,
-            );
+            daySkyMat.color.setHex(0xffffff);
             torch.color.setHex(palette.torch);
             ambient.color.setHex(palette.dark);
             fogIndoor.setHex(palette.fog);
@@ -6873,8 +6867,8 @@
             scene.fog.density = INDOOR_FOG_DENSITY + (OUTDOOR_FOG_DENSITY - INDOOR_FOG_DENSITY) * outdoorBlend;
             scene.background.copy(fogIndoor).lerp(DAY_SKY_BG, outdoorBlend);
             ambient.color.copy(ambientIndoor).lerp(DAY_AMBIENT, outdoorBlend);
-            ambient.intensity = 0.4 + outdoorBlend * 0.7;
-            outdoorHemi.intensity = outdoorBlend * 1.15;
+            ambient.intensity = 0.4 + outdoorBlend * 1.05;
+            outdoorHemi.intensity = outdoorBlend * 1.85;
 
             camera.position.set(
                 camPos.x + lookX * bump,

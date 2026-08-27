@@ -325,6 +325,13 @@
         const CELL = 1;
         const EYE = 0.52;
         const WALL_H = 1.55;
+        const OUTDOOR_SKY_H = 13;
+        const OUTDOOR_LOOK_PITCH = -0.2;
+        const INDOOR_FOG_DENSITY = 0.42;
+        const OUTDOOR_FOG_DENSITY = 0.1;
+        const DAY_FOG_COLOR = new THREE.Color(0x8eb7dc);
+        const DAY_SKY_BG = new THREE.Color(0x6fa8e4);
+        const DAY_AMBIENT = new THREE.Color(0xc4d6ee);
         const PROP_LIFT = 0.028;
         const WALL_PUSH = 0.62;
         const WALL_DECAL = 0.57;
@@ -353,7 +360,7 @@
         scene.background = new THREE.Color(0x090807);
         scene.fog = new THREE.FogExp2(0x090807, 0.42);
 
-        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 24);
+        const camera = new THREE.PerspectiveCamera(110, 640 / 480, 0.05, 64);
         const renderer = new THREE.WebGLRenderer({
             antialias: false,
             powerPreference: 'high-performance',
@@ -366,6 +373,8 @@
 
         const ambient = new THREE.AmbientLight(0x2a241c, 0.4);
         scene.add(ambient);
+        const outdoorHemi = new THREE.HemisphereLight(0xb7d8ff, 0x6d8a52, 0);
+        scene.add(outdoorHemi);
         const torch = new THREE.PointLight(0xffd6a0, 2.4, 8, 1.6);
         camera.add(torch);
         scene.add(camera);
@@ -1653,6 +1662,8 @@
             );
             torch.color.setHex(palette.torch);
             ambient.color.setHex(palette.dark);
+            fogIndoor.setHex(palette.fog);
+            ambientIndoor.setHex(palette.dark);
             return palette;
         }
 
@@ -1820,9 +1831,17 @@
             return PALETTE_CEIL[paletteId] || 'dark';
         }
 
+        function outdoorOpeningHeight(room) {
+            const span = Math.max(room?.w || 5, room?.h || 5);
+            return Math.max(2.45, Math.min(3.7, 0.55 + 0.42 * span));
+        }
+
         function pickCeilHeight(x, z, rooms) {
             const room = roomContaining(rooms, x, z);
-            if (!room || isOutdoorRoom(room)) {
+            if (isOutdoorRoom(room)) {
+                return outdoorOpeningHeight(room);
+            }
+            if (!room) {
                 return WALL_H;
             }
             if (room.kind === 'cave') {
@@ -2052,6 +2071,7 @@
             map: canvasToTexture(makeDaySkyCanvas(), 1, 1),
             fog: false,
             depthWrite: true,
+            side: THREE.DoubleSide,
         });
         const stainedGlassMats = [0, 1, 2].map((variant) => {
             const map = canvasToTexture(makeStainedGlassCanvas(variant), 1, 1);
@@ -2486,6 +2506,7 @@
         const caveBlockGeo = new THREE.BoxGeometry(1, 1, 1);
         const outdoorSkyGeo = new THREE.PlaneGeometry(1, 1);
         outdoorSkyGeo.rotateX(Math.PI / 2);
+        const outdoorSkyDomeGeo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
         const curveQuarterGeo = new THREE.CylinderGeometry(0.98, 0.98, 1, 16, 1, false, 0, Math.PI / 2);
         const curveHalfGeo = new THREE.CylinderGeometry(0.7, 0.7, 1, 14, 1, false, 0, Math.PI);
 
@@ -2533,7 +2554,12 @@
         const camPos = new THREE.Vector3(1, EYE, 1);
         const targetPos = new THREE.Vector3(1, EYE, 1);
         let camYaw = 0;
+        let camPitch = 0;
         let targetYaw = 0;
+        let liveRooms = [];
+        let outdoorBlend = 0;
+        const fogIndoor = new THREE.Color(0x090807);
+        const ambientIndoor = new THREE.Color(0x2a241c);
         let bump = 0;
         let lastAt = '';
         let lastShotId = 0;
@@ -2586,7 +2612,7 @@
             goblinTuskGeo, goblinArmGeo, goblinHandGeo, goblinLegGeo, goblinFootGeo, goblinClothGeo, goblinBladeGeo, goblinBrowGeo,
             ghostBodyGeo, ghostHeadGeo, ghostArmGeo, ghostHemGeo, ghostEyeGeo, ghostMouthGeo, ghostCoreGeo,
             frogBodyGeo, frogHeadGeo, frogEyeGeo, frogLegGeo, frogFootGeo, bloodStainGeo,
-            hangCurtainGeo, cobwebHangGeo, caveBlockGeo, outdoorSkyGeo, curveQuarterGeo, curveHalfGeo,
+            hangCurtainGeo, cobwebHangGeo, caveBlockGeo, outdoorSkyGeo, outdoorSkyDomeGeo, curveQuarterGeo, curveHalfGeo,
         ]);
         const SHARED_MATS = new Set([
             floorBaseMat, ceilMat, wallMat, vineWallMat, crackedWallMat, woodWallMat, metalWallMat,
@@ -6084,6 +6110,7 @@
             clearProps();
 
             const palette = applyPalette(state.palette);
+            liveRooms = state.rooms || [];
             waterMat.color.setHex(state.palette === 'sewer' ? 0x2a4a18 : 0x1a4858);
             waterMat.emissive.setHex(state.palette === 'sewer' ? 0x14280c : 0x0a2838);
             for (const mat of floorMats) {
@@ -6534,17 +6561,24 @@
                 if (!isOutdoorRoom(room)) {
                     continue;
                 }
+                const cx = room.x + (room.w - 1) / 2;
+                const cz = room.y + (room.h - 1) / 2;
+                const opening = outdoorOpeningHeight(room);
+                const dome = new THREE.Mesh(outdoorSkyDomeGeo, daySkyMat);
+                dome.position.set(cx, 0.04, cz);
+                dome.scale.set(room.w * 0.5 + 0.2, OUTDOOR_SKY_H, room.h * 0.5 + 0.2);
+                outdoorSkyRoot.add(dome);
                 const sky = new THREE.Mesh(outdoorSkyGeo, daySkyMat);
-                sky.position.set(room.x + (room.w - 1) / 2, 18.5, room.y + (room.h - 1) / 2);
-                sky.scale.set(room.w + 20, 1, room.h + 20);
+                sky.position.set(cx, OUTDOOR_SKY_H - 0.04, cz);
+                sky.scale.set(room.w + 1.2, 1, room.h + 1.2);
                 outdoorSkyRoot.add(sky);
                 const sun = new THREE.PointLight(
                     0xfff0c8,
-                    1.5,
-                    Math.max(room.w, room.h) + 12,
-                    1.4,
+                    2.05,
+                    Math.max(room.w, room.h) + opening + 10,
+                    1.25,
                 );
-                sun.position.set(room.x + (room.w - 1) / 2, 5.5, room.y + (room.h - 1) / 2);
+                sun.position.set(cx, Math.max(4.8, opening + 2.4), cz);
                 outdoorSkyRoot.add(sun);
             }
             scene.add(outdoorSkyRoot);
@@ -6703,6 +6737,8 @@
                 camPos.copy(targetPos);
                 camYaw = targetYaw;
                 bump = 0;
+                outdoorBlend = isOutdoorAt(player.x, player.y, liveRooms) ? 1 : 0;
+                camPitch = outdoorBlend ? OUTDOOR_LOOK_PITCH : 0;
             }
 
             if (state.exit) {
@@ -6829,11 +6865,23 @@
             const bob = Math.sin(clock.elapsedTime * 2.1) * 0.018;
             const lookX = -Math.sin(camYaw);
             const lookZ = -Math.cos(camYaw);
+            const outdoorHere = isOutdoorAt(Math.round(targetPos.x), Math.round(targetPos.z), liveRooms);
+            const outdoorWant = outdoorHere ? 1 : 0;
+            outdoorBlend += (outdoorWant - outdoorBlend) * (1 - Math.exp(-dt * 3.2));
+            camPitch += (((outdoorHere ? OUTDOOR_LOOK_PITCH : 0) - camPitch) * (1 - Math.exp(-dt * 4.2)));
+            scene.fog.color.copy(fogIndoor).lerp(DAY_FOG_COLOR, outdoorBlend);
+            scene.fog.density = INDOOR_FOG_DENSITY + (OUTDOOR_FOG_DENSITY - INDOOR_FOG_DENSITY) * outdoorBlend;
+            scene.background.copy(fogIndoor).lerp(DAY_SKY_BG, outdoorBlend);
+            ambient.color.copy(ambientIndoor).lerp(DAY_AMBIENT, outdoorBlend);
+            ambient.intensity = 0.4 + outdoorBlend * 0.7;
+            outdoorHemi.intensity = outdoorBlend * 1.15;
+
             camera.position.set(
                 camPos.x + lookX * bump,
                 camPos.y + bob,
                 camPos.z + lookZ * bump,
             );
+            camera.rotation.x = camPitch;
             camera.rotation.y = camYaw;
             staffKick *= Math.exp(-dt * 11);
             swordKick *= Math.exp(-dt * 10);
@@ -6855,7 +6903,7 @@
             shield.rotation.x = shieldBaseRot.x - shieldGuard * 0.35;
             shield.rotation.y = shieldBaseRot.y - shieldGuard * 0.45;
             updateFx(dt);
-            torch.intensity = 1.6 + Math.sin(clock.elapsedTime * 11) * 0.12;
+            torch.intensity = (1.6 + Math.sin(clock.elapsedTime * 11) * 0.12) * (1 - outdoorBlend * 0.55);
             torchFlameMat.emissiveIntensity = 2.1 + Math.sin(clock.elapsedTime * 17) * 0.45 + Math.sin(clock.elapsedTime * 29) * 0.2;
             updateTorchEmbers(dt);
             updateMushroomSpores(dt);

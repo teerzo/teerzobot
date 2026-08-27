@@ -162,6 +162,10 @@ export function createApi({ getStatus, commands, store, obs, chatFeed, nowPlayin
         res.sendFile(path.join(publicDir, 'ttt.html'));
     });
 
+    app.get('/dungeon/assets', (_req, res) => {
+        res.sendFile(path.join(publicDir, 'dungeon-assets.html'));
+    });
+
     app.get('/dungeon', (_req, res) => {
         res.sendFile(path.join(publicDir, 'dungeon.html'));
     });

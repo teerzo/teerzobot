@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>teerzobot dungeon assets</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #0b0d12;
+            color: #e8e4dc;
+            font: 14px/1.4 "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+        #app {
+            position: fixed;
+            inset: 0;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #label {
+            position: fixed;
+            top: 12px;
+            left: 14px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.45);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-size: 12px;
+            pointer-events: none;
+            user-select: none;
+        }
+        #hint {
+            position: fixed;
+            bottom: 12px;
+            left: 14px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.45);
+            font-size: 12px;
+            opacity: 0.75;
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <div id="label">goblin</div>
+    <div id="hint">drag to orbit &middot; scroll to zoom &middot; right-drag to pan</div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const container = document.getElementById('app');
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0b0d12);
+
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+        camera.position.set(0.9, 0.8, 1.4);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.target.set(0, 0.28, 0);
+        controls.minDistance = 0.3;
+        controls.maxDistance = 8;
+
+        // Lighting
+        scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1a1712, 0.85));
+        const keyLight = new THREE.DirectionalLight(0xfff2d8, 1.6);
+        keyLight.position.set(2, 3, 2);
+        scene.add(keyLight);
+        const fillLight = new THREE.DirectionalLight(0x88aaff, 0.5);
+        fillLight.position.set(-2, 1, -1.5);
+        scene.add(fillLight);
+
+        // Ground grid for reference
+        const grid = new THREE.GridHelper(4, 16, 0x3a4356, 0x21262f);
+        grid.position.y = 0;
+        scene.add(grid);
+
+        // ---- Goblin materials (ported from dungeon.html) ----
+        const goblinMat = new THREE.MeshStandardMaterial({ color: 0x3a8a28, roughness: 0.72, metalness: 0.04 });
+        const goblinDarkMat = new THREE.MeshStandardMaterial({ color: 0x245c18, roughness: 0.8, metalness: 0.04 });
+        const goblinEyeMat = new THREE.MeshBasicMaterial({ color: 0x140808 });
+        const goblinEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffee55 });
+        // Solid-color stand-ins for the texture-mapped materials used in dungeon.html
+        const sackclothMat = new THREE.MeshStandardMaterial({ color: 0xb5a380, roughness: 0.92, metalness: 0 });
+        const boneMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.78, metalness: 0.04 });
+        const rustMat = new THREE.MeshStandardMaterial({ color: 0x8a5a3a, roughness: 0.72, metalness: 0.22 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.86, metalness: 0.04 });
+
+        // ---- Goblin geometries (ported from dungeon.html) ----
+        const goblinBodyGeo = new THREE.BoxGeometry(0.18, 0.2, 0.13);
+        const goblinBellyGeo = new THREE.SphereGeometry(0.09, 7, 5);
+        const goblinHeadGeo = new THREE.SphereGeometry(0.095, 8, 6);
+        const goblinEarGeo = new THREE.ConeGeometry(0.032, 0.13, 5);
+        const goblinNoseGeo = new THREE.ConeGeometry(0.028, 0.07, 5);
+        const goblinEyeGeo = new THREE.BoxGeometry(0.028, 0.022, 0.018);
+        const goblinPupilGeo = new THREE.BoxGeometry(0.012, 0.012, 0.012);
+        const goblinTuskGeo = new THREE.ConeGeometry(0.012, 0.04, 4);
+        const goblinArmGeo = new THREE.BoxGeometry(0.045, 0.18, 0.045);
+        const goblinHandGeo = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+        const goblinLegGeo = new THREE.BoxGeometry(0.055, 0.14, 0.055);
+        const goblinFootGeo = new THREE.BoxGeometry(0.06, 0.03, 0.09);
+        const goblinClothGeo = new THREE.BoxGeometry(0.16, 0.08, 0.04);
+        const goblinBladeGeo = new THREE.BoxGeometry(0.02, 0.16, 0.035);
+        const goblinBrowGeo = new THREE.BoxGeometry(0.12, 0.018, 0.03);
+
+        // ---- Goblin builder (ported from dungeon.html makeGoblin) ----
+        function makeGoblin() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(goblinBodyGeo, goblinMat);
+            body.position.set(0, 0.28, 0.01);
+            body.rotation.x = 0.18;
+            const belly = new THREE.Mesh(goblinBellyGeo, goblinDarkMat);
+            belly.position.set(0, 0.22, 0.05);
+            const cloth = new THREE.Mesh(goblinClothGeo, sackclothMat);
+            cloth.position.set(0, 0.18, 0.07);
+            const head = new THREE.Mesh(goblinHeadGeo, goblinMat);
+            head.position.set(0, 0.44, 0.05);
+            const brow = new THREE.Mesh(goblinBrowGeo, goblinDarkMat);
+            brow.position.set(0, 0.49, 0.12);
+            const nose = new THREE.Mesh(goblinNoseGeo, goblinDarkMat);
+            nose.position.set(0, 0.42, 0.14);
+            nose.rotation.x = Math.PI / 2;
+            const earL = new THREE.Mesh(goblinEarGeo, goblinMat);
+            earL.position.set(-0.09, 0.5, 0.02);
+            earL.rotation.z = 0.7;
+            const earR = new THREE.Mesh(goblinEarGeo, goblinMat);
+            earR.position.set(0.09, 0.5, 0.02);
+            earR.rotation.z = -0.7;
+            const eyeL = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
+            eyeL.position.set(-0.035, 0.455, 0.13);
+            const eyeR = new THREE.Mesh(goblinEyeGeo, goblinEyeGlowMat);
+            eyeR.position.set(0.035, 0.455, 0.13);
+            const pupilL = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilL.position.set(-0.035, 0.455, 0.14);
+            const pupilR = new THREE.Mesh(goblinPupilGeo, goblinEyeMat);
+            pupilR.position.set(0.035, 0.455, 0.14);
+            const tuskL = new THREE.Mesh(goblinTuskGeo, boneMat);
+            tuskL.position.set(-0.03, 0.38, 0.12);
+            tuskL.rotation.x = 2.4;
+            const tuskR = new THREE.Mesh(goblinTuskGeo, boneMat);
+            tuskR.position.set(0.03, 0.38, 0.12);
+            tuskR.rotation.x = 2.4;
+            const armL = new THREE.Mesh(goblinArmGeo, goblinMat);
+            armL.position.set(-0.13, 0.24, 0.02);
+            armL.rotation.z = 0.45;
+            const armR = new THREE.Mesh(goblinArmGeo, goblinMat);
+            armR.position.set(0.14, 0.26, 0.04);
+            armR.rotation.z = -0.85;
+            armR.rotation.x = -0.4;
+            const handL = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
+            handL.position.set(-0.16, 0.14, 0.02);
+            const handR = new THREE.Mesh(goblinHandGeo, goblinDarkMat);
+            handR.position.set(0.2, 0.16, 0.1);
+            const blade = new THREE.Mesh(goblinBladeGeo, rustMat);
+            blade.position.set(0.2, 0.24, 0.12);
+            blade.rotation.z = -0.3;
+            const hilt = new THREE.Mesh(goblinHandGeo, woodMat);
+            hilt.position.set(0.2, 0.16, 0.1);
+            hilt.scale.set(0.6, 1.2, 0.6);
+            const legL = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
+            legL.position.set(-0.05, 0.1, 0);
+            const legR = new THREE.Mesh(goblinLegGeo, goblinDarkMat);
+            legR.position.set(0.05, 0.1, 0.02);
+            const footL = new THREE.Mesh(goblinFootGeo, sackclothMat);
+            footL.position.set(-0.05, 0.02, 0.02);
+            const footR = new THREE.Mesh(goblinFootGeo, sackclothMat);
+            footR.position.set(0.05, 0.02, 0.04);
+            group.add(
+                body, belly, cloth, head, brow, nose, earL, earR,
+                eyeL, eyeR, pupilL, pupilR, tuskL, tuskR,
+                armL, armR, handL, handR, blade, hilt, legL, legR, footL, footR,
+            );
+            group.rotation.y = Math.PI;
+            return group;
+        }
+
+        const goblin = makeGoblin();
+        scene.add(goblin);
+
+        // Frame the model so orbit target sits at its visual center
+        const bounds = new THREE.Box3().setFromObject(goblin);
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        controls.target.copy(center);
+        const radius = Math.max(size.x, size.y, size.z) * 0.5 || 0.4;
+        camera.position.set(center.x + radius * 2.2, center.y + radius * 1.4, center.z + radius * 2.8);
+        controls.update();
+
+        function resize() {
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || window.innerHeight;
+            if (width < 1 || height < 1) return;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height, false);
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(resize).observe(container);
+        }
+
+        renderer.setAnimationLoop(() => {
+            controls.update();
+            renderer.render(scene, camera);
+        });
+    </script>
+</body>
+</html>

@@ -1832,8 +1832,8 @@
         }
 
         function outdoorOpeningHeight(room) {
-            const span = Math.max(room?.w || 5, room?.h || 5);
-            return Math.max(2.45, Math.min(3.7, 0.55 + 0.42 * span));
+            const span = Math.min(room?.w || 5, room?.h || 5);
+            return Math.max(2.35, Math.min(3.55, 0.52 + 0.4 * span));
         }
 
         function pickCeilHeight(x, z, rooms) {

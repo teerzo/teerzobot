@@ -452,7 +452,7 @@ function assignRoomKinds(rooms) {
     // Turn several of the largest rooms into open-air outdoor rooms so the
     // dungeon has multiple courtyards/gardens rather than just a single one.
     const outdoorCandidates = rooms
-        .filter((room) => room.w * room.h >= 18)
+        .filter((room) => room.w * room.h >= 18 && Math.min(room.w, room.h) >= 4)
         .sort((a, b) => (b.w * b.h) - (a.w * a.h));
     const outdoorTarget = Math.min(
         outdoorCandidates.length,
